@@ -1,0 +1,58 @@
+import Products from "./Products";
+import { useEffect, useState } from "react";
+import { MAGIC_ARTE } from "../utils/constants";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
+import Footer from "../components/Footer";
+
+export default function Home() {
+  const order = { column: "order" };
+  const { data: categories = [] } = useSupabaseQuery("categories", { order });
+
+  const modifiedCategories =
+    categories.length > 0 && categories[0].name !== "Todos"
+      ? [{ id: 0, name: "Todos" }, ...categories]
+      : categories;
+
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  useEffect(() => {
+    if (!selectedCategory && modifiedCategories.length > 0) {
+      setSelectedCategory(modifiedCategories[0]);
+    }
+  }, [modifiedCategories, selectedCategory]);
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-6 text-white text-center shadow-lg">
+        <h1 className="text-4xl font-bold">{MAGIC_ARTE}</h1>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <section className="mb-8 text-center">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+            Explora por Categoría
+          </h2>
+          <div className="flex flex-wrap justify-center gap-3">
+            {modifiedCategories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  selectedCategory?.id === category.id
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "bg-gray-200 text-gray-700 hover:bg-indigo-100"
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <Products selectedCategory={selectedCategory} />
+      </main>
+
+      <Footer></Footer>
+    </div>
+  );
+}
