@@ -3,9 +3,17 @@ import { MAGIC_ARTE } from "../utils/constants";
 import instagramIcon from "../assets/icons/instagram.svg";
 import facebookIcon from "../assets/icons/facebook.svg";
 import cartIcon from "../assets/icons/shopping-cart.svg";
+import { generateWhatsAppLinkForProducts } from "../utils/generateWhatsappLink";
 
+const phoneNumber = "50557503212";
 export default function Header() {
   const { cart } = useApp();
+
+  function handleSendWhatsApp() {
+    const url = generateWhatsAppLinkForProducts(cart, phoneNumber);
+    window.open(url, "_blank");
+  }
+
   return (
     <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-4 shadow-lg">
       <div className="container mx-auto flex items-center justify-between">
@@ -35,6 +43,7 @@ export default function Header() {
               href="#"
               aria-label="Cart"
               className="hover:opacity-75 transition-opacity"
+              onClick={handleSendWhatsApp}
             >
               <img src={cartIcon} alt="Cart" className="w-6 h-6" />
             </a>

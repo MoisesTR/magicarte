@@ -16,7 +16,6 @@ const fetchData = async ({ table, options }) => {
   }
 
   const { data, error } = await query;
-  console.log(data);
   if (error) throw error;
   return data;
 };
