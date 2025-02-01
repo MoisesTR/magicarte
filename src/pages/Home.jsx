@@ -1,8 +1,8 @@
 import Products from "./Products";
 import { useEffect, useState } from "react";
-import { MAGIC_ARTE } from "../utils/constants";
 import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import Footer from "../components/Footer";
+import Header from "../components/Header";
 
 export default function Home() {
   const order = { column: "order" };
@@ -23,10 +23,7 @@ export default function Home() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-6 text-white text-center shadow-lg">
-        <h1 className="text-4xl font-bold">{MAGIC_ARTE}</h1>
-      </header>
-
+      <Header></Header>
       <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <section className="mb-8 text-center">
           <h2 className="text-2xl font-semibold text-gray-800 mb-4">

@@ -1,10 +1,34 @@
 import { MAGIC_ARTE } from "../utils/constants";
+import instagramIcon from "../assets/icons/instagram.svg";
+import facebookIcon from "../assets/icons/facebook.svg";
 
 export default function Header() {
-    return (
-      <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-4 text-white text-center shadow-lg">
-        <h1 className="text-3xl font-bold">{MAGIC_ARTE}</h1>
-      </header>
-    );
-  }
-  
+  return (
+    <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-4 shadow-lg">
+      <div className="container mx-auto flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">{MAGIC_ARTE}</h1>
+
+        <div className="flex space-x-4">
+          <a
+            href="https://www.instagram.com/magicarte.ni/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="hover:opacity-75 transition-opacity"
+          >
+            <img src={instagramIcon} alt="Instagram" className="w-6 h-6" />
+          </a>
+          <a
+            href="https://www.facebook.com/profile.php?id=61556667861230"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Facebook"
+            className="hover:opacity-75 transition-opacity"
+          >
+            <img src={facebookIcon} alt="Facebook" className="w-6 h-6" />
+          </a>
+        </div>
+      </div>
+    </header>
+  );
+}
