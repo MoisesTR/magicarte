@@ -1,4 +1,7 @@
+import { useApp } from "../context/AppContext";
+
 export default function ProductCard({ product }) {
+  const { addItem } = useApp();
   const truncatedDescription = product.description
     ? product.description.length > 60
       ? product.description.slice(0, 60) + "..."
@@ -26,7 +29,7 @@ export default function ProductCard({ product }) {
 
       <div className="p-6 text-center relative">
         <button
-          onClick={() => alert("Producto agregado al carrito")}
+          onClick={() => addItem(product)}
           className="absolute top-0 right-4 -translate-y-1/2 flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 shadow-sm text-gray-600 transition-all duration-300 hover:bg-indigo-600 hover:text-white hover:scale-110"
         >
           <svg

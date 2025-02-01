@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
+import AppProvider from "../context/AppContext";
 
 export default function Home() {
   const order = { column: "order" };
@@ -22,34 +23,36 @@ export default function Home() {
   }, [modifiedCategories, selectedCategory]);
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <Header></Header>
-      <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <section className="mb-8 text-center">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-            Explora por Categoría
-          </h2>
-          <div className="flex flex-wrap justify-center gap-3">
-            {modifiedCategories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                  selectedCategory?.id === category.id
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "bg-gray-200 text-gray-700 hover:bg-indigo-100"
-                }`}
-              >
-                {category.name}
-              </button>
-            ))}
-          </div>
-        </section>
+    <AppProvider>
+      <div className="bg-gray-50 min-h-screen">
+        <Header />
+        <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+          <section className="mb-8 text-center">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+              Explora por Categoría
+            </h2>
+            <div className="flex flex-wrap justify-center gap-3">
+              {modifiedCategories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    selectedCategory?.id === category.id
+                      ? "bg-indigo-600 text-white shadow-md"
+                      : "bg-gray-200 text-gray-700 hover:bg-indigo-100"
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          </section>
 
-        <Products selectedCategory={selectedCategory} />
-      </main>
+          <Products selectedCategory={selectedCategory} />
+        </main>
 
-      <Footer></Footer>
-    </div>
+        <Footer></Footer>
+      </div>
+    </AppProvider>
   );
 }
