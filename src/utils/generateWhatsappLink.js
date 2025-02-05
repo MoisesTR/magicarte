@@ -1,5 +1,5 @@
-export function generateWhatsAppLinkForProducts(products, phoneNumber) {
-  const header = "Me interesan estos productos:";
+export function generateWhatsAppLinkForProducts(products, phoneNumber = "50557503212") {
+  const header = "Me interesan estos productos:\n";
   const productMessages = products.map((product) => {
     return `\nNombre: ${product.name}\nPrecio: C$${product.price}\nDescripcion: ${product.description}`;
   });

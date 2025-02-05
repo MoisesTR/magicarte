@@ -1,18 +1,18 @@
 import { useApp } from "../context/AppContext";
 import { MAGIC_ARTE } from "../utils/constants";
-import instagramIcon from "../assets/icons/instagram.svg";
-import facebookIcon from "../assets/icons/facebook.svg";
-import cartIcon from "../assets/icons/shopping-cart.svg";
-import { generateWhatsAppLinkForProducts } from "../utils/generateWhatsappLink";
+import instagramIcon from "../assets/instagram.svg";
+import CartModal from "./CartModal";
+import cartIcon from "../assets/cart.svg";
+import facebookIcon from "../assets/facebook.svg";
+import { useState } from "react";
 
-const phoneNumber = "50557503212";
 export default function Header() {
   const { cart } = useApp();
+  const [showCartModal, setShowCartModal] = useState(false);
 
-  function handleSendWhatsApp() {
-    const url = generateWhatsAppLinkForProducts(cart, phoneNumber);
-    window.open(url, "_blank");
-  }
+  const handleCartClick = () => {
+    setShowCartModal(true);
+  };
 
   return (
     <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-4 shadow-lg">
@@ -43,7 +43,7 @@ export default function Header() {
               href="#"
               aria-label="Cart"
               className="hover:opacity-75 transition-opacity"
-              onClick={handleSendWhatsApp}
+              onClick={handleCartClick}
             >
               <img src={cartIcon} alt="Cart" className="w-6 h-6" />
             </a>
@@ -54,6 +54,11 @@ export default function Header() {
             )}
           </div>
         </div>
+
+        <CartModal
+          isOpen={showCartModal}
+          onClose={() => setShowCartModal(false)}
+        />
       </div>
     </header>
   );

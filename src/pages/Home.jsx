@@ -28,9 +28,9 @@ export default function Home() {
         <Header />
         <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <section className="mb-8 text-center">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+            {/* <h2 className="text-2xl font-semibold text-gray-800 mb-4">
               Explora por Categoría
-            </h2>
+            </h2> */}
             <div className="flex flex-wrap justify-center gap-3">
               {modifiedCategories.map((category) => (
                 <button
