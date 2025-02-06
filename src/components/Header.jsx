@@ -15,7 +15,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 p-4 shadow-lg">
+    <header className="bg-primary text-white p-4 shadow-lg text-xl font-bold">
       <div className="container mx-auto flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white">{MAGIC_ARTE}</h1>
 
@@ -48,7 +48,7 @@ export default function Header() {
               <img src={cartIcon} alt="Cart" className="w-6 h-6" />
             </a>
             {cart.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 bg-[#E63946] text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white shadow-md">
                 {cart.length}
               </span>
             )}

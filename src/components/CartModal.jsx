@@ -56,7 +56,7 @@ export default function CartModal({ isOpen, onClose, phoneNumber }) {
                     />
                   </svg>
                 </button>
-                <h2 className="text-2xl font-bold mb-4">¡Tu Carrito!</h2>
+                <h2 className="text-2xl text-black font-bold mb-4">¡Tu Carrito!</h2>
               </div>
 
               {products && products.length > 0 ? (

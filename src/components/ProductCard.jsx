@@ -2,6 +2,7 @@ import React from "react";
 import { useApp } from "../context/AppContext";
 import { getImageUrl } from "../utils/getImageUrl";
 import LazyImage from "./LazyImage";
+import cartIcon from "../assets/cart.svg";
 
 export default function ProductCard({ product }) {
   const { addItem } = useApp();
@@ -29,16 +30,16 @@ export default function ProductCard({ product }) {
         </p>
         <button
           onClick={() => addItem(product)}
-          className="absolute top-0 right-4 -translate-y-1/2 flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 shadow-sm text-gray-600 transition-all duration-300 hover:bg-indigo-600 hover:text-white hover:scale-110"
+          className="absolute top-0 right-4 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full 
+  bg-white shadow-lg border-2 border-[#E63946] text-[#E63946] 
+  transition-all duration-300 hover:scale-110 hover:shadow-md"
+          aria-label="Agregar al carrito"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M2 2h2l3.6 7.59-1.35 2.44A2 2 0 008 14h12v-2H8.42a.25.25 0 01-.22-.13l.03-.06L10.1 10h9.45a1 1 0 00.95-.69L22 4H5.21l-.94-2H2zm5 16a2 2 0 112 2 2 2 0 01-2-2zm10 0a2 2 0 112 2 2 2 0 01-2-2z" />
-          </svg>
+          <img
+            src={cartIcon}
+            alt="Carrito"
+            className="w-6 h-6 transition-all duration-300"
+          />
         </button>
       </div>
     </article>
