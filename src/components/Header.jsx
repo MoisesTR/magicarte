@@ -13,7 +13,6 @@ export default function Header({ onCartClick }) {
   useEffect(() => {
     if (!itemAdded) return
 
-    console.log('Item added to cart')
     setCartEffect(true)
 
     const timer = setTimeout(() => {
