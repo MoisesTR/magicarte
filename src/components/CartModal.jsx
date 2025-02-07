@@ -5,6 +5,7 @@ import { generateWhatsAppLinkForProducts } from "../utils/generateWhatsappLink";
 import { useApp } from "../context/AppContext";
 import trashIcon from "../assets/trash.svg";
 import emptyBox from "../assets/empty-box.png";
+import whatsappIcon from "../assets/whatsapp.svg";
 
 export default function CartModal({ isOpen, onClose }) {
   const { cart: products, removeItem } = useApp();
@@ -121,13 +122,13 @@ export default function CartModal({ isOpen, onClose }) {
               )}
             </div>
 
-
             <div className="flex-shrink-0 mt-4 space-y-3 pb-[env(safe-area-inset-bottom)]">
               {products.length > 0 && (
                 <button
                   onClick={handleWhatsAppClick}
                   className="w-full flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded shadow transition duration-200 focus:outline-none"
                 >
+                  <img src={whatsappIcon} alt="WhatsApp" className="w-6 h-6" />
                   <span>Enviar por WhatsApp</span>
                 </button>
               )}
