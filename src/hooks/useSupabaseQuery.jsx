@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../config/supabaseClient";
+import { COLUMNS } from "../utils/constants";
 
 const fetchData = async ({ table, options }) => {
-  let query = supabase.from(table).select("*");
+  const columns = COLUMNS[table] || "*";
+  let query = supabase.from(table).select(columns);
 
   if (options?.filters) {
     options.filters.forEach(({ column, value, operator = "eq" }) => {

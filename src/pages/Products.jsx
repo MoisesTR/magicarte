@@ -1,8 +1,9 @@
 import ProductCard from "../components/ProductCard";
 import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
+import { TABLE } from "../utils/constants";
 
 export default function Products({ selectedCategory }) {
-  const { data: products = [] } = useSupabaseQuery("products");
+  const { data: products = [] } = useSupabaseQuery(TABLE.PRODUCT);
   const productFilter = (product) =>
     !selectedCategory ||
     selectedCategory.name === "Todos" ||

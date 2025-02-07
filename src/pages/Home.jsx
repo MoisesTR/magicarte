@@ -4,10 +4,11 @@ import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import AppProvider from "../context/AppContext";
+import { TABLE } from "../utils/constants";
 
 export default function Home() {
   const order = { column: "order" };
-  const { data: categories = [] } = useSupabaseQuery("categories", { order });
+  const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, { order });
 
   const modifiedCategories =
     categories.length > 0 && categories[0].name !== "Todos"
