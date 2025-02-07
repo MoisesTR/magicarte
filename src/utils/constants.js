@@ -5,6 +5,6 @@ export const TABLE = {
     CATEGORIES: 'categories'
 };
 export const COLUMNS = {
-    [TABLE.PRODUCT]: "id, name, price, description, image_url, category_id",
+    [TABLE.PRODUCT]: "id, name, price, description, image_url, category_id, stock_quantity",
     [TABLE.CATEGORIES]: "id, name, order"
 };

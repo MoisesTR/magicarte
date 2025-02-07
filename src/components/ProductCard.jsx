@@ -2,6 +2,7 @@ import React from 'react'
 import { useApp } from '../context/AppContext'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
+import { motion } from 'framer-motion'
 
 export default function ProductCard({ product }) {
   const { addItem, removeItem, hasItem } = useApp()
@@ -15,6 +16,19 @@ export default function ProductCard({ product }) {
     }
   }
 
+  const getStockLabel = () => {
+    if (product.stock_quantity === 0) {
+      return { text: 'Agotado', color: 'bg-red-700 border border-red-500 text-white shadow-md', icon: '❌' }
+    } else if (product.stock_quantity <= 2) {
+      return { text: `¡Solo ${product.stock_quantity} disponibles!`, color: 'bg-red-500', icon: '⚠️' }
+    } else if (product.stock_quantity <= 5) {
+      return { text: '¡Stock limitado!', color: 'bg-orange-400', icon: '⏳' }
+    }
+    return null
+  }
+
+  const stockLabel = getStockLabel()
+
   return (
     <article className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl'>
       <div className='relative'>
@@ -25,19 +39,41 @@ export default function ProductCard({ product }) {
         />
       </div>
 
-      <div className='relative flex h-64 flex-col p-6 text-center'>
-        <h3 className='mt-2 text-lg leading-tight font-semibold text-gray-900'>
-          {product.name}
-        </h3>
-        <p className='mt-2 h-16 overflow-hidden text-sm text-gray-600'>
-          {product.description}
-        </p>
-        <p className='text-danger mt-2 text-xl font-bold'>C$ {product.price}</p>
+      <div className='relative flex h-64 flex-col p-6 text-center justify-between'>
+        <div>
+          <h3 className='text-lg leading-tight font-semibold text-gray-900'>
+            {product.name}
+          </h3>
+          <p className='mt-2 h-16 overflow-hidden text-sm text-gray-600'>
+            {product.description}
+          </p>
+        </div>
+
+        <div className="mt-auto flex flex-col items-center">
+          <p className='text-danger text-xl font-bold'>C$ {product.price}</p>
+
+          <div className="min-h-12 flex items-center">
+            {stockLabel && (
+              <motion.div
+                className={`mt-2 inline-block px-3 py-1 text-sm font-bold text-white rounded-full ${stockLabel.color}`}
+                initial={{ scale: 1 }}
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+              >
+                {stockLabel.icon} {stockLabel.text}
+              </motion.div>
+            )}
+          </div>
+        </div>
+
         <button
           onClick={() => onCartClick(product.id)}
+          disabled={product.stock_quantity === 0}
           className={`absolute top-0 right-4 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-lg transition-all duration-75 ${
-            hasItem(product.id)
-              ? 'border-[#E63946] bg-[#E63946] text-white' // 🔥 Estado de agregado
+            product.stock_quantity === 0
+              ? 'border-gray-400 bg-gray-400 text-white cursor-not-allowed'
+              : hasItem(product.id)
+              ? 'border-[#E63946] bg-[#E63946] text-white'
               : 'border-[#E63946] bg-white text-[#E63946] hover:scale-110'
           } active:scale-95`}
           aria-label='Agregar al carrito'
