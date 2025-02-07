@@ -1,43 +1,57 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 
+/* Define color variables */
 :root {
   --color-primary: #ffb6c1; /* Main Pink */
   --color-secondary: #51c879; /* Green */
   --color-accent: #50bfe6; /* Blue */
-  --color-danger: #e53e3e; /* Red for cart counter */
+  --color-danger: #e53e3e; /* Red for cart counter and price */
   --color-background: #f8f9fa; /* Light background */
 }
 
-/* Define Tailwind utilities using CSS variables */
+/* Background colors */
 .bg-primary {
   background-color: var(--color-primary);
-}
-.text-primary {
-  color: var(--color-primary);
 }
 .bg-secondary {
   background-color: var(--color-secondary);
 }
-.text-secondary {
-  color: var(--color-secondary);
+.bg-accent {
+  background-color: var(--color-accent);
 }
 .bg-danger {
   background-color: var(--color-danger);
 }
 
-/* Import Fredoka from Google Fonts */
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap");
+/* Text colors */
+.text-primary {
+  color: var(--color-primary);
+}
+.text-secondary {
+  color: var(--color-secondary);
+}
+.text-accent {
+  color: var(--color-accent);
+}
+.text-danger {
+  color: var(--color-danger);
+}
 
 /* Define the font globally */
 :root {
   --font-primary: "Fredoka", sans-serif;
-  --font-size-sm: 14px; /* Small text */
-  --font-size-base: 16px; /* Default */
-  --font-size-lg: 20px; /* Large text */
-  --font-size-xl: 24px; /* Extra Large */
+  --font-size-sm: 12px; /* Pequeño, para detalles secundarios */
+  --font-size-base: 14px; /* Tamaño base para descripciones y texto normal */
+  --font-size-lg: 18px; /* Para títulos o elementos destacados */
+  --font-size-xl: 22px; /* Para títulos principales */
+}
+/* Apply font globally */
+body {
+  font-family: var(--font-primary);
 }
 
-/* Utility classes */
+/* Font size utilities */
 .text-sm {
   font-size: var(--font-size-sm);
 }
