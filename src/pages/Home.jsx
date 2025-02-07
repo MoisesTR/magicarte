@@ -9,9 +9,7 @@ import { TABLE } from "../utils/constants";
 
 export default function Home() {
   const order = { column: "order" };
-  const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
-    order,
-  });
+  const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, { order });
 
   const modifiedCategories =
     categories.length > 0 && categories[0].name !== "Todos"
@@ -30,8 +28,9 @@ export default function Home() {
   return (
     <AppProvider>
       <div className="bg-gray-50 min-h-screen">
-        <Header onCartClick={() => setShowCartModal(true)} />{" "}
-        <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <Header onCartClick={() => setShowCartModal(true)} />
+
+        <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8 pt-20">
           <section className="mb-8 text-center">
             <div className="flex flex-wrap justify-center gap-3">
               {modifiedCategories.map((category) => (
@@ -54,7 +53,9 @@ export default function Home() {
 
           <Products selectedCategory={selectedCategory} />
         </main>
+
         <Footer />
+
         <CartModal
           isOpen={showCartModal}
           onClose={() => setShowCartModal(false)}
