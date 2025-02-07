@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
 import { motion } from 'framer-motion'
+import { trackAddToCart } from '../utils/analytics'
 
 export default function ProductCard({ product }) {
   const { addItem, removeItem, hasItem } = useApp()
@@ -13,6 +14,7 @@ export default function ProductCard({ product }) {
       removeItem(productId)
     } else {
       addItem(product)
+      trackAddToCart(product)
     }
   }
 
