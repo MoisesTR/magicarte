@@ -25,7 +25,7 @@ export default function ProductCard({ product }) {
         <p className="mt-2 text-sm text-gray-600 h-16 overflow-hidden">
           {product.description}
         </p>
-        <p className="mt-2 text-xl font-bold text-indigo-600">
+        <p className="mt-2 text-xl font-bold text-danger">
           C$ {product.price}
         </p>
         <button
