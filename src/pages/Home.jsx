@@ -9,7 +9,9 @@ import { TABLE } from "../utils/constants";
 
 export default function Home() {
   const order = { column: "order" };
-  const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, { order });
+  const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
+    order,
+  });
 
   const modifiedCategories =
     categories.length > 0 && categories[0].name !== "Todos"
@@ -27,10 +29,10 @@ export default function Home() {
 
   return (
     <AppProvider>
-      <div className="bg-gray-50 min-h-screen">
+      <div className="bg-gray-50 min-h-screen flex flex-col">
         <Header onCartClick={() => setShowCartModal(true)} />
 
-        <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8 pt-20">
+        <main className="mx-auto max-w-7xl px-6 py-16 lg:px-8 pt-20 flex-grow">
           <section className="mb-8 text-center">
             <div className="flex flex-wrap justify-center gap-3">
               {modifiedCategories.map((category) => (
@@ -38,12 +40,12 @@ export default function Home() {
                   key={category.id}
                   onClick={() => setSelectedCategory(category)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-in-out cursor-pointer
-                    ${
-                      selectedCategory?.id === category.id
-                        ? "bg-primary text-white shadow-xl scale-110"
-                        : "bg-gray-200 text-gray-700 hover:bg-[#FFC8D0] hover:text-white hover:shadow"
-                    }
-                  `}
+                ${
+                  selectedCategory?.id === category.id
+                    ? "bg-primary text-white shadow-xl scale-110"
+                    : "bg-gray-200 text-gray-700 hover:bg-[#FFC8D0] hover:text-white hover:shadow"
+                }
+              `}
                 >
                   {category.name}
                 </button>
