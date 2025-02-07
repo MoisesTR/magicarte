@@ -41,6 +41,8 @@ export default function AppProvider({ children }) {
         setCart((prevCart) => prevCart.filter((cartItem) => cartItem.id !== itemId));
     };
 
+    const hasItem = (itemId) => cart.some((cartItem) => cartItem.id === itemId);
+
     const updateItemQuantity = (itemId, quantity) => {
         setCart((prevCart) =>
             prevCart.map((cartItem) =>
@@ -59,6 +61,7 @@ export default function AppProvider({ children }) {
         removeItem,
         updateItemQuantity,
         clearCart,
+        hasItem,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
