@@ -5,6 +5,7 @@ const CART_STORAGE_KEY = "cartItems";
 const AppContext = createContext();
 
 export default function AppProvider({ children }) {
+    const [itemAdded, setItemAdded] = useState(false);
     const [cart, setCart] = useState(() => {
         try {
             const storedCart = localStorage.getItem(CART_STORAGE_KEY);
@@ -35,6 +36,7 @@ export default function AppProvider({ children }) {
             }
             return [...prevCart, { ...item, quantity: 1 }];
         });
+        setItemAdded(true);
     };
 
     const removeItem = (itemId) => {
@@ -62,6 +64,8 @@ export default function AppProvider({ children }) {
         updateItemQuantity,
         clearCart,
         hasItem,
+        itemAdded,
+        setItemAdded,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
