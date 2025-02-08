@@ -6,16 +6,22 @@ import { motion } from 'framer-motion'
 import { trackAddToCart } from '../utils/analytics'
 
 export default function ProductCard({ product }) {
-  const { addItem, removeItem, hasItem } = useApp()
+  const { addItem, removeItem, hasItem, setShowCartModal } = useApp()
   const [selectedImage, setSelectedImage] = useState(product.image_url)
+  const [showOptions, setShowOptions] = useState(false)
 
-  const onCartClick = (productId) => {
-    if (hasItem(productId)) {
-      removeItem(productId)
+  const onCartClick = () => {
+    if (hasItem(product.id)) {
+      setShowOptions(true)
     } else {
       addItem(product)
       trackAddToCart(product)
     }
+  }
+
+  const onShowCartModal = () => {
+    setShowCartModal(true)
+    setShowOptions(false)
   }
 
   const getStockLabel = () => {
@@ -41,7 +47,6 @@ export default function ProductCard({ product }) {
 
   return (
     <article className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl'>
-      {/* Main Image */}
       <div className='relative'>
         <LazyImage
           src={getImageUrl(selectedImage)}
@@ -51,12 +56,14 @@ export default function ProductCard({ product }) {
       </div>
 
       {product.secondary_images?.length > 0 && (
-        <div className="flex justify-center gap-2 mt-2">
+        <div className='mt-2 flex justify-center gap-2'>
           <img
             src={getImageUrl(product.image_url)}
-            alt="Main"
-            className={`w-12 h-12 object-cover rounded-md cursor-pointer border-2 transition-all duration-200 ${
-              selectedImage === product.image_url ? "border-primary scale-105" : "border-transparent hover:opacity-75"
+            alt='Main'
+            className={`h-12 w-12 cursor-pointer rounded-md border-2 object-cover transition-all duration-200 ${
+              selectedImage === product.image_url
+                ? 'border-primary scale-105'
+                : 'border-transparent hover:opacity-75'
             }`}
             onClick={() => setSelectedImage(product.image_url)}
           />
@@ -65,8 +72,10 @@ export default function ProductCard({ product }) {
               key={index}
               src={getImageUrl(image)}
               alt={`Thumbnail ${index + 1}`}
-              className={`w-12 h-12 object-cover rounded-md cursor-pointer border-2 transition-all duration-200 ${
-                selectedImage === image ? "border-primary scale-105" : "border-transparent hover:opacity-75"
+              className={`h-12 w-12 cursor-pointer rounded-md border-2 object-cover transition-all duration-200 ${
+                selectedImage === image
+                  ? 'border-primary scale-105'
+                  : 'border-transparent hover:opacity-75'
               }`}
               onClick={() => setSelectedImage(image)}
             />
@@ -74,7 +83,7 @@ export default function ProductCard({ product }) {
         </div>
       )}
 
-      <div className='relative flex h-64 flex-col justify-between p-6 text-center'>
+      <div className='relative flex min-h-[220px] flex-col justify-between p-6 text-center'>
         <div>
           <h3 className='text-lg leading-tight font-semibold text-gray-900'>
             {product.name}
@@ -87,46 +96,58 @@ export default function ProductCard({ product }) {
         <div className='mt-auto flex flex-col items-center'>
           <p className='text-danger text-xl font-bold'>C$ {product.price}</p>
 
-          <div className='flex min-h-12 items-center'>
-            {stockLabel && (
-              <motion.div
-                className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold text-white ${stockLabel.color}`}
-                initial={{ scale: 1 }}
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1.5,
-                  ease: 'easeInOut',
-                }}
-              >
-                {stockLabel.icon} {stockLabel.text}
-              </motion.div>
-            )}
-          </div>
+          {stockLabel && (
+            <motion.div
+              className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold text-white ${stockLabel.color}`}
+              initial={{ scale: 1 }}
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{
+                repeat: Infinity,
+                duration: 1.5,
+                ease: 'easeInOut',
+              }}
+            >
+              {stockLabel.icon} {stockLabel.text}
+            </motion.div>
+          )}
         </div>
 
-        <button
-          onClick={() => onCartClick(product.id)}
-          disabled={product.stock_quantity === 0}
-          className={`absolute top-0 right-4 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-lg transition-all duration-75 ${
-            product.stock_quantity === 0
-              ? 'cursor-not-allowed border-gray-400 bg-gray-400 text-white'
-              : hasItem(product.id)
-                ? 'border-[#E63946] bg-[#E63946] text-white'
-                : 'border-[#E63946] bg-white text-[#E63946] hover:scale-110'
-          } active:scale-95`}
-          aria-label='Agregar al carrito'
-        >
-          <svg
-            xmlns='http://www.w3.org/2000/svg'
-            viewBox='0 0 24 24'
-            className='h-6 w-6 transition-all duration-0'
-            fill='currentColor'
+        <div className='mt-4'>
+          <button
+            onClick={onCartClick}
+            disabled={product.stock_quantity === 0}
+            className={`w-full rounded-lg px-4 py-2 font-semibold transition-all duration-200 ${
+              product.stock_quantity === 0
+                ? 'cursor-not-allowed bg-gray-400 text-white'
+                : hasItem(product.id)
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-[#E63946] text-white hover:bg-[#D32F2F]'
+            }`}
+            aria-label='Agregar al carrito'
           >
-            <path fill='none' d='M0 0h24v24H0V0z'></path>
-            <path d='M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 3c0 .55.45 1 1 1h1l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h11c.55 0 1-.45 1-1s-.45-1-1-1H7l1.1-2h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.37-.66-.11-1.48-.87-1.48H5.21l-.67-1.43c-.16-.35-.52-.57-.9-.57H2c-.55 0-1 .45-1 1zm16 15c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z'></path>
-          </svg>
-        </button>
+            {hasItem(product.id) ? 'En el carrito' : 'Agregar al carrito'}
+          </button>
+
+          {showOptions && hasItem(product.id) && (
+            <div className='mt-2 flex gap-2'>
+              <button
+                onClick={onShowCartModal}
+                className='w-1/2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-600'
+              >
+                Ir al carrito
+              </button>
+              <button
+                onClick={() => {
+                  removeItem(product.id)
+                  setShowOptions(false)
+                }}
+                className='w-1/2 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-red-600'
+              >
+                Remover
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </article>
   )

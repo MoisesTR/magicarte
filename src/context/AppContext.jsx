@@ -6,6 +6,7 @@ const AppContext = createContext()
 
 export default function AppProvider({ children }) {
   const [itemAdded, setItemAdded] = useState(false)
+  const [showCartModal, setShowCartModal] = useState(false)
   const [cart, setCart] = useState(() => {
     try {
       const storedCart = localStorage.getItem(CART_STORAGE_KEY)
@@ -66,6 +67,8 @@ export default function AppProvider({ children }) {
     hasItem,
     itemAdded,
     setItemAdded,
+    showCartModal,
+    setShowCartModal,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

@@ -7,8 +7,8 @@ import trashIcon from '../assets/trash.svg'
 import emptyBox from '../assets/empty-box.png'
 import whatsappIcon from '../assets/whatsapp.svg'
 
-export default function CartModal({ isOpen, onClose }) {
-  const { cart: products, removeItem } = useApp()
+export default function CartModal({ isOpen }) {
+  const { cart: products, removeItem, setShowCartModal } = useApp()
 
   const handleWhatsAppClick = () => {
     const url = generateWhatsAppLinkForProducts(products)
@@ -23,6 +23,10 @@ export default function CartModal({ isOpen, onClose }) {
     }
     return () => document.body.classList.remove('overflow-hidden')
   }, [isOpen])
+
+  const onClose = () => {
+    setShowCartModal(false)
+  }
 
   return (
     <Transition show={isOpen} appear>
@@ -91,7 +95,6 @@ export default function CartModal({ isOpen, onClose }) {
                       </p>
                     </div>
 
-                    {/* 🔹 Botón para eliminar producto */}
                     <div className='group relative'>
                       <button
                         onClick={() => removeItem(product.id)}
