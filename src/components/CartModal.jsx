@@ -87,10 +87,10 @@ export default function CartModal({ isOpen }) {
                     />
 
                     <div className='flex flex-1 flex-col justify-center'>
-                      <h3 className='text-base font-medium text-black'>
+                      <h3 className='text-[18px] font-medium text-black'>
                         {product.name}
                       </h3>
-                      <p className='text-danger text-base font-semibold'>
+                      <p className='text-[18px] text-danger font-semibold'>
                         C$ {product.price}
                       </p>
                     </div>

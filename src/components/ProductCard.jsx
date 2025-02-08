@@ -40,7 +40,7 @@ export default function ProductCard({ product }) {
         icon: '⚠️',
       }
     } else if (product.stock_quantity <= 5) {
-      return { text: '¡Stock limitado!', color: 'bg-orange-400', icon: '⏳' }
+      return { text: '¡Quedan pocas unidades!', color: 'bg-orange-400', icon: '⏳' }
     }
     return null
   }
@@ -90,7 +90,7 @@ export default function ProductCard({ product }) {
           <h3 className='text-lg leading-tight font-semibold text-gray-900'>
             {product.name}
           </h3>
-          <p className='mt-2 h-16 overflow-hidden text-sm text-gray-600'>
+          <p className='mt-2 h-16 overflow-hidden text-[14px] text-gray-600'>
             {product.description}
           </p>
         </div>
