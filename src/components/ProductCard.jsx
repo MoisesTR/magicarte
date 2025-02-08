@@ -25,6 +25,8 @@ export default function ProductCard({ product }) {
   }
 
   const getStockLabel = () => {
+    const quantityLabel =
+      product.stock_quantity > 1 ? 'unidades disponibles' : 'unidad disponible'
     if (product.stock_quantity === 0) {
       return {
         text: 'Agotado',
@@ -33,7 +35,7 @@ export default function ProductCard({ product }) {
       }
     } else if (product.stock_quantity <= 2) {
       return {
-        text: `¡Solo ${product.stock_quantity} disponibles!`,
+        text: `¡Solo ${product.stock_quantity} ${quantityLabel}!`,
         color: 'bg-red-500',
         icon: '⚠️',
       }
