@@ -39,7 +39,9 @@ export default function Products({ selectedCategory }) {
             <p className='mt-4 text-lg font-semibold text-gray-700'>
               No hay productos disponibles
             </p>
-            <p className='mt-1 text-gray-500'>Revisa más tarde.</p>
+            <p className='mt-1 text-gray-500'>
+              Estamos preparando algo especial. ¡Vuelve pronto para descubrirlo!
+            </p>
           </div>
         )}
 
