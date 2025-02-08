@@ -29,7 +29,7 @@ export default function ProductCard({ product }) {
       return {
         text: 'Agotado',
         color: 'bg-red-700 border border-red-500 text-white shadow-md',
-        icon: '❌',
+        icon: '',
       }
     } else if (product.stock_quantity <= 2) {
       return {
