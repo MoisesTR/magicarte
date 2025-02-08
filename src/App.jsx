@@ -5,7 +5,9 @@ import Products from './pages/Products'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID)
+if (import.meta.env.VITE_GA_ENABLED === "true") {
+  ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID);
+}
 
 export default function App() {
   const queryClient = new QueryClient()
