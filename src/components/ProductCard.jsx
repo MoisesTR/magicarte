@@ -20,9 +20,17 @@ export default function ProductCard({ product }) {
 
   const getStockLabel = () => {
     if (product.stock_quantity === 0) {
-      return { text: 'Agotado', color: 'bg-red-700 border border-red-500 text-white shadow-md', icon: '❌' }
+      return {
+        text: 'Agotado',
+        color: 'bg-red-700 border border-red-500 text-white shadow-md',
+        icon: '❌',
+      }
     } else if (product.stock_quantity <= 2) {
-      return { text: `¡Solo ${product.stock_quantity} disponibles!`, color: 'bg-red-500', icon: '⚠️' }
+      return {
+        text: `¡Solo ${product.stock_quantity} disponibles!`,
+        color: 'bg-red-500',
+        icon: '⚠️',
+      }
     } else if (product.stock_quantity <= 5) {
       return { text: '¡Stock limitado!', color: 'bg-orange-400', icon: '⏳' }
     }
@@ -41,7 +49,7 @@ export default function ProductCard({ product }) {
         />
       </div>
 
-      <div className='relative flex h-64 flex-col p-6 text-center justify-between'>
+      <div className='relative flex h-64 flex-col justify-between p-6 text-center'>
         <div>
           <h3 className='text-lg leading-tight font-semibold text-gray-900'>
             {product.name}
@@ -51,16 +59,20 @@ export default function ProductCard({ product }) {
           </p>
         </div>
 
-        <div className="mt-auto flex flex-col items-center">
+        <div className='mt-auto flex flex-col items-center'>
           <p className='text-danger text-xl font-bold'>C$ {product.price}</p>
 
-          <div className="min-h-12 flex items-center">
+          <div className='flex min-h-12 items-center'>
             {stockLabel && (
               <motion.div
-                className={`mt-2 inline-block px-3 py-1 text-sm font-bold text-white rounded-full ${stockLabel.color}`}
+                className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold text-white ${stockLabel.color}`}
                 initial={{ scale: 1 }}
                 animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 1.5,
+                  ease: 'easeInOut',
+                }}
               >
                 {stockLabel.icon} {stockLabel.text}
               </motion.div>
@@ -73,10 +85,10 @@ export default function ProductCard({ product }) {
           disabled={product.stock_quantity === 0}
           className={`absolute top-0 right-4 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-2 shadow-lg transition-all duration-75 ${
             product.stock_quantity === 0
-              ? 'border-gray-400 bg-gray-400 text-white cursor-not-allowed'
+              ? 'cursor-not-allowed border-gray-400 bg-gray-400 text-white'
               : hasItem(product.id)
-              ? 'border-[#E63946] bg-[#E63946] text-white'
-              : 'border-[#E63946] bg-white text-[#E63946] hover:scale-110'
+                ? 'border-[#E63946] bg-[#E63946] text-white'
+                : 'border-[#E63946] bg-white text-[#E63946] hover:scale-110'
           } active:scale-95`}
           aria-label='Agregar al carrito'
         >

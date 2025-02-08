@@ -1,5 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap");
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
+@import 'tailwindcss';
 
 /* Define color variables */
 :root {
@@ -40,7 +40,7 @@
 
 /* Define the font globally */
 :root {
-  --font-primary: "Fredoka", sans-serif;
+  --font-primary: 'Fredoka', sans-serif;
   --font-size-sm: 12px; /* Pequeño, para detalles secundarios */
   --font-size-base: 14px; /* Tamaño base para descripciones y texto normal */
   --font-size-lg: 18px; /* Para títulos o elementos destacados */
