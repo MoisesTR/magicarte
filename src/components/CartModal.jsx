@@ -15,6 +15,8 @@ export default function CartModal({ isOpen }) {
     window.open(url, '_blank')
   }
 
+  const totalPrice = products.reduce((acc, product) => acc + product.price, 0);
+
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('overflow-hidden')
@@ -126,6 +128,16 @@ export default function CartModal({ isOpen }) {
             </div>
 
             <div className='mt-4 flex-shrink-0 space-y-3 pb-[env(safe-area-inset-bottom)]'>
+              {products.length > 0 && (
+                <div className='flex justify-between'>
+                  <span className='text-lg font-semibold text-gray-600'>
+                    Total
+                  </span>
+                  <span className='text-lg font-semibold text-danger'>
+                    C$ {totalPrice}
+                  </span>
+                </div>
+              )}
               {products.length > 0 && (
                 <button
                   onClick={handleWhatsAppClick}
