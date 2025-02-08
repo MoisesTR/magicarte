@@ -27,5 +27,9 @@ export const useSupabaseQuery = (table, options = {}) => {
     queryKey: [table, options],
     queryFn: () => fetchData({ table, options }),
     refetchInterval: options.refetchInterval ?? false,
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }

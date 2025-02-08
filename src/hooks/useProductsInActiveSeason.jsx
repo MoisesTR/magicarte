@@ -6,6 +6,8 @@ export function useProductsInActiveSeason() {
     queryKey: ['productsInActiveSeason'],
     queryFn: fetchProductsInActiveSeason,
     staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     retry: 1,
   })
 }
