@@ -1,8 +1,11 @@
 import ProductCard from '../components/ProductCard'
-import { useProductsInActiveSeason } from '../hooks/useProductsInActiveSeason'
+import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
+import { TABLE } from '../utils/constants'
 
 export default function Products({ selectedCategory }) {
-  const { data: products = [], isLoading } = useProductsInActiveSeason()
+  const { data: products = [], isLoading } = useSupabaseQuery(TABLE.PRODUCT, {
+    order: { column: 'created_at', ascending: false }
+  })
 
   const productFilter = (product) =>
     !selectedCategory ||
