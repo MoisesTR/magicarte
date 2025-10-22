@@ -4,12 +4,14 @@ import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
 import AdminLogin from '../components/AdminLogin'
+import CategoryManager from '../components/CategoryManager'
 
 export default function Admin() {
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [products, setProducts] = useState([])
   const [showForm, setShowForm] = useState(false)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -247,12 +249,18 @@ export default function Admin() {
                 Gestiona tus productos de MDF • {user.email}
               </p>
             </div>
-            <div className='flex space-x-3'>
+            <div className='flex flex-wrap gap-3'>
               <button
                 onClick={() => setShowForm(true)}
                 className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
               >
                 + Nuevo Producto
+              </button>
+              <button
+                onClick={() => setShowCategoryManager(true)}
+                className='bg-gradient-to-r from-[#9966cc] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#8555b3] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
+              >
+                📁 Categorías
               </button>
               <button
                 onClick={handleLogout}
@@ -300,6 +308,12 @@ export default function Admin() {
             </div>
           ))}
         </div>
+
+        {/* Category Manager Modal */}
+        <CategoryManager 
+          isOpen={showCategoryManager} 
+          onClose={() => setShowCategoryManager(false)} 
+        />
 
         {/* Form Modal */}
         {showForm && (
