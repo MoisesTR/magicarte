@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp } from '../context/AppContext'
-import { MAGIC_ARTE } from '../utils/constants'
-import instagramIcon from '../assets/instagram.svg'
 import cartIcon from '../assets/cart.svg'
-import facebookIcon from '../assets/facebook.svg'
 
 export default function Header({ onCartClick }) {
   const { cart, setItemAdded, itemAdded } = useApp()
@@ -24,58 +21,40 @@ export default function Header({ onCartClick }) {
   }, [itemAdded, setItemAdded])
 
   return (
-    <header className='bg-primary fixed top-0 left-0 z-50 w-full p-4 text-xl font-bold text-white shadow-lg'>
+    <header className='bg-white fixed top-0 left-0 z-50 w-full py-4 px-6 shadow-lg border-b border-gray-100'>
       <div className='container mx-auto flex items-center justify-between'>
-        <h1 className='text-3xl font-bold text-white'>{MAGIC_ARTE}</h1>
+        {/* Logo */}
+        <div>
+          <h1 className='text-3xl font-bold tracking-tight'>
+            <span className='text-[#51c879]'>Magic</span>
+            <span className='text-[#50bfe6]'>Arte</span>
+          </h1>
+          <p className='text-sm text-gray-500 font-medium'>Artesanía en MDF</p>
+        </div>
 
-        <div className='flex items-center space-x-6'>
-          {/* Instagram */}
-          <a
-            href='https://www.instagram.com/magicarte.ni/'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='transition-opacity hover:opacity-75'
-          >
-            <img src={instagramIcon} alt='Instagram' className='h-6 w-6' />
-          </a>
+        {/* Cart Button */}
+        <button
+          onClick={onCartClick}
+          className='relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg'
+        >
+          <motion.img
+            src={cartIcon}
+            alt='Cart'
+            className='h-6 w-6 filter brightness-0 invert'
+            animate={cartEffect ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          />
 
-          {/* Facebook */}
-          <a
-            href='https://www.facebook.com/profile.php?id=61556667861230'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='transition-opacity hover:opacity-75'
-          >
-            <img src={facebookIcon} alt='Facebook' className='h-6 w-6' />
-          </a>
-
-          {/* Cart Icon with Hand Cursor & Animation */}
-          <a
-            href='#'
-            onClick={(e) => {
-              e.preventDefault()
-              onCartClick()
-            }}
-            className='relative flex cursor-pointer items-center transition-opacity hover:opacity-75'
-          >
-            <motion.img
-              src={cartIcon}
-              alt='Cart'
-              className='h-6 w-6'
+          {cart.length > 0 && (
+            <motion.span
+              className='absolute -top-2 -right-2 bg-gray-900 text-white text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white'
               animate={cartEffect ? { scale: [1, 1.3, 1] } : {}}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
-            />
-            {cart.length > 0 && (
-              <motion.span
-                className='bg-danger absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-md'
-                animate={cartEffect ? { scale: [1, 1.4, 1] } : {}}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-              >
-                {cart.length}
-              </motion.span>
-            )}
-          </a>
-        </div>
+            >
+              {cart.length}
+            </motion.span>
+          )}
+        </button>
       </div>
     </header>
   )

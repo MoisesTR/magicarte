@@ -26,20 +26,20 @@ export default function Home() {
   }, [modifiedCategories, selectedCategory])
 
   return (
-    <div className='flex min-h-screen flex-col bg-gray-50'>
+    <div className='flex min-h-screen flex-col bg-gradient-to-br from-blue-50/40 to-green-50/40'>
       <Header onCartClick={() => setShowCartModal(true)} />
 
-      <main className='mx-auto max-w-7xl flex-grow px-6 py-16 pt-20 lg:px-8'>
-        <section className='mb-8 text-center'>
+      <main className='mx-auto max-w-7xl flex-grow px-6 py-16 pt-32 lg:px-8'>
+        <section className='mb-12 text-center'>
           <div className='flex flex-wrap justify-center gap-3'>
             {modifiedCategories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category)}
-                className={`cursor-pointer rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ease-in-out ${
+                className={`cursor-pointer rounded-full px-6 py-3 text-sm font-semibold transition-all duration-300 ease-in-out ${
                   selectedCategory?.id === category.id
-                    ? 'bg-primary scale-110 text-white shadow-xl'
-                    : 'bg-gray-200 text-gray-700 hover:bg-[#FFC8D0] hover:text-white hover:shadow'
+                    ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white shadow-lg scale-105'
+                    : 'bg-white text-gray-700 hover:bg-gradient-to-r hover:from-[#51c879] hover:to-[#50bfe6] hover:text-white hover:shadow-md border border-gray-200'
                 } `}
               >
                 {category.name}

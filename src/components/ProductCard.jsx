@@ -24,28 +24,8 @@ export default function ProductCard({ product }) {
     setShowOptions(false)
   }
 
-  const getStockLabel = () => {
-    const quantityLabel =
-      product.stock_quantity > 1 ? 'unidades disponibles' : 'unidad disponible'
-    if (product.stock_quantity === 0) {
-      return {
-        text: 'Agotado',
-        color: 'bg-red-700 border border-red-500 text-white shadow-md',
-        icon: '',
-      }
-    } else if (product.stock_quantity <= 2) {
-      return {
-        text: `¡Solo ${product.stock_quantity} ${quantityLabel}!`,
-        color: 'bg-red-500',
-        icon: '⚠️',
-      }
-    } else if (product.stock_quantity <= 5) {
-      return { text: '¡Quedan pocas unidades!', color: 'bg-orange-400', icon: '⏳' }
-    }
-    return null
-  }
-
-  const stockLabel = getStockLabel()
+  // Only show "Agotado" for out of stock items
+  const isOutOfStock = product.stock_quantity === 0
 
   return (
     <article className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl'>
@@ -85,49 +65,31 @@ export default function ProductCard({ product }) {
         </div>
       )}
 
-      <div className='relative flex min-h-[220px] flex-col justify-between p-6 text-center'>
-        <div>
-          <h3 className='text-lg leading-tight font-semibold text-gray-900'>
+      <div className='relative flex flex-col justify-between p-6 text-center'>
+        <div className='mb-4'>
+          <h3 className='text-lg font-semibold text-gray-900 mb-3'>
             {product.name}
           </h3>
-          <p className='mt-2 h-16 overflow-hidden text-[14px] text-gray-600'>
-            {product.description}
-          </p>
+          <p className='text-2xl font-bold text-gray-800'>C$ {product.price}</p>
         </div>
 
-        <div className='mt-auto flex flex-col items-center'>
-          <p className='text-danger text-xl font-bold'>C$ {product.price}</p>
-
-          {stockLabel && (
-            <motion.div
-              className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold text-white ${stockLabel.color}`}
-              initial={{ scale: 1 }}
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{
-                repeat: Infinity,
-                duration: 1.5,
-                ease: 'easeInOut',
-              }}
-            >
-              {stockLabel.icon} {stockLabel.text}
-            </motion.div>
-          )}
+        <div className='flex flex-col items-center'>
         </div>
 
-        <div className='mt-4'>
+        <div className='mt-6'>
           <button
             onClick={onCartClick}
-            disabled={product.stock_quantity === 0}
-            className={`w-full rounded-lg px-4 py-2 font-semibold transition-all duration-200 ${
-              product.stock_quantity === 0
+            disabled={isOutOfStock}
+            className={`w-full rounded-xl px-4 py-3 font-semibold transition-all duration-200 ${
+              isOutOfStock
                 ? 'cursor-not-allowed bg-gray-400 text-white'
                 : hasItem(product.id)
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-[#E63946] text-white hover:bg-[#D32F2F]'
+                  ? 'bg-[#51c879] text-white hover:bg-[#45b86b] shadow-lg'
+                  : 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white hover:from-[#45b86b] hover:to-[#42a8d1] shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
             }`}
             aria-label='Agregar al carrito'
           >
-            {hasItem(product.id) ? 'En el carrito' : 'Agregar al carrito'}
+            {isOutOfStock ? 'Agotado' : hasItem(product.id) ? '✓ En el carrito' : 'Agregar al carrito'}
           </button>
 
           {showOptions && hasItem(product.id) && (
