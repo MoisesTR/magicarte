@@ -7,6 +7,7 @@ const AppContext = createContext()
 export default function AppProvider({ children }) {
   const [itemAdded, setItemAdded] = useState(false)
   const [showCartModal, setShowCartModal] = useState(false)
+  const [showCartNotification, setShowCartNotification] = useState(false)
   const [cart, setCart] = useState(() => {
     try {
       const storedCart = localStorage.getItem(CART_STORAGE_KEY)
@@ -16,6 +17,11 @@ export default function AppProvider({ children }) {
       return []
     }
   })
+
+  // Mobile detection
+  const isMobile = () => {
+    return window.innerWidth <= 768
+  }
 
   useEffect(() => {
     try {
@@ -38,6 +44,16 @@ export default function AppProvider({ children }) {
       return [...prevCart, { ...item, quantity: 1 }]
     })
     setItemAdded(true)
+    
+    // Mobile-friendly behavior
+    if (isMobile()) {
+      // On mobile, show notification instead of opening cart
+      setShowCartNotification(true)
+      setTimeout(() => setShowCartNotification(false), 3000)
+    } else {
+      // On desktop, auto-show cart like Amazon
+      setShowCartModal(true)
+    }
   }
 
   const removeItem = (itemId) => {
@@ -69,6 +85,8 @@ export default function AppProvider({ children }) {
     setItemAdded,
     showCartModal,
     setShowCartModal,
+    showCartNotification,
+    setShowCartNotification,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

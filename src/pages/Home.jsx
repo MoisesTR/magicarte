@@ -4,6 +4,7 @@ import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
 import CartModal from '../components/CartModal'
+import CartNotification from '../components/CartNotification'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
 
@@ -54,6 +55,7 @@ export default function Home() {
       <Footer />
 
       <CartModal isOpen={showCartModal} />
+      <CartNotification />
     </div>
   )
 }

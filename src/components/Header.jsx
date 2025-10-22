@@ -37,13 +37,15 @@ export default function Header({ onCartClick }) {
           onClick={onCartClick}
           className='relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg'
         >
-          <motion.img
-            src={cartIcon}
-            alt='Cart'
-            className='h-6 w-6 filter brightness-0 invert'
+          <motion.svg
+            className='h-6 w-6 text-white'
+            fill='currentColor'
+            viewBox='0 0 20 20'
             animate={cartEffect ? { scale: [1, 1.2, 1] } : {}}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-          />
+          >
+            <path fillRule='evenodd' d='M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z' clipRule='evenodd' />
+          </motion.svg>
 
           {cart.length > 0 && (
             <motion.span

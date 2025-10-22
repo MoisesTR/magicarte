@@ -6,22 +6,12 @@ import { motion } from 'framer-motion'
 import { trackAddToCart } from '../utils/analytics'
 
 export default function ProductCard({ product }) {
-  const { addItem, removeItem, hasItem, setShowCartModal } = useApp()
+  const { addItem, hasItem } = useApp()
   const [selectedImage, setSelectedImage] = useState(product.image_url)
-  const [showOptions, setShowOptions] = useState(false)
 
-  const onCartClick = () => {
-    if (hasItem(product.id)) {
-      setShowOptions(true)
-    } else {
-      addItem(product)
-      trackAddToCart(product)
-    }
-  }
-
-  const onShowCartModal = () => {
-    setShowCartModal(true)
-    setShowOptions(false)
+  const onQuoteClick = () => {
+    addItem(product)
+    trackAddToCart(product)
   }
 
   // Only show "Agotado" for out of stock items
@@ -78,39 +68,19 @@ export default function ProductCard({ product }) {
 
         <div className='mt-6'>
           <button
-            onClick={onCartClick}
+            onClick={onQuoteClick}
             disabled={isOutOfStock}
             className={`w-full rounded-xl px-4 py-3 font-semibold transition-all duration-200 ${
               isOutOfStock
                 ? 'cursor-not-allowed bg-gray-400 text-white'
                 : hasItem(product.id)
-                  ? 'bg-[#51c879] text-white hover:bg-[#45b86b] shadow-lg'
+                  ? 'bg-[#51c879] text-white shadow-lg cursor-default'
                   : 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white hover:from-[#45b86b] hover:to-[#42a8d1] shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
             }`}
-            aria-label='Agregar al carrito'
+            aria-label='Solicitar cotización'
           >
-            {isOutOfStock ? 'Agotado' : hasItem(product.id) ? '✓ En el carrito' : 'Agregar al carrito'}
+            {isOutOfStock ? 'No disponible' : hasItem(product.id) ? '✓ Cotización solicitada' : 'Solicitar Cotización'}
           </button>
-
-          {showOptions && hasItem(product.id) && (
-            <div className='mt-2 flex gap-2'>
-              <button
-                onClick={onShowCartModal}
-                className='w-1/2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-blue-600'
-              >
-                Ir al carrito
-              </button>
-              <button
-                onClick={() => {
-                  removeItem(product.id)
-                  setShowOptions(false)
-                }}
-                className='w-1/2 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-red-600'
-              >
-                Remover
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </article>
