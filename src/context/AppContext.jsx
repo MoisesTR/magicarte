@@ -13,7 +13,6 @@ export default function AppProvider({ children }) {
       const storedCart = localStorage.getItem(CART_STORAGE_KEY)
       return storedCart ? JSON.parse(storedCart) : []
     } catch (error) {
-      console.error('Failed to retrieve cart from localStorage:', error)
       return []
     }
   })
@@ -27,7 +26,7 @@ export default function AppProvider({ children }) {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart))
     } catch (error) {
-      console.error('Failed to save cart to localStorage:', error)
+      // Silent fail for localStorage
     }
   }, [cart])
 
