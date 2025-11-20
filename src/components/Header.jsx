@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useApp } from '../context/AppContext'
-import cartIcon from '../assets/cart.svg'
+import { FEATURES } from '../config/features'
+
 
 export default function Header({ onCartClick }) {
   const { cart, setItemAdded, itemAdded } = useApp()
   const [cartEffect, setCartEffect] = useState(false)
 
+  // Cart effects - keeping for potential future use
   useEffect(() => {
     if (!itemAdded) return
 
@@ -35,7 +37,7 @@ export default function Header({ onCartClick }) {
         {/* Cart Button */}
         <button
           onClick={onCartClick}
-          className='relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg'
+          className={`relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg ${!FEATURES.SHOW_CART_BUTTON ? 'hidden' : ''}`}
         >
           <motion.svg
             className='h-6 w-6 text-white'

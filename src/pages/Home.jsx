@@ -7,6 +7,7 @@ import CartModal from '../components/CartModal'
 import CartNotification from '../components/CartNotification'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
+import { FEATURES } from '../config/features'
 
 export default function Home() {
   const { showCartModal, setShowCartModal } = useApp()
@@ -54,8 +55,11 @@ export default function Home() {
 
       <Footer />
 
-      <CartModal isOpen={showCartModal} />
-      <CartNotification />
+      {/* Cart functionality - controlled by feature flags */}
+      <div className={!FEATURES.SHOW_CART_COMPONENTS ? 'hidden' : ''}>
+        <CartModal isOpen={showCartModal} />
+        <CartNotification />
+      </div>
     </div>
   )
 }
