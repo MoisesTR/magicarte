@@ -53,11 +53,14 @@ export default function ProductCard({ product }) {
       onClick={handleCardClick}
       className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
     >
-      <div className='relative'>
+      <div className='relative bg-white overflow-hidden' style={{ minHeight: '240px', maxHeight: '280px' }}>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
-          className='h-60 w-full object-cover transition-transform duration-300 group-hover:scale-110'
+          className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
+          style={{
+            objectPosition: 'center center'
+          }}
         />
         
         {/* View Details Overlay */}
@@ -74,33 +77,7 @@ export default function ProductCard({ product }) {
         </div>
       </div>
 
-      {product.secondary_images?.length > 0 && (
-        <div className='mt-2 flex justify-center gap-2'>
-          <img
-            src={getImageUrl(product.image_url)}
-            alt='Main'
-            className={`h-12 w-12 cursor-pointer rounded-md border-2 object-cover transition-all duration-200 ${
-              selectedImage === product.image_url
-                ? 'border-primary scale-105'
-                : 'border-transparent hover:opacity-75'
-            }`}
-            onClick={(e) => handleImageClick(e, product.image_url)}
-          />
-          {product.secondary_images.map((image, index) => (
-            <img
-              key={index}
-              src={getImageUrl(image)}
-              alt={`Thumbnail ${index + 1}`}
-              className={`h-12 w-12 cursor-pointer rounded-md border-2 object-cover transition-all duration-200 ${
-                selectedImage === image
-                  ? 'border-primary scale-105'
-                  : 'border-transparent hover:opacity-75'
-              }`}
-              onClick={(e) => handleImageClick(e, image)}
-            />
-          ))}
-        </div>
-      )}
+
 
       <div className='relative flex flex-col justify-between p-6 text-center'>
         <div className='mb-4'>
