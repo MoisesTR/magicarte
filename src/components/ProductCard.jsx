@@ -1,18 +1,21 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
-
 import { trackAddToCart } from '../utils/analytics'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
 import { FEATURES } from '../config/features'
 
 export default function ProductCard({ product }) {
+  const navigate = useNavigate()
   const { addItem, hasItem } = useApp()
   const [selectedImage, setSelectedImage] = useState(product.image_url)
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
 
-  const onQuoteClick = () => {
+  const onQuoteClick = (e) => {
+    e.stopPropagation() // Prevent card click when clicking button
+    
     if (FEATURES.CART_ENABLED) {
       // Cart functionality
       addItem(product)
@@ -31,19 +34,44 @@ export default function ProductCard({ product }) {
     }
   }
 
+  const handleCardClick = () => {
+    navigate(`/product/${product.id}`)
+  }
+
+  const handleImageClick = (e, image) => {
+    e.stopPropagation() // Prevent card click when clicking thumbnail
+    setSelectedImage(image)
+  }
+
 
 
   // Only show "Agotado" for out of stock items
   const isOutOfStock = product.stock_quantity === 0
 
   return (
-    <article className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl'>
+    <article 
+      onClick={handleCardClick}
+      className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
+    >
       <div className='relative'>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
           className='h-60 w-full object-cover transition-transform duration-300 group-hover:scale-110'
         />
+        
+        {/* View Details Overlay */}
+        <div className='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center'>
+          <div className='opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full'>
+            <span className='text-sm font-semibold text-gray-800 flex items-center gap-2'>
+              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' />
+              </svg>
+              Ver detalles
+            </span>
+          </div>
+        </div>
       </div>
 
       {product.secondary_images?.length > 0 && (
@@ -56,7 +84,7 @@ export default function ProductCard({ product }) {
                 ? 'border-primary scale-105'
                 : 'border-transparent hover:opacity-75'
             }`}
-            onClick={() => setSelectedImage(product.image_url)}
+            onClick={(e) => handleImageClick(e, product.image_url)}
           />
           {product.secondary_images.map((image, index) => (
             <img
@@ -68,7 +96,7 @@ export default function ProductCard({ product }) {
                   ? 'border-primary scale-105'
                   : 'border-transparent hover:opacity-75'
               }`}
-              onClick={() => setSelectedImage(image)}
+              onClick={(e) => handleImageClick(e, image)}
             />
           ))}
         </div>

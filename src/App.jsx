@@ -2,6 +2,7 @@ import ReactGA from 'react-ga4'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Products from './pages/Products'
+import ProductDetail from './pages/ProductDetail'
 import Admin from './pages/Admin'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect } from 'react'
@@ -27,6 +28,7 @@ export default function App() {
           <Routes>
             <Route path='/' element={<Home />} />
             <Route path='/products' element={<Products />} />
+            <Route path='/product/:id' element={<ProductDetail />} />
             <Route path='/admin' element={<Admin />} />
           </Routes>
         </Router>

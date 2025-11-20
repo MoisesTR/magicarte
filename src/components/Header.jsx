@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
 
 
 export default function Header({ onCartClick }) {
+  const navigate = useNavigate()
   const { cart, setItemAdded, itemAdded } = useApp()
   const [cartEffect, setCartEffect] = useState(false)
 
@@ -26,7 +28,10 @@ export default function Header({ onCartClick }) {
     <header className='bg-white fixed top-0 left-0 z-50 w-full py-4 px-6 shadow-lg border-b border-gray-100'>
       <div className='container mx-auto flex items-center justify-between'>
         {/* Logo */}
-        <div>
+        <div 
+          onClick={() => navigate('/')}
+          className='cursor-pointer hover:opacity-80 transition-opacity duration-200'
+        >
           <h1 className='text-3xl font-bold tracking-tight'>
             <span className='text-[#51c879]'>Magic</span>
             <span className='text-[#50bfe6]'>Arte</span>
