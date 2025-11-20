@@ -10,6 +10,17 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
   const { cart, setItemAdded, itemAdded } = useApp()
   const [cartEffect, setCartEffect] = useState(false)
 
+  const handleLogoClick = () => {
+    // Navigate to home
+    navigate('/')
+    
+    // Find and select "Todos" category
+    const todosCategory = categories.find(cat => cat.name === 'Todos')
+    if (todosCategory && onCategorySelect) {
+      onCategorySelect(todosCategory)
+    }
+  }
+
   // Cart effects - keeping for potential future use
   useEffect(() => {
     if (!itemAdded) return
@@ -31,7 +42,7 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
         <div className='container mx-auto flex items-center justify-between py-4 px-6'>
           {/* Logo */}
           <div 
-            onClick={() => navigate('/')}
+            onClick={handleLogoClick}
             className='cursor-pointer hover:opacity-80 transition-opacity duration-200'
           >
             <h1 className='text-3xl font-bold tracking-tight'>
