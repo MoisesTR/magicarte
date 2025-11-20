@@ -109,6 +109,8 @@ export default function Admin() {
         ...formData,
         price: parseFloat(formData.price),
         stock_quantity: parseInt(formData.stock_quantity),
+        width: parseFloat(formData.width),
+        length: parseFloat(formData.length),
         image_url: mainImagePath,
         secondary_images: secondaryImagePaths
       }
@@ -149,6 +151,8 @@ export default function Admin() {
     setFormData({
       name: '',
       price: '',
+      width: '',
+      length: '',
       description: '',
       category_id: '',
       stock_quantity: 1,
@@ -166,6 +170,8 @@ export default function Admin() {
       price: product.price || '',
       description: product.description || '',
       category_id: product.category_id || '',
+      width: product.width || '',
+      length: product.length || '',
       stock_quantity: product.stock_quantity || 1,
       image_url: product.image_url || '',
       secondary_images: product.secondary_images || []
@@ -361,6 +367,34 @@ export default function Admin() {
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                         placeholder='250.00'
+                      />
+                    </div>
+                  </div>
+
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-2'>
+                        Largo
+                      </label>
+                      <input
+                        type='number'
+                        required
+                        value={formData.length}
+                        onChange={(e) => setFormData({ ...formData, length: e.target.value })}
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      />
+                    </div>
+
+                    <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-2'>
+                        Ancho
+                      </label>
+                      <input
+                        type='number'
+                        required
+                        value={formData.width}
+                        onChange={(e) => setFormData({ ...formData, width: e.target.value })}
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                       />
                     </div>
                   </div>
