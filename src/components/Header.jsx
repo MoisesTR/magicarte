@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
 
 
-export default function Header({ onCartClick }) {
+export default function Header({ onCartClick, categories = [], selectedCategory, onCategorySelect }) {
   const navigate = useNavigate()
   const { cart, setItemAdded, itemAdded } = useApp()
   const [cartEffect, setCartEffect] = useState(false)
@@ -25,46 +25,79 @@ export default function Header({ onCartClick }) {
   }, [itemAdded, setItemAdded])
 
   return (
-    <header className='bg-white fixed top-0 left-0 z-50 w-full py-4 px-6 shadow-lg border-b border-gray-100'>
-      <div className='container mx-auto flex items-center justify-between'>
-        {/* Logo */}
-        <div 
-          onClick={() => navigate('/')}
-          className='cursor-pointer hover:opacity-80 transition-opacity duration-200'
-        >
-          <h1 className='text-3xl font-bold tracking-tight'>
-            <span className='text-[#51c879]'>Magic</span>
-            <span className='text-[#50bfe6]'>Arte</span>
-          </h1>
-          <p className='text-sm text-gray-500 font-medium'>Artesanía en MDF</p>
-        </div>
-
-        {/* Cart Button */}
-        <button
-          onClick={onCartClick}
-          className={`relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg ${!FEATURES.SHOW_CART_BUTTON ? 'hidden' : ''}`}
-        >
-          <motion.svg
-            className='h-6 w-6 text-white'
-            fill='currentColor'
-            viewBox='0 0 20 20'
-            animate={cartEffect ? { scale: [1, 1.2, 1] } : {}}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
+    <header className='bg-white fixed top-0 left-0 z-50 w-full shadow-lg border-b border-gray-100'>
+      {/* Top bar with logo and cart */}
+      <div className='border-b border-gray-100'>
+        <div className='container mx-auto flex items-center justify-between py-4 px-6'>
+          {/* Logo */}
+          <div 
+            onClick={() => navigate('/')}
+            className='cursor-pointer hover:opacity-80 transition-opacity duration-200'
           >
-            <path fillRule='evenodd' d='M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z' clipRule='evenodd' />
-          </motion.svg>
+            <h1 className='text-3xl font-bold tracking-tight'>
+              <span className='text-[#51c879]'>Magic</span>
+              <span className='text-[#50bfe6]'>Arte</span>
+            </h1>
+            <p className='text-sm text-gray-500 font-medium'>Artesanía en MDF</p>
+          </div>
 
-          {cart.length > 0 && (
-            <motion.span
-              className='absolute -top-2 -right-2 bg-gray-900 text-white text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white'
-              animate={cartEffect ? { scale: [1, 1.3, 1] } : {}}
+          {/* Cart Button */}
+          <button
+            onClick={onCartClick}
+            className={`relative p-3 bg-gradient-to-r from-[#51c879] to-[#50bfe6] rounded-2xl hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-md hover:shadow-lg ${!FEATURES.SHOW_CART_BUTTON ? 'hidden' : ''}`}
+          >
+            <motion.svg
+              className='h-6 w-6 text-white'
+              fill='currentColor'
+              viewBox='0 0 20 20'
+              animate={cartEffect ? { scale: [1, 1.2, 1] } : {}}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
             >
-              {cart.length}
-            </motion.span>
-          )}
-        </button>
+              <path fillRule='evenodd' d='M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z' clipRule='evenodd' />
+            </motion.svg>
+
+            {cart.length > 0 && (
+              <motion.span
+                className='absolute -top-2 -right-2 bg-gray-900 text-white text-sm font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white'
+                animate={cartEffect ? { scale: [1, 1.3, 1] } : {}}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+              >
+                {cart.length}
+              </motion.span>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Category Navigation */}
+      {categories.length > 0 && (
+        <div className='bg-gray-50'>
+          <div className='container mx-auto px-6 py-3'>
+            <div className='relative'>
+              <div className='flex items-center justify-start md:justify-center gap-3 overflow-x-auto scrollbar-hide'>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => onCategorySelect?.(category)}
+                    className={`flex-shrink-0 px-6 py-3 rounded-full text-base font-semibold transition-all duration-200 whitespace-nowrap ${
+                      selectedCategory?.id === category.id
+                        ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white shadow-md'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
+                    }`}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Scroll indicator for mobile - shows there are more items */}
+              <div className='md:hidden absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-gray-50 to-transparent pointer-events-none flex items-center justify-end pr-1'>
+                <div className='w-1 h-1 bg-gray-400 rounded-full animate-pulse'></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

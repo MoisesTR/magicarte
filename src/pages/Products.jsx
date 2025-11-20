@@ -17,10 +17,13 @@ export default function Products({ selectedCategory }) {
   return (
     <section className='py-8'>
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
+
+
         {isLoading && (
-          <p className='text-center text-lg text-gray-500'>
-            Cargando productos...
-          </p>
+          <div className='text-center py-12'>
+            <div className='w-12 h-12 animate-spin rounded-full border-4 border-gray-200 border-t-[#51c879] mx-auto mb-4'></div>
+            <p className='text-lg text-gray-500'>Cargando productos...</p>
+          </div>
         )}
 
         {!isLoading && productsToShow.length === 0 && (
