@@ -54,14 +54,11 @@ export default function ProductCard({ product }) {
       onClick={handleCardClick}
       className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
     >
-      <div className='relative bg-white overflow-hidden' style={{ minHeight: '240px', maxHeight: '280px' }}>
+      <div className='aspect-square overflow-hidden'>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
-          className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
-          style={{
-            objectPosition: 'center center'
-          }}
+          className='w-full h-full object-cover group-hover:scale-110 transition-transform duration-300'
         />
         
         {/* View Details Overlay */}

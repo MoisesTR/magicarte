@@ -98,7 +98,6 @@ export default function ProductDetail() {
     )
   }
 
-  const isOutOfStock = product.stock_quantity === 0
   const allImages = [product.image_url, ...(product.secondary_images || [])]
 
   return (
@@ -172,27 +171,7 @@ export default function ProductDetail() {
               <span className='text-4xl font-bold text-gray-800'>
                 C$ {product.price}
               </span>
-              {isOutOfStock && (
-                <span className='bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium'>
-                  Agotado
-                </span>
-              )}
             </div>
-
-            {/* Stock Info */}
-            {!isOutOfStock && (
-              <div className='flex items-center gap-2 text-green-600'>
-                <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 20 20'>
-                  <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                </svg>
-                <span className='font-medium'>
-                  {product.stock_quantity > 5 
-                    ? 'Disponible' 
-                    : `Solo ${product.stock_quantity} disponible${product.stock_quantity > 1 ? 's' : ''}`
-                  }
-                </span>
-              </div>
-            )}
 
             {/* Description */}
             <div className='bg-white rounded-2xl p-6 shadow-lg'>
@@ -206,18 +185,13 @@ export default function ProductDetail() {
             <div className='space-y-4'>
               <button
                 onClick={handleQuoteClick}
-                disabled={isOutOfStock}
                 className={`w-full rounded-2xl px-8 py-4 font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3 ${
-                  isOutOfStock
-                    ? 'cursor-not-allowed bg-gray-400 text-white'
-                    : (FEATURES.CART_ENABLED ? hasItem(product.id) : isQuoteRequested)
-                      ? 'bg-[#51c879] text-white shadow-lg cursor-default'
-                      : 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white hover:from-[#45b86b] hover:to-[#42a8d1] shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
+                  (FEATURES.CART_ENABLED ? hasItem(product.id) : isQuoteRequested)
+                    ? 'bg-[#51c879] text-white shadow-lg cursor-default'
+                    : 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white hover:from-[#45b86b] hover:to-[#42a8d1] shadow-lg hover:shadow-xl transform hover:scale-[1.02]'
                 }`}
               >
-                {isOutOfStock ? (
-                  'No disponible'
-                ) : FEATURES.CART_ENABLED ? (
+                {FEATURES.CART_ENABLED ? (
                   hasItem(product.id) ? '✓ En carrito' : 'Agregar al carrito'
                 ) : isQuoteRequested ? (
                   <>
