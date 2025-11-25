@@ -54,7 +54,7 @@ export default function ProductCard({ product }) {
       onClick={handleCardClick}
       className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
     >
-      <div className='aspect-square overflow-hidden'>
+      <div className='relative aspect-square overflow-hidden'>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
