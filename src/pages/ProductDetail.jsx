@@ -120,12 +120,14 @@ export default function ProductDetail() {
           {/* Image Gallery */}
           <div className='space-y-4'>
             {/* Main Image */}
-            <div className='aspect-square rounded-2xl overflow-hidden bg-white shadow-lg'>
-              <LazyImage
-                src={getImageUrl(selectedImage)}
-                alt={product.name}
-                className='w-full h-full object-cover'
-              />
+            <div className='rounded-2xl overflow-hidden bg-gray-50 shadow-lg p-6'>
+              <div className='aspect-[3/4] w-full'>
+                <LazyImage
+                  src={getImageUrl(selectedImage)}
+                  alt={product.name}
+                  className='w-full h-full object-contain'
+                />
+              </div>
             </div>
 
             {/* Thumbnail Images */}
