@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
@@ -7,6 +8,7 @@ import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 
 export default function Admin() {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [products, setProducts] = useState([])
@@ -261,6 +263,12 @@ export default function Admin() {
                 className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
               >
                 + Nuevo Producto
+              </button>
+              <button
+                onClick={() => navigate('/admin/orders')}
+                className='bg-gradient-to-r from-[#ff6b6b] to-[#feca57] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#ee5a52] hover:to-[#f5b942] transition-all duration-200 shadow-lg hover:shadow-xl'
+              >
+                📦 Pedidos
               </button>
               <button
                 onClick={() => setShowCategoryManager(true)}
