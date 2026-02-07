@@ -65,6 +65,46 @@ body {
   font-size: var(--font-size-xl);
 }
 
+/* Heart float animation for Valentine's */
+@keyframes heartFloat {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-50vh) rotate(20deg) scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-110vh) rotate(-10deg) scale(0.8);
+    opacity: 0;
+  }
+}
+
+.animate-heartFloat {
+  animation: heartFloat linear infinite;
+}
+
+/* Twinkle animation for sparkles */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.animate-twinkle {
+  animation: twinkle ease-in-out infinite;
+}
+
+/* Welcome bounce animation */
+@keyframes welcomeBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-10px); }
+}
+
+.animate-welcome-bounce {
+  animation: welcomeBounce 2s ease-in-out infinite;
+}
+
 /* Hide scrollbar utility */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* Internet Explorer 10+ */

@@ -2,9 +2,17 @@ import ProductCard from '../components/ProductCard'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 
-export default function Products({ selectedCategory }) {
+export default function Products({ selectedCategory, categories = [] }) {
   const { data: products = [], isLoading } = useSupabaseQuery(TABLE.PRODUCT, {
     order: { column: 'created_at', ascending: false }
+  })
+
+  // Build a map of category_id -> order for sorting products by category priority
+  const categoryOrderMap = {}
+  categories.forEach((cat, index) => {
+    if (cat.name !== 'Todos') {
+      categoryOrderMap[cat.id] = index
+    }
   })
 
   const productFilter = (product) =>
@@ -12,7 +20,15 @@ export default function Products({ selectedCategory }) {
     selectedCategory.name === 'Todos' ||
     product.category_id === selectedCategory.id
 
-  const productsToShow = products.filter(productFilter)
+  const productsToShow = products.filter(productFilter).sort((a, b) => {
+    // When viewing "Todos", sort by category order first, then by created_at within same category
+    if (selectedCategory?.name === 'Todos') {
+      const orderA = categoryOrderMap[a.category_id] ?? 999
+      const orderB = categoryOrderMap[b.category_id] ?? 999
+      if (orderA !== orderB) return orderA - orderB
+    }
+    return 0
+  })
 
   return (
     <section className='py-8'>

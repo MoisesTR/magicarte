@@ -8,6 +8,8 @@ import CartNotification from '../components/CartNotification'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
+import ValentineBanner from '../components/ValentineBanner'
+import ValentineHero from '../components/ValentineHero'
 
 export default function Home() {
   const { showCartModal, setShowCartModal } = useApp()
@@ -45,26 +47,36 @@ export default function Home() {
   }, [])
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-blue-50/40 to-green-50/40'>
-      <Header 
-        onCartClick={() => setShowCartModal(true)}
-        categories={modifiedCategories}
-        selectedCategory={selectedCategory}
-        onCategorySelect={setSelectedCategory}
-      />
+    <>
+      <div className='min-h-screen bg-gradient-to-br from-pink-50/40 to-red-50/30'>
+        <Header 
+          onCartClick={() => setShowCartModal(true)}
+          categories={modifiedCategories}
+          selectedCategory={selectedCategory}
+          onCategorySelect={setSelectedCategory}
+        />
+        <ValentineBanner />
 
       <main className='pt-32'>
         {/* Main Content */}
         <div className='max-w-7xl mx-auto px-6 py-12'>
+          {/* Valentine Hero - only on "Todos" view */}
+          {selectedCategory?.name === 'Todos' && (
+            <ValentineHero
+              categories={modifiedCategories}
+              onCategorySelect={setSelectedCategory}
+            />
+          )}
+
           {/* Current Category Header */}
-          <div className='mb-12 text-center'>
+          <div className='mb-12 mt-10 text-center'>
             <h1 className='text-4xl font-bold text-gray-900 mb-2'>
               {selectedCategory?.name || 'Cargando...'}
             </h1>
             <p className='text-gray-600 text-lg'>Descubre nuestras creaciones únicas en MDF</p>
           </div>
 
-          <Products selectedCategory={selectedCategory} />
+          <Products selectedCategory={selectedCategory} categories={modifiedCategories} />
         </div>
       </main>
 
@@ -76,5 +88,6 @@ export default function Home() {
         <CartNotification />
       </div>
     </div>
+    </>
   )
 }

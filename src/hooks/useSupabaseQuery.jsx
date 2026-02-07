@@ -14,7 +14,7 @@ const fetchData = async ({ table, options }) => {
 
   if (options?.order) {
     const { column, ascending = true } = options.order
-    query = query.order(column, { ascending })
+    query = query.order(column, { ascending, nullsFirst: false })
   }
 
   const { data, error } = await query
