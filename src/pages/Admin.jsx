@@ -4,6 +4,7 @@ import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
+import { uploadCompressedImage } from '../utils/uploadImage'
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 
@@ -96,13 +97,13 @@ export default function Admin() {
       // Upload main image
       let mainImagePath = formData.image_url
       if (imageFiles.main) {
-        mainImagePath = await uploadImage(imageFiles.main)
+        mainImagePath = await uploadCompressedImage(imageFiles.main)
       }
 
       // Upload secondary images
       let secondaryImagePaths = formData.secondary_images
       if (imageFiles.secondary.length > 0) {
-        const uploadPromises = imageFiles.secondary.map(file => uploadImage(file))
+        const uploadPromises = imageFiles.secondary.map(file => uploadCompressedImage(file))
         const uploadedPaths = await Promise.all(uploadPromises)
         secondaryImagePaths = uploadedPaths.filter(path => path !== null)
       }
