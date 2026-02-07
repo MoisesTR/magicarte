@@ -23,12 +23,20 @@ export default function ValentineHero({ categories, onCategorySelect }) {
           Sorprende a esa persona especial con un detalle único y personalizado en MDF.
         </p>
 
-        <button
-          onClick={handleClick}
-          className='bg-white text-pink-600 font-semibold px-6 py-3 rounded-xl hover:bg-pink-50 transition-colors duration-200 shadow-lg'
-        >
-          Ver regalos de {featuredCategory.name} →
-        </button>
+        <div className='flex flex-col sm:flex-row items-start gap-4'>
+          <button
+            onClick={handleClick}
+            className='bg-white text-pink-600 font-semibold px-6 py-3 rounded-xl hover:bg-pink-50 transition-colors duration-200 shadow-lg'
+          >
+            Ver regalos de {featuredCategory.name} →
+          </button>
+
+          <div className='bg-white/15 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/20'>
+            <p className='text-white text-sm font-semibold'>
+              📅 Pedidos hasta el 12 de febrero
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   )

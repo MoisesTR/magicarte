@@ -11,10 +11,9 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
   const [cartEffect, setCartEffect] = useState(false)
 
   const handleLogoClick = () => {
-    // Navigate to home
     navigate('/')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     
-    // Find and select "Todos" category
     const todosCategory = categories.find(cat => cat.name === 'Todos')
     if (todosCategory && onCategorySelect) {
       onCategorySelect(todosCategory)

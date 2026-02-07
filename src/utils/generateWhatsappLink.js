@@ -6,12 +6,12 @@ export function generateWhatsAppLinkForProducts(
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
 
-  const header = 'Hola! Me gustaria solicitar cotizacion para:\n\n'
+  const header = 'Hola! 👋 Me gustaría cotizar:\n\n'
   const productMessages = products.map((product) => {
     return `- ${product.name}: C$${product.price}`
   })
 
-  const footer = '\n\nTiempo estimado: de 3 a 5 días hábiles. Gracias!'
+  const footer = '\n\nGracias!'
   const message = `${header}${productMessages.join('\n')}${footer}`
   const encodedMessage = encodeURIComponent(message)
   
@@ -26,11 +26,11 @@ export function generateWhatsAppLinkForSingleProduct(
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
 
-  const message = `Hola! Me gustaria solicitar cotizacion para:
+  const message = `Hola! 👋 Me gustaría cotizar:
 
 - ${product.name}: C$${product.price}
 
-Tiempo estimado: de 3 a 5 días hábiles. Gracias!`
+Gracias!`
   
   const encodedMessage = encodeURIComponent(message)
   return `https://wa.me/${phoneNumber}?text=${encodedMessage}`
