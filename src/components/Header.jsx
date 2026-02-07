@@ -83,28 +83,21 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
       {/* Category Navigation */}
       {categories.length > 0 && (
         <div className='bg-gray-50'>
-          <div className='container mx-auto px-6 py-3'>
-            <div className='relative'>
-              <div className='flex items-center justify-start md:justify-center gap-3 overflow-x-auto scrollbar-hide'>
-                {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    onClick={() => onCategorySelect?.(category)}
-                    className={`flex-shrink-0 px-6 py-3 rounded-full text-base font-semibold transition-all duration-200 whitespace-nowrap ${
-                      selectedCategory?.id === category.id
-                        ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
-                    }`}
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </div>
-              
-              {/* Scroll indicator for mobile - shows there are more items */}
-              <div className='md:hidden absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-gray-50 to-transparent pointer-events-none flex items-center justify-end pr-1'>
-                <div className='w-1 h-1 bg-gray-400 rounded-full animate-pulse'></div>
-              </div>
+          <div className='overflow-x-auto scrollbar-hide'>
+            <div className='flex items-center justify-start md:justify-center gap-3 px-6 py-3 min-w-min'>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => onCategorySelect?.(category)}
+                  className={`flex-shrink-0 px-6 py-3 rounded-full text-base font-semibold transition-all duration-200 whitespace-nowrap ${
+                    selectedCategory?.id === category.id
+                      ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-sm border border-gray-200'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
             </div>
           </div>
         </div>
