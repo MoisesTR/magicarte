@@ -1,4 +1,32 @@
 import { supabase } from '../config/supabaseClient'
+import heic2any from 'heic2any'
+
+/**
+ * Convert HEIC/HEIF to JPEG using heic2any (works on all browsers)
+ */
+async function convertHeicToJpeg(file) {
+  const blob = await heic2any({
+    blob: file,
+    toType: 'image/jpeg',
+    quality: 0.95,
+  })
+  const resultBlob = Array.isArray(blob) ? blob[0] : blob
+  return new File([resultBlob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+    type: 'image/jpeg',
+  })
+}
+
+/**
+ * Prepare file — converts HEIC to JPEG so sharp can process it
+ */
+async function prepareFile(file) {
+  const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
+  if (isHeic) {
+    console.log('Converting HEIC to JPEG...')
+    return convertHeicToJpeg(file)
+  }
+  return file
+}
 
 /**
  * Upload an image through the compression API.
@@ -6,7 +34,8 @@ import { supabase } from '../config/supabaseClient'
  */
 export async function uploadCompressedImage(file, folder = 'products') {
   try {
-    // Get the current session token
+    const prepared = await prepareFile(file)
+
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) {
       throw new Error('No authenticated session')
@@ -17,10 +46,10 @@ export async function uploadCompressedImage(file, folder = 'products') {
       headers: {
         'Content-Type': 'application/octet-stream',
         'Authorization': `Bearer ${session.access_token}`,
-        'x-filename': file.name,
+        'x-filename': prepared.name,
         'x-folder': folder,
       },
-      body: file,
+      body: prepared,
     })
 
     if (!response.ok) {
