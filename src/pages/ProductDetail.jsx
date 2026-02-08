@@ -187,6 +187,27 @@ export default function ProductDetail() {
               </p>
             </div>
 
+            {/* Dimensions */}
+            {(product.width > 0 || product.length > 0) && (
+              <div className='bg-white rounded-2xl p-6 shadow-lg'>
+                <h3 className='text-xl font-semibold text-gray-900 mb-3'>Medidas</h3>
+                <div className='flex gap-6'>
+                  {product.length > 0 && (
+                    <div className='flex items-center gap-2'>
+                      <span className='text-gray-500 text-sm'>Largo</span>
+                      <span className='text-gray-800 font-semibold'>{product.length} cm</span>
+                    </div>
+                  )}
+                  {product.width > 0 && (
+                    <div className='flex items-center gap-2'>
+                      <span className='text-gray-500 text-sm'>Ancho</span>
+                      <span className='text-gray-800 font-semibold'>{product.width} cm</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className='space-y-4'>
               <button
