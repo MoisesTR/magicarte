@@ -39,6 +39,61 @@ export default function Admin() {
     order: { column: 'order' }
   })
 
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return ''
+    const category = categoriesData.find((item) => item.id === categoryId)
+    return category?.name || ''
+  }
+
+  const formatDimensions = (product) => {
+    const length = product.length ?? ''
+    const width = product.width ?? ''
+    if (length === '' && width === '') return ''
+    if (length !== '' && width !== '') return `${length} x ${width}`
+    return length !== '' ? `${length}` : `${width}`
+  }
+
+  const buildFacebookListing = (product) => {
+    const categoryName = getCategoryName(product.category_id)
+    const dimensions = formatDimensions(product)
+    const lines = [
+      `Titulo: ${product.name || ''}`,
+      `Descripcion: ${product.description || ''}`,
+      `Precio: C$ ${product.price ?? ''}`,
+      `Categoria: ${categoryName}`,
+      `Dimensiones: ${dimensions}`,
+      'Tiempo de entrega: de 3 a 5 dias habiles',
+      'Pago: Se debe dar o cancelar la mitad del producto personalizado 2 dias antes de la entrega como maximo para poder dar inicio.'
+    ]
+
+    return lines.filter(Boolean).join('\n')
+  }
+
+  const copyListing = async (product) => {
+    const text = buildFacebookListing(product)
+    if (!text) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+      alert('Listing copiado al portapapeles')
+    } catch (error) {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      try {
+        document.execCommand('copy')
+        alert('Listing copiado al portapapeles')
+      } catch (copyError) {
+        alert('No se pudo copiar el listing')
+      } finally {
+        document.body.removeChild(textarea)
+      }
+    }
+  }
+
   const fetchProducts = async () => {
     try {
       const { data, error } = await supabase
@@ -272,6 +327,12 @@ export default function Admin() {
                 📦 Pedidos
               </button>
               <button
+                onClick={() => navigate('/admin/calculator')}
+                className='bg-gradient-to-r from-[#f59e0b] to-[#f97316] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#d97706] hover:to-[#ea580c] transition-all duration-200 shadow-lg hover:shadow-xl'
+              >
+                🧮 Calculadora
+              </button>
+              <button
                 onClick={() => setShowCategoryManager(true)}
                 className='bg-gradient-to-r from-[#9966cc] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#8555b3] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
               >
@@ -315,10 +376,16 @@ export default function Admin() {
               <div className='p-4'>
                 <h3 className='font-semibold text-gray-800 mb-2'>{product.name}</h3>
                 <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.description}</p>
-                <div className='flex justify-between items-center'>
+                <div className='flex justify-between items-center mb-3'>
                   <span className='text-lg font-bold text-gray-800'>C$ {product.price}</span>
                   <span className='text-sm text-gray-500'>Stock: {product.stock_quantity}</span>
                 </div>
+                <button
+                  onClick={() => copyListing(product)}
+                  className='w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200 transition-colors'
+                >
+                  Copiar listing (Facebook)
+                </button>
               </div>
             </div>
           ))}

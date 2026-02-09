@@ -3,6 +3,7 @@ import { supabase } from '../config/supabaseClient'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { TABLE } from '../utils/constants'
+import OrderCalculator from '../components/OrderCalculator'
 
 export default function Orders() {
   const navigate = useNavigate()
@@ -16,6 +17,8 @@ export default function Orders() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
   const [sortBy, setSortBy] = useState('created_at')
+  const [calcOrder, setCalcOrder] = useState(null)
+  const [selectedOrders, setSelectedOrders] = useState(new Set())
 
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -26,6 +29,7 @@ export default function Orders() {
     order_date: new Date().toISOString().split('T')[0],
     status: 'pending',
     priority: 'normal',
+    payment_status: 'unpaid',
     notes: '',
     estimated_delivery_date: '',
     items: []
@@ -55,7 +59,7 @@ export default function Orders() {
           *,
           order_items (
             *,
-            products (name, image_url)
+            products (name, image_url, width, length)
           )
         `)
         .order('created_at', { ascending: false })
@@ -135,6 +139,7 @@ export default function Orders() {
         order_date: formData.order_date,
         status: formData.status,
         priority: formData.priority,
+        payment_status: formData.payment_status,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
         total_amount: calculateTotal()
@@ -202,6 +207,7 @@ export default function Orders() {
       order_date: new Date().toISOString().split('T')[0],
       status: 'pending',
       priority: 'normal',
+      payment_status: 'unpaid',
       notes: '',
       estimated_delivery_date: '',
       items: []
@@ -220,6 +226,7 @@ export default function Orders() {
       order_date: order.order_date || new Date().toISOString().split('T')[0],
       status: order.status,
       priority: order.priority,
+      payment_status: order.payment_status || 'unpaid',
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
       items: order.order_items.map(item => ({
@@ -271,6 +278,19 @@ export default function Orders() {
     }
   }
 
+  const updatePaymentStatus = async (id, payment_status) => {
+    const { error } = await supabase
+      .from(TABLE.ORDERS)
+      .update({ payment_status })
+      .eq('id', id)
+
+    if (error) {
+      alert('Error al actualizar estado de pago')
+    } else {
+      fetchOrders()
+    }
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setUser(null)
@@ -309,6 +329,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
       pending: 'bg-yellow-100 text-yellow-800',
       confirmed: 'bg-blue-100 text-blue-800',
       in_progress: 'bg-purple-100 text-purple-800',
+      ready: 'bg-teal-100 text-teal-800',
       completed: 'bg-green-100 text-green-800',
       canceled: 'bg-red-100 text-red-800'
     }
@@ -324,10 +345,20 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     return colors[priority] || 'bg-gray-100 text-gray-800'
   }
 
+  const getPaymentColor = (paymentStatus) => {
+    const colors = {
+      unpaid: 'bg-red-100 text-red-800',
+      partial: 'bg-orange-100 text-orange-800',
+      paid: 'bg-green-100 text-green-800'
+    }
+    return colors[paymentStatus] || 'bg-gray-100 text-gray-800'
+  }
+
   const statusLabels = {
     pending: 'Pendiente',
     confirmed: 'Confirmado',
     in_progress: 'En Proceso',
+    ready: 'Listo para Entregar',
     completed: 'Completado',
     canceled: 'Cancelado'
   }
@@ -338,16 +369,47 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     urgent: 'Urgente'
   }
 
+  const paymentStatusLabels = {
+    unpaid: 'No Pagado',
+    partial: 'Pago Parcial',
+    paid: 'Pagado'
+  }
+
   const deliveryMethodLabels = {
     delivery: 'Entrega a Domicilio',
     pickup: 'Recoger en Tienda'
   }
+
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrders(prev => {
+      const next = new Set(prev)
+      if (next.has(orderId)) next.delete(orderId)
+      else next.add(orderId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedOrders.size === filteredOrders.length) {
+      setSelectedOrders(new Set())
+    } else {
+      setSelectedOrders(new Set(filteredOrders.map(o => o.id)))
+    }
+  }
+
+  const selectedOrderObjects = orders.filter(o => selectedOrders.has(o.id))
 
   const filteredOrders = orders.filter(order => {
     if (filterStatus !== 'all' && order.status !== filterStatus) return false
     if (filterPriority !== 'all' && order.priority !== filterPriority) return false
     return true
   }).sort((a, b) => {
+    // Primary: payment status (paid first, then partial, then unpaid)
+    const paymentOrder = { paid: 0, partial: 1, unpaid: 2 }
+    const payDiff = (paymentOrder[a.payment_status] ?? 2) - (paymentOrder[b.payment_status] ?? 2)
+    if (payDiff !== 0) return payDiff
+
+    // Secondary: selected sort criteria
     if (sortBy === 'priority') {
       const priorityOrder = { urgent: 0, normal: 1, low: 2 }
       return priorityOrder[a.priority] - priorityOrder[b.priority]
@@ -486,6 +548,38 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   <option value='delivery_date'>Ordenar: Fecha de entrega</option>
                 </select>
               </div>
+
+              {/* Selection controls */}
+              <div className='flex flex-wrap items-center gap-4 mt-4 pt-4 border-t'>
+                <label className='flex items-center gap-2 cursor-pointer'>
+                  <input
+                    type='checkbox'
+                    checked={filteredOrders.length > 0 && selectedOrders.size === filteredOrders.length}
+                    onChange={toggleSelectAll}
+                    className='w-4 h-4 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
+                  />
+                  <span className='text-sm text-gray-600'>
+                    {selectedOrders.size > 0 ? `${selectedOrders.size} seleccionado${selectedOrders.size > 1 ? 's' : ''}` : 'Seleccionar todos'}
+                  </span>
+                </label>
+
+                {selectedOrders.size > 0 && (
+                  <>
+                    <button
+                      onClick={() => setCalcOrder(selectedOrderObjects)}
+                      className='bg-amber-500 text-white px-5 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors shadow-md'
+                    >
+                      🧮 Calcular {selectedOrders.size} pedido{selectedOrders.size > 1 ? 's' : ''}
+                    </button>
+                    <button
+                      onClick={() => setSelectedOrders(new Set())}
+                      className='text-sm text-gray-500 hover:text-gray-700 underline'
+                    >
+                      Limpiar selección
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Orders List */}
@@ -497,16 +591,25 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             ) : (
               <div className='space-y-4'>
                 {filteredOrders.map((order) => (
-                  <div key={order.id} className='bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow'>
+                  <div key={order.id} className={`bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
                     <div className='flex justify-between items-start mb-4'>
                       <div className='flex-1'>
                         <div className='flex items-center gap-3 mb-3'>
+                          <input
+                            type='checkbox'
+                            checked={selectedOrders.has(order.id)}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className='w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500 flex-shrink-0'
+                          />
                           <h3 className='text-2xl font-bold text-gray-800'>Pedido #{order.order_number}</h3>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
                             {statusLabels[order.status]}
                           </span>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
                             {priorityLabels[order.priority]}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
+                            {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                           </span>
                         </div>
                         
@@ -577,6 +680,15 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                           <option key={key} value={key}>{label}</option>
                         ))}
                       </select>
+                      <select
+                        value={order.payment_status || 'unpaid'}
+                        onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
+                        className={`px-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 ${getPaymentColor(order.payment_status)}`}
+                      >
+                        {Object.entries(paymentStatusLabels).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
                       {order.customer_phone && (
                         <button
                           onClick={() => openWhatsApp(order)}
@@ -593,6 +705,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         className='px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
                       >
                         ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => setCalcOrder([order])}
+                        className='px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors'
+                      >
+                        🧮 Calcular
                       </button>
                       <button
                         onClick={() => deleteOrder(order.id)}
@@ -699,7 +817,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               </div>
 
               {/* Order Details */}
-              <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
                 <div>
                   <label className='block text-sm font-medium text-gray-700 mb-2'>Estado</label>
                   <select
@@ -720,6 +838,18 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                     className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
                   >
                     {Object.entries(priorityLabels).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className='block text-sm font-medium text-gray-700 mb-2'>Estado de Pago</label>
+                  <select
+                    value={formData.payment_status}
+                    onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                  >
+                    {Object.entries(paymentStatusLabels).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
                     ))}
                   </select>
@@ -909,6 +1039,11 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               </div>
             </form>
           </div>
+        )}
+
+        {/* Calculator Modal */}
+        {calcOrder && (
+          <OrderCalculator orders={calcOrder} onClose={() => setCalcOrder(null)} />
         )}
       </div>
     </div>
