@@ -1,11 +1,8 @@
 import ProductCard from '../components/ProductCard'
-import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
-import { TABLE } from '../utils/constants'
+import { useProductsInActiveSeason } from '../hooks/useProductsInActiveSeason'
 
 export default function Products({ selectedCategory, categories = [] }) {
-  const { data: products = [], isLoading } = useSupabaseQuery(TABLE.PRODUCT, {
-    order: { column: 'created_at', ascending: false }
-  })
+  const { data: products = [], isLoading } = useProductsInActiveSeason()
 
   // Build a map of category_id -> order for sorting products by category priority
   const categoryOrderMap = {}

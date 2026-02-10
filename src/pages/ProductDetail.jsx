@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useProductsInActiveSeason } from '../hooks/useProductsInActiveSeason'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
@@ -21,9 +22,7 @@ export default function ProductDetail() {
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
 
   // Fetch product data
-  const { data: products = [], isLoading, error } = useSupabaseQuery(TABLE.PRODUCT, {
-    order: { column: 'created_at', ascending: false }
-  })
+  const { data: products = [], isLoading, error } = useProductsInActiveSeason()
 
   // Find the specific product
   const product = products.find(p => p.id === id)
