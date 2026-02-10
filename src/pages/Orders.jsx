@@ -19,7 +19,7 @@ export default function Orders() {
   const [sortBy, setSortBy] = useState('created_at')
   const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
-
+  const [viewMode, setViewMode] = useState('list')
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -316,7 +316,7 @@ Detalles del pedido:
 ${order.order_items.map(item => `- ${item.product_name}, cantidad: ${item.quantity}`).join('\n')}
 
 Total: C$ ${parseFloat(order.total_amount).toFixed(2)}
-${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date).toLocaleDateString()}` : ''}`
+${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}` : ''}`
 
     const encodedMessage = encodeURIComponent(message)
     const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`
@@ -378,6 +378,96 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   const deliveryMethodLabels = {
     delivery: 'Entrega a Domicilio',
     pickup: 'Recoger en Tienda'
+  }
+
+  const getDeliveryCountdown = (deliveryDate, status) => {
+    if (!deliveryDate || status === 'completed' || status === 'canceled') return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const delivery = new Date(deliveryDate + 'T00:00:00')
+    const diffDays = Math.ceil((delivery - today) / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) return { text: `Vencido hace ${Math.abs(diffDays)}d`, color: 'bg-red-600 text-white' }
+    if (diffDays === 0) return { text: 'Hoy', color: 'bg-red-500 text-white' }
+    if (diffDays === 1) return { text: 'Mañana', color: 'bg-orange-500 text-white' }
+    if (diffDays <= 3) return { text: `${diffDays} días`, color: 'bg-orange-400 text-white' }
+    if (diffDays <= 7) return { text: `${diffDays} días`, color: 'bg-yellow-400 text-yellow-900' }
+    return { text: `${diffDays} días`, color: 'bg-green-100 text-green-800' }
+  }
+
+  const printLabels = (ordersToPrint) => {
+    const labelHtml = ordersToPrint.map(order => {
+      const items = order.order_items.map(i =>
+        `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
+      ).join('')
+      const payLabel = { paid: 'PAGADO', partial: 'PARCIAL', unpaid: 'NO PAGADO' }[order.payment_status] || 'NO PAGADO'
+      const payClass = { paid: 'paid', partial: 'partial', unpaid: 'unpaid' }[order.payment_status] || 'unpaid'
+      const delivery = order.estimated_delivery_date
+        ? new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')
+        : ''
+      const method = order.delivery_method === 'pickup' ? 'Recoger en Tienda' : 'Entrega a Domicilio'
+
+      return `<div class="label">
+        <div class="brand">MagicArte Nicaragua</div>
+        <div class="spacer"></div>
+        <div class="customer">Cliente: ${order.customer_name}</div>
+        ${order.customer_phone ? `<div class="phone">Telefono: ${order.customer_phone}</div>` : ''}
+        <div class="divider"></div>
+        <div class="section-title">Productos</div>
+        <div class="items">${items}</div>
+        <div class="divider"></div>
+        ${order.delivery_method === 'pickup'
+          ? `<div class="detail">Recoger en Tienda</div>`
+          : order.delivery_address
+            ? `<div class="section-title">Dirección de Entrega</div><div class="detail">${order.delivery_address}</div>`
+            : ''
+        }
+        ${order.notes ? `<div class="notes">${order.notes}</div>` : ''}
+        <div class="footer-row">
+          <div class="thanks">¡Gracias por tu compra! ✨</div>
+          <div class="qr-wrap">
+            <div class="qr-label">Visitanos</div>
+            <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https://magicarte.net" alt="QR" />
+          </div>
+        </div>
+      </div>`
+    }).join('')
+
+    const win = window.open('', '_blank', 'width=500,height=300')
+    win.document.write(`<!DOCTYPE html>
+<html><head><title>Etiquetas MagicArte</title>
+<style>
+  @page { size: 4in 2in; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  .label {
+    width: 4in; height: 2in; padding: 5px 10px;
+    page-break-after: auto; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .label:last-child { page-break-after: avoid; }
+  .brand { text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin-bottom: 1px; }
+  .spacer { height: 4px; }
+  .customer { font-size: 13px; font-weight: bold; text-align: center; }
+  .phone { font-size: 11px; text-align: center; }
+  .divider { border-top: 1px solid #000; margin: 4px 0; }
+  .items { margin-top: 2px; }
+  .item { font-size: 12px; line-height: 1.4; }
+  .qty { }
+  .detail { font-size: 11px; text-align: center; margin-top: 1px; }
+  .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+  .notes { font-size: 10px; text-align: center; margin-top: 2px; font-style: italic; }
+  .footer-row { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 3px; }
+  .thanks { font-size: 10px; font-style: italic; }
+  .qr-wrap { text-align: center; flex-shrink: 0; }
+  .qr-label { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
+  .qr { width: 45px; height: 45px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style></head><body>${labelHtml}</body></html>`)
+    win.document.close()
+    setTimeout(() => { win.print() }, 300)
   }
 
   const toggleOrderSelection = (orderId) => {
@@ -547,6 +637,13 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   <option value='priority'>Ordenar: Prioridad</option>
                   <option value='delivery_date'>Ordenar: Fecha de entrega</option>
                 </select>
+
+                <button
+                  onClick={() => setViewMode(viewMode === 'list' ? 'board' : 'list')}
+                  className={`px-4 py-2 rounded-xl font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                >
+                  {viewMode === 'board' ? '📋 Tablero' : '📋 Tablero'}
+                </button>
               </div>
 
               {/* Selection controls */}
@@ -572,6 +669,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       🧮 Calcular {selectedOrders.size} pedido{selectedOrders.size > 1 ? 's' : ''}
                     </button>
                     <button
+                      onClick={() => printLabels(selectedOrderObjects)}
+                      className='bg-gray-700 text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow-md'
+                    >
+                      🏷️ Etiquetas ({selectedOrders.size})
+                    </button>
+                    <button
                       onClick={() => setSelectedOrders(new Set())}
                       className='text-sm text-gray-500 hover:text-gray-700 underline'
                     >
@@ -582,11 +685,90 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               </div>
             </div>
 
-            {/* Orders List */}
+            {/* Orders View */}
             {loading ? (
               <div className='text-center py-12'>
                 <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-[#51c879] mx-auto mb-4'></div>
                 <p className='text-gray-600'>Cargando pedidos...</p>
+              </div>
+            ) : viewMode === 'board' ? (
+              /* Kanban Board */
+              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
+                {[
+                  { key: 'pending', label: 'Pendiente', color: 'yellow', icon: '🕐' },
+                  { key: 'confirmed', label: 'Confirmado', color: 'blue', icon: '✅' },
+                  { key: 'in_progress', label: 'En Proceso', color: 'purple', icon: '⚙️' },
+                  { key: 'ready', label: 'Listo para Entregar', color: 'teal', icon: '📦' }
+                ].map(col => {
+                  const colOrders = orders
+                    .filter(o => o.status === col.key)
+                    .sort((a, b) => {
+                      const priorityOrder = { urgent: 0, normal: 1, low: 2 }
+                      const pDiff = (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
+                      if (pDiff !== 0) return pDiff
+                      if (!a.estimated_delivery_date) return 1
+                      if (!b.estimated_delivery_date) return -1
+                      return new Date(a.estimated_delivery_date) - new Date(b.estimated_delivery_date)
+                    })
+
+                  const colColors = {
+                    yellow: 'from-yellow-400 to-yellow-500',
+                    blue: 'from-blue-400 to-blue-500',
+                    purple: 'from-purple-400 to-purple-500',
+                    teal: 'from-teal-400 to-teal-500'
+                  }
+
+                  return (
+                    <div key={col.key} className='flex flex-col'>
+                      <div className={`bg-gradient-to-r ${colColors[col.color]} text-white px-4 py-3 rounded-t-xl flex items-center justify-between`}>
+                        <span className='font-bold text-sm'>{col.icon} {col.label}</span>
+                        <span className='bg-white/30 px-2 py-0.5 rounded-full text-xs font-bold'>{colOrders.length}</span>
+                      </div>
+                      <div className='bg-gray-100 rounded-b-xl p-2 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto'>
+                        {colOrders.length === 0 && (
+                          <p className='text-center text-gray-400 text-sm py-8'>Sin pedidos</p>
+                        )}
+                        {colOrders.map(order => {
+                          const countdown = getDeliveryCountdown(order.estimated_delivery_date, order.status)
+                          return (
+                            <div
+                              key={order.id}
+                              className='bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer'
+                              onClick={() => editOrder(order)}
+                            >
+                              <div className='flex items-center justify-between mb-1'>
+                                <span className='font-bold text-sm text-gray-800 truncate'>{order.customer_name}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityColor(order.priority)}`}>
+                                  {priorityLabels[order.priority]}
+                                </span>
+                              </div>
+                              <div className='text-xs text-gray-500 mb-1'>
+                                {order.order_items?.length || 0} producto{(order.order_items?.length || 0) !== 1 ? 's' : ''}
+                                <span className='mx-1'>·</span>
+                                C$ {parseFloat(order.total_amount).toFixed(0)}
+                              </div>
+                              <div className='flex items-center justify-between'>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPaymentColor(order.payment_status)}`}>
+                                  {paymentStatusLabels[order.payment_status] || 'No Pagado'}
+                                </span>
+                                {countdown && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${countdown.color}`}>
+                                    ⏳ {countdown.text}
+                                  </span>
+                                )}
+                              </div>
+                              {order.estimated_delivery_date && (
+                                <div className='text-[10px] text-gray-400 mt-1'>
+                                  📅 {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <div className='space-y-4'>
@@ -619,17 +801,24 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                           {order.customer_social_media && <p><strong>Redes:</strong> {order.customer_social_media}</p>}
                           {order.delivery_address && <p><strong>Dirección:</strong> {order.delivery_address}</p>}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
-                          {order.order_date && <p><strong>Fecha del Encargo:</strong> {new Date(order.order_date).toLocaleDateString()}</p>}
+                          {order.order_date && <p><strong>Fecha del Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
                       </div>
                       
                       <div className='text-right ml-4'>
                         <p className='text-3xl font-bold text-[#51c879]'>C$ {parseFloat(order.total_amount).toFixed(2)}</p>
-                        <p className='text-sm text-gray-500 mt-1'>{new Date(order.created_at).toLocaleDateString()}</p>
+                        <p className='text-sm text-gray-500 mt-1'>{new Date(order.created_at).toLocaleDateString('es-NI')}</p>
                         {order.estimated_delivery_date && (
-                          <p className='text-sm text-gray-600 mt-1'>
-                            📅 Entrega: {new Date(order.estimated_delivery_date).toLocaleDateString()}
-                          </p>
+                          <div className='mt-1'>
+                            <p className='text-sm text-gray-600'>
+                              📅 Entrega: {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
+                            </p>
+                            {getDeliveryCountdown(order.estimated_delivery_date, order.status) && (
+                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${getDeliveryCountdown(order.estimated_delivery_date, order.status).color}`}>
+                                ⏳ {getDeliveryCountdown(order.estimated_delivery_date, order.status).text}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -713,6 +902,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         🧮 Calcular
                       </button>
                       <button
+                        onClick={() => printLabels([order])}
+                        className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
+                      >
+                        🏷️ Etiqueta
+                      </button>
+                      <button
                         onClick={() => deleteOrder(order.id)}
                         className='px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors'
                       >
@@ -732,20 +927,22 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             )}
           </>
         ) : (
-          <div className='bg-white rounded-2xl shadow-lg p-6'>
-            <div className='flex justify-between items-center mb-6'>
-              <h2 className='text-2xl font-bold text-gray-800'>
-                {editingOrder ? 'Editar Pedido' : 'Nuevo Pedido'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className='text-gray-500 hover:text-gray-700 text-3xl'
-              >
-                ×
-              </button>
-            </div>
+          <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
+            <div className='bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col'>
+              <div className='flex justify-between items-center p-6 border-b'>
+                <h2 className='text-2xl font-bold text-gray-800'>
+                  {editingOrder ? 'Editar Pedido' : 'Nuevo Pedido'}
+                </h2>
+                <button
+                  onClick={resetForm}
+                  className='text-gray-500 hover:text-gray-700 text-3xl leading-none'
+                >
+                  ×
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className='space-y-6'>
+              <form onSubmit={handleSubmit} className='flex flex-col flex-1 overflow-hidden'>
+                <div className='flex-1 overflow-y-auto p-6 space-y-6'>
               {/* Customer Info */}
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
@@ -1021,7 +1218,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               </div>
 
               {/* Submit Buttons */}
-              <div className='flex gap-4 pt-6 border-t'>
+              </div>
+              <div className='flex gap-4 p-6 border-t bg-white rounded-b-2xl'>
                 <button
                   type='button'
                   onClick={resetForm}
@@ -1038,6 +1236,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 </button>
               </div>
             </form>
+          </div>
           </div>
         )}
 
