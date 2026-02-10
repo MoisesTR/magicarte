@@ -7,6 +7,7 @@ import { getImageUrl } from '../utils/getImageUrl'
 import { uploadCompressedImage } from '../utils/uploadImage'
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
+import toast from 'react-hot-toast'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -75,7 +76,7 @@ export default function Admin() {
 
     try {
       await navigator.clipboard.writeText(text)
-      alert('Listing copiado al portapapeles')
+      toast.success('Listing copiado al portapapeles')
     } catch (error) {
       const textarea = document.createElement('textarea')
       textarea.value = text
@@ -85,9 +86,9 @@ export default function Admin() {
       textarea.select()
       try {
         document.execCommand('copy')
-        alert('Listing copiado al portapapeles')
+        toast.success('Listing copiado al portapapeles')
       } catch (copyError) {
-        alert('No se pudo copiar el listing')
+        toast.error('No se pudo copiar el listing')
       } finally {
         document.body.removeChild(textarea)
       }
@@ -102,13 +103,13 @@ export default function Admin() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        alert(`Error al cargar productos: ${error.message}`)
+        toast.error(`Error al cargar productos: ${error.message}`)
       } else {
         // Products loaded successfully
         setProducts(data || [])
       }
     } catch (error) {
-      alert('Error inesperado al cargar productos')
+      toast.error('Error inesperado al cargar productos')
     }
   }
 
@@ -131,7 +132,7 @@ export default function Admin() {
 
         // Si es error de permisos, mostrar mensaje específico
         if (uploadError.message?.includes('row-level security') || uploadError.statusCode === '403') {
-          alert('Error de Storage: Verifica las políticas del bucket "images" en Supabase')
+          toast.error('Error de Storage: Verifica las políticas del bucket "images" en Supabase')
           return null
         }
 
@@ -189,17 +190,17 @@ export default function Admin() {
 
         // Mensaje específico para errores de permisos
         if (result.error.message?.includes('row-level security') || result.error.code === '42501') {
-          alert('Error de permisos: Necesitas configurar las políticas de Supabase. Ve a tu dashboard > Authentication > Policies y permite operaciones en la tabla "products".')
+          toast.error('Error de permisos: Configura las políticas de Supabase para la tabla "products".')
         } else {
-          alert(`Error al guardar el producto: ${result.error.message}`)
+          toast.error(`Error al guardar el producto: ${result.error.message}`)
         }
       } else {
-        alert(editingProduct ? 'Producto actualizado exitosamente!' : 'Producto creado exitosamente!')
+        toast.success(editingProduct ? 'Producto actualizado!' : 'Producto creado!')
         resetForm()
         fetchProducts()
       }
     } catch (error) {
-      alert('Error al procesar la solicitud')
+      toast.error('Error al procesar la solicitud')
     } finally {
       setLoading(false)
     }
@@ -247,9 +248,9 @@ export default function Admin() {
       .eq('id', id)
 
     if (error) {
-      alert('Error al eliminar el producto')
+      toast.error('Error al eliminar el producto')
     } else {
-      alert('Producto eliminado')
+      toast.success('Producto eliminado')
       fetchProducts()
     }
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../config/supabaseClient'
 import { TABLE } from '../utils/constants'
+import toast from 'react-hot-toast'
 
 export default function OrdersManager({ isOpen, onClose }) {
   const [orders, setOrders] = useState([])
@@ -47,7 +48,7 @@ export default function OrdersManager({ isOpen, onClose }) {
       if (error) throw error
       setOrders(data || [])
     } catch (error) {
-      alert('Error al cargar pedidos: ' + error.message)
+      toast.error('Error al cargar pedidos: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -164,11 +165,11 @@ export default function OrdersManager({ isOpen, onClose }) {
 
       if (itemsError) throw itemsError
 
-      alert(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
+      toast.success(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
       resetForm()
       fetchOrders()
     } catch (error) {
-      alert('Error: ' + error.message)
+      toast.error('Error: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -224,9 +225,9 @@ export default function OrdersManager({ isOpen, onClose }) {
       .eq('id', id)
 
     if (error) {
-      alert('Error al eliminar')
+      toast.error('Error al eliminar')
     } else {
-      alert('Pedido eliminado')
+      toast.success('Pedido eliminado')
       fetchOrders()
     }
   }
@@ -243,7 +244,7 @@ export default function OrdersManager({ isOpen, onClose }) {
       .eq('id', id)
 
     if (error) {
-      alert('Error al actualizar estado')
+      toast.error('Error al actualizar estado')
     } else {
       fetchOrders()
     }

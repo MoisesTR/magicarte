@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../config/supabaseClient'
 import { TABLE } from '../utils/constants'
+import toast from 'react-hot-toast'
 import {
   loadConfig, MATERIAL_LABELS, MATERIAL_OPTIONS, SHEET_CM2,
 } from '../utils/calculatorConfig'
@@ -103,9 +104,9 @@ export default function OrderCalculator({ orders, onClose }) {
           .eq('id', order.id)
         if (error) throw error
       }
-      alert('✅ Datos guardados')
+      toast.success('Datos guardados')
     } catch (err) {
-      alert('Error al guardar: ' + err.message)
+      toast.error('Error al guardar: ' + err.message)
     } finally {
       setSaving(false)
     }

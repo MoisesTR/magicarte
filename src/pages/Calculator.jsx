@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
+import toast from 'react-hot-toast'
 import {
   loadConfig, saveConfig as persistConfig,
   loadQuotes, saveQuotes,
@@ -181,7 +182,7 @@ export default function Calculator() {
   // ─── Save quote ───
   const guardarCotizacion = () => {
     if (!form.nombre) {
-      alert('Ingresa un nombre para el producto')
+      toast.error('Ingresa un nombre para el producto')
       return
     }
     const quotes = loadQuotes()
@@ -192,7 +193,7 @@ export default function Calculator() {
       precioVenta: formatC(r.precioVenta),
     })
     saveQuotes(quotes)
-    alert('✅ Cotización guardada')
+    toast.success('Cotización guardada')
   }
 
   const cargarCotizacion = (quote) => {
@@ -261,8 +262,8 @@ PRECIO VENTA: ${formatC(r.precioVenta)}
 TU SUELDO: ${formatC(r.manoObraCosto)}
 INGRESO TOTAL: ${formatC(r.ganancia + r.manoObraCosto)}
 ========================================`
-    navigator.clipboard.writeText(log).then(() => alert('✅ Resumen copiado'))
-      .catch(() => alert('No se pudo copiar'))
+    navigator.clipboard.writeText(log).then(() => toast.success('Resumen copiado'))
+      .catch(() => toast.error('No se pudo copiar'))
   }
 
   if (checkingAuth) {

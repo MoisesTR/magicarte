@@ -1,3 +1,4 @@
+import { Toaster } from 'react-hot-toast'
 import ReactGA from 'react-ga4'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
@@ -26,6 +27,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
       <AppProvider>
+        <Toaster position='top-right' toastOptions={{ duration: 3000, style: { borderRadius: '12px', padding: '12px 16px' } }} />
         <Router>
           <Routes>
             <Route path='/' element={<Home />} />

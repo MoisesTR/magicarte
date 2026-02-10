@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { TABLE } from '../utils/constants'
 import OrderCalculator from '../components/OrderCalculator'
+import toast from 'react-hot-toast'
 
 export default function Orders() {
   const navigate = useNavigate()
@@ -20,6 +21,7 @@ export default function Orders() {
   const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState('list')
+  const [draggedOrderId, setDraggedOrderId] = useState(null)
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -32,6 +34,9 @@ export default function Orders() {
     payment_status: 'unpaid',
     notes: '',
     estimated_delivery_date: '',
+    delivery_fee: 0,
+    recipient_name: '',
+    recipient_phone: '',
     items: []
   })
 
@@ -67,7 +72,7 @@ export default function Orders() {
       if (error) throw error
       setOrders(data || [])
     } catch (error) {
-      alert('Error al cargar pedidos: ' + error.message)
+      toast.error('Error al cargar pedidos: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -86,6 +91,9 @@ export default function Orders() {
       ...formData,
       items: [...formData.items, {
         product_id: null,
+        product_query: '',
+        product_open: false,
+        product_active_index: -1,
         product_name: '',
         product_description: '',
         quantity: 1,
@@ -107,16 +115,89 @@ export default function Orders() {
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items]
     newItems[index][field] = value
-    
+
+    if (field === 'product_query') {
+      const query = value?.trim() || ''
+      if (query !== newItems[index].product_name) {
+        newItems[index].product_id = null
+        newItems[index].product_name = ''
+        newItems[index].unit_price = 0
+      }
+      newItems[index].product_open = true
+      newItems[index].product_active_index = 0
+    }
+
     if (field === 'product_id' && value) {
       const product = products.find(p => p.id === value)
       if (product) {
         newItems[index].product_name = product.name
         newItems[index].unit_price = product.price
+        newItems[index].product_query = product.name
+        newItems[index].product_open = false
+        newItems[index].product_active_index = -1
+      }
+    }
+
+    if (field === 'is_custom') {
+      if (value) {
+        newItems[index].product_id = null
+        newItems[index].product_query = ''
+        newItems[index].product_open = false
+        newItems[index].product_active_index = -1
+        newItems[index].product_name = ''
+        newItems[index].product_description = ''
+        newItems[index].unit_price = 0
       }
     }
     
     setFormData({ ...formData, items: newItems })
+  }
+
+  const selectProduct = (index, product) => {
+    const newItems = [...formData.items]
+    newItems[index].product_id = product.id
+    newItems[index].product_name = product.name
+    newItems[index].unit_price = product.price
+    newItems[index].product_query = product.name
+    newItems[index].product_open = false
+    newItems[index].product_active_index = -1
+    setFormData({ ...formData, items: newItems })
+  }
+
+  const highlightMatch = (name, query) => {
+    const q = query.trim()
+    if (!q) return name
+    const idx = name.toLowerCase().indexOf(q.toLowerCase())
+    if (idx === -1) return name
+    const before = name.slice(0, idx)
+    const match = name.slice(idx, idx + q.length)
+    const after = name.slice(idx + q.length)
+    return (
+      <>
+        {before}
+        <span className='text-blue-700 bg-blue-100 rounded px-0.5'>{match}</span>
+        {after}
+      </>
+    )
+  }
+
+  const handleProductKeyDown = (index, e, matches) => {
+    if (!matches.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      updateItem(index, 'product_active_index', Math.min((formData.items[index].product_active_index ?? 0) + 1, matches.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      updateItem(index, 'product_active_index', Math.max((formData.items[index].product_active_index ?? 0) - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const active = formData.items[index].product_active_index ?? 0
+      const product = matches[active]
+      if (product) selectProduct(index, product)
+    } else if (e.key === 'Escape') {
+      updateItem(index, 'product_open', false)
+      updateItem(index, 'product_active_index', -1)
+    }
   }
 
   const calculateTotal = () => {
@@ -142,6 +223,9 @@ export default function Orders() {
         payment_status: formData.payment_status,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
+        delivery_fee: formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0,
+        recipient_name: formData.delivery_method === 'delivery' ? (formData.recipient_name || null) : null,
+        recipient_phone: formData.delivery_method === 'delivery' ? (formData.recipient_phone || null) : null,
         total_amount: calculateTotal()
       }
 
@@ -187,11 +271,11 @@ export default function Orders() {
 
       if (itemsError) throw itemsError
 
-      alert(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
+      toast.success(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
       resetForm()
       fetchOrders()
     } catch (error) {
-      alert('Error: ' + error.message)
+      toast.error('Error: ' + error.message)
     } finally {
       setLoading(false)
     }
@@ -210,6 +294,9 @@ export default function Orders() {
       payment_status: 'unpaid',
       notes: '',
       estimated_delivery_date: '',
+      delivery_fee: 0,
+      recipient_name: '',
+      recipient_phone: '',
       items: []
     })
     setEditingOrder(null)
@@ -229,8 +316,14 @@ export default function Orders() {
       payment_status: order.payment_status || 'unpaid',
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
+      delivery_fee: order.delivery_fee || 0,
+      recipient_name: order.recipient_name || '',
+      recipient_phone: order.recipient_phone || '',
       items: order.order_items.map(item => ({
         product_id: item.product_id,
+        product_query: item.product_id ? item.product_name : '',
+        product_open: false,
+        product_active_index: -1,
         product_name: item.product_name,
         product_description: item.product_description || '',
         quantity: item.quantity,
@@ -253,9 +346,9 @@ export default function Orders() {
       .eq('id', id)
 
     if (error) {
-      alert('Error al eliminar')
+      toast.error('Error al eliminar')
     } else {
-      alert('Pedido eliminado')
+      toast.success('Pedido eliminado')
       fetchOrders()
     }
   }
@@ -272,10 +365,21 @@ export default function Orders() {
       .eq('id', id)
 
     if (error) {
-      alert('Error al actualizar estado')
+      toast.error('Error al actualizar estado')
     } else {
       fetchOrders()
     }
+  }
+
+  const handleBoardDrop = (newStatus) => {
+    if (!draggedOrderId) return
+    const order = orders.find(o => o.id === draggedOrderId)
+    if (order && order.status !== newStatus) {
+      // Optimistic update
+      setOrders(prev => prev.map(o => o.id === draggedOrderId ? { ...o, status: newStatus } : o))
+      updateOrderStatus(draggedOrderId, newStatus)
+    }
+    setDraggedOrderId(null)
   }
 
   const updatePaymentStatus = async (id, payment_status) => {
@@ -285,7 +389,7 @@ export default function Orders() {
       .eq('id', id)
 
     if (error) {
-      alert('Error al actualizar estado de pago')
+      toast.error('Error al actualizar estado de pago')
     } else {
       fetchOrders()
     }
@@ -300,7 +404,7 @@ export default function Orders() {
   const openWhatsApp = (order) => {
     let phone = order.customer_phone
     if (!phone) {
-      alert('Este pedido no tiene número de teléfono registrado')
+      toast.error('Este pedido no tiene número de teléfono registrado')
       return
     }
 
@@ -315,7 +419,8 @@ Te escribo sobre tu pedido.
 Detalles del pedido:
 ${order.order_items.map(item => `- ${item.product_name}, cantidad: ${item.quantity}`).join('\n')}
 
-Total: C$ ${parseFloat(order.total_amount).toFixed(2)}
+Total productos: C$ ${parseFloat(order.total_amount).toFixed(2)}
+${order.delivery_fee > 0 ? `Delivery: C$ ${parseFloat(order.delivery_fee).toFixed(2)}\nTotal: C$ ${(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}` : ''}
 ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}` : ''}`
 
     const encodedMessage = encodeURIComponent(message)
@@ -387,12 +492,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     const delivery = new Date(deliveryDate + 'T00:00:00')
     const diffDays = Math.ceil((delivery - today) / (1000 * 60 * 60 * 24))
 
-    if (diffDays < 0) return { text: `Vencido hace ${Math.abs(diffDays)}d`, color: 'bg-red-600 text-white' }
-    if (diffDays === 0) return { text: 'Hoy', color: 'bg-red-500 text-white' }
-    if (diffDays === 1) return { text: 'Mañana', color: 'bg-orange-500 text-white' }
-    if (diffDays <= 3) return { text: `${diffDays} días`, color: 'bg-orange-400 text-white' }
-    if (diffDays <= 7) return { text: `${diffDays} días`, color: 'bg-yellow-400 text-yellow-900' }
-    return { text: `${diffDays} días`, color: 'bg-green-100 text-green-800' }
+    if (diffDays < 0) return { text: `Vencido (${Math.abs(diffDays)}d)`, color: 'bg-red-700 text-white' }
+    if (diffDays === 0) return { text: 'Hoy', color: 'bg-red-600 text-white' }
+    if (diffDays === 1) return { text: 'Mañana', color: 'bg-orange-600 text-white' }
+    if (diffDays <= 3) return { text: `${diffDays} días`, color: 'bg-amber-500 text-white' }
+    if (diffDays <= 7) return { text: `${diffDays} días`, color: 'bg-sky-100 text-sky-800 border border-sky-300' }
+    return { text: `${diffDays} días`, color: 'bg-emerald-100 text-emerald-800 border border-emerald-300' }
   }
 
   const printLabels = (ordersToPrint) => {
@@ -407,11 +512,14 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
         : ''
       const method = order.delivery_method === 'pickup' ? 'Recoger en Tienda' : 'Entrega a Domicilio'
 
+      const labelName = order.recipient_name || order.customer_name
+      const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
+
       return `<div class="label">
         <div class="brand">MagicArte Nicaragua</div>
         <div class="spacer"></div>
-        <div class="customer">Cliente: ${order.customer_name}</div>
-        ${order.customer_phone ? `<div class="phone">Telefono: ${order.customer_phone}</div>` : ''}
+        <div class="customer">${labelName}</div>
+        ${labelPhone ? `<div class="phone">Telefono: ${labelPhone}</div>` : ''}
         <div class="divider"></div>
         <div class="section-title">Productos</div>
         <div class="items">${items}</div>
@@ -672,7 +780,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       onClick={() => printLabels(selectedOrderObjects)}
                       className='bg-gray-700 text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow-md'
                     >
-                      🏷️ Etiquetas ({selectedOrders.size})
+                      🖨️ Imprimir ({selectedOrders.size})
                     </button>
                     <button
                       onClick={() => setSelectedOrders(new Set())}
@@ -724,7 +832,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         <span className='font-bold text-sm'>{col.icon} {col.label}</span>
                         <span className='bg-white/30 px-2 py-0.5 rounded-full text-xs font-bold'>{colOrders.length}</span>
                       </div>
-                      <div className='bg-gray-100 rounded-b-xl p-2 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto'>
+                      <div
+                        className={`bg-gray-100 rounded-b-xl p-2 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto transition-colors ${draggedOrderId ? 'border-2 border-dashed border-gray-300' : ''}`}
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-gray-200') }}
+                        onDragLeave={(e) => { e.currentTarget.classList.remove('bg-gray-200') }}
+                        onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-gray-200'); handleBoardDrop(col.key) }}
+                      >
                         {colOrders.length === 0 && (
                           <p className='text-center text-gray-400 text-sm py-8'>Sin pedidos</p>
                         )}
@@ -733,7 +846,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                           return (
                             <div
                               key={order.id}
-                              className='bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer'
+                              draggable
+                              onDragStart={() => setDraggedOrderId(order.id)}
+                              onDragEnd={() => setDraggedOrderId(null)}
+                              className={`bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${draggedOrderId === order.id ? 'opacity-50' : ''}`}
                               onClick={() => editOrder(order)}
                             >
                               <div className='flex items-center justify-between mb-1'>
@@ -752,8 +868,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                                   {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                                 </span>
                                 {countdown && (
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${countdown.color}`}>
-                                    ⏳ {countdown.text}
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${countdown.color}`}>
+                                    {countdown.text}
                                   </span>
                                 )}
                               </div>
@@ -798,8 +914,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-600'>
                           <p><strong>Cliente:</strong> {order.customer_name}</p>
                           {order.customer_phone && <p><strong>Teléfono:</strong> {order.customer_phone}</p>}
-                          {order.customer_social_media && <p><strong>Redes:</strong> {order.customer_social_media}</p>}
                           {order.delivery_address && <p><strong>Dirección:</strong> {order.delivery_address}</p>}
+                          {order.recipient_name && (
+                            <p><strong>Recibe:</strong> {order.recipient_name}{order.recipient_phone ? ` — ${order.recipient_phone}` : ''}</p>
+                          )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
                           {order.order_date && <p><strong>Fecha del Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
@@ -807,6 +925,12 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       
                       <div className='text-right ml-4'>
                         <p className='text-3xl font-bold text-[#51c879]'>C$ {parseFloat(order.total_amount).toFixed(2)}</p>
+                        {order.delivery_fee > 0 && (
+                          <p className='text-xs text-gray-500'>+ Delivery: C$ {parseFloat(order.delivery_fee).toFixed(2)}</p>
+                        )}
+                        {order.delivery_fee > 0 && (
+                          <p className='text-sm font-semibold text-gray-700'>Total cliente: C$ {(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}</p>
+                        )}
                         <p className='text-sm text-gray-500 mt-1'>{new Date(order.created_at).toLocaleDateString('es-NI')}</p>
                         {order.estimated_delivery_date && (
                           <div className='mt-1'>
@@ -814,8 +938,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                               📅 Entrega: {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
                             </p>
                             {getDeliveryCountdown(order.estimated_delivery_date, order.status) && (
-                              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-bold ${getDeliveryCountdown(order.estimated_delivery_date, order.status).color}`}>
-                                ⏳ {getDeliveryCountdown(order.estimated_delivery_date, order.status).text}
+                              <span className={`inline-block mt-1 px-3 py-1 rounded-lg text-sm font-bold ${getDeliveryCountdown(order.estimated_delivery_date, order.status).color}`}>
+                                {getDeliveryCountdown(order.estimated_delivery_date, order.status).text}
                               </span>
                             )}
                           </div>
@@ -905,7 +1029,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         onClick={() => printLabels([order])}
                         className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
                       >
-                        🏷️ Etiqueta
+                        🖨️ Imprimir
                       </button>
                       <button
                         onClick={() => deleteOrder(order.id)}
@@ -968,16 +1092,6 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
 
               <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                 <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Redes Sociales</label>
-                  <input
-                    type='text'
-                    value={formData.customer_social_media}
-                    onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                    placeholder='@usuario o enlace'
-                  />
-                </div>
-                <div>
                   <label className='block text-sm font-medium text-gray-700 mb-2'>Dirección de Entrega</label>
                   <input
                     type='text'
@@ -1012,6 +1126,43 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   />
                 </div>
               </div>
+
+              {formData.delivery_method === 'delivery' && (
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-2'>Costo de Delivery (C$)</label>
+                    <input
+                      type='number'
+                      step='0.01'
+                      min='0'
+                      value={formData.delivery_fee}
+                      onChange={(e) => setFormData({ ...formData, delivery_fee: parseFloat(e.target.value) || 0 })}
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                      placeholder='0.00'
+                    />
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-2'>Persona que Recibe</label>
+                    <input
+                      type='text'
+                      value={formData.recipient_name}
+                      onChange={(e) => setFormData({ ...formData, recipient_name: e.target.value })}
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                      placeholder='Si es diferente al cliente'
+                    />
+                  </div>
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-2'>Teléfono de quien Recibe</label>
+                    <input
+                      type='text'
+                      value={formData.recipient_phone}
+                      onChange={(e) => setFormData({ ...formData, recipient_phone: e.target.value })}
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                      placeholder='Si es diferente al cliente'
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Order Details */}
               <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
@@ -1112,16 +1263,80 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         {!item.is_custom ? (
                           <div className='md:col-span-2'>
                             <label className='block text-sm font-medium text-gray-700 mb-2'>Producto del Catálogo</label>
-                            <select
-                              value={item.product_id || ''}
-                              onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                              className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                            >
-                              <option value=''>Seleccionar producto</option>
-                              {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} - C$ {p.price}</option>
-                              ))}
-                            </select>
+                            <div className='relative'>
+                              {(() => {
+                                const query = (item.product_query || '').trim().toLowerCase()
+                                const matches = query
+                                  ? products.filter(p => p.name.toLowerCase().includes(query))
+                                  : products
+                                const visible = matches.slice(0, 8)
+                                const activeIndex = item.product_active_index ?? 0
+                                return (
+                                  <>
+                                    <div className='relative'>
+                                      <input
+                                        type='text'
+                                        value={item.product_query || ''}
+                                        onChange={(e) => updateItem(index, 'product_query', e.target.value)}
+                                        onFocus={() => updateItem(index, 'product_open', true)}
+                                        onBlur={() => {
+                                          setTimeout(() => {
+                                            updateItem(index, 'product_open', false)
+                                            updateItem(index, 'product_active_index', -1)
+                                          }, 120)
+                                        }}
+                                        onKeyDown={(e) => handleProductKeyDown(index, e, visible)}
+                                        className='w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white'
+                                        placeholder='Busca un producto por nombre...'
+                                        role='combobox'
+                                        aria-expanded={item.product_open ? 'true' : 'false'}
+                                        aria-controls={`product-list-${index}`}
+                                      />
+                                      <div className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>
+                                        🔎
+                                      </div>
+                                    </div>
+
+                                    {item.product_id && (
+                                      <div className='mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'>
+                                        Seleccionado: {item.product_name} · C$ {parseFloat(item.unit_price).toFixed(2)}
+                                      </div>
+                                    )}
+
+                                    {item.product_open && (
+                                      <div
+                                        id={`product-list-${index}`}
+                                        role='listbox'
+                                        className='absolute z-10 mt-2 w-full max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl'
+                                        onMouseDown={(e) => e.preventDefault()}
+                                      >
+                                        {visible.length === 0 ? (
+                                          <div className='px-4 py-3 text-sm text-gray-500'>No hay resultados.</div>
+                                        ) : (
+                                          visible.map((p, i) => (
+                                            <button
+                                              key={p.id}
+                                              type='button'
+                                              role='option'
+                                              aria-selected={item.product_id === p.id}
+                                              onClick={() => selectProduct(index, p)}
+                                              className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 ${
+                                                i === activeIndex ? 'bg-blue-50' : 'bg-white'
+                                              } hover:bg-blue-50 transition-colors`}
+                                            >
+                                              <div className='truncate font-medium text-gray-800'>
+                                                {highlightMatch(p.name, item.product_query || '')}
+                                              </div>
+                                              <div className='text-sm text-gray-500'>C$ {parseFloat(p.price).toFixed(2)}</div>
+                                            </button>
+                                          ))
+                                        )}
+                                      </div>
+                                    )}
+                                  </>
+                                )
+                              })()}
+                            </div>
                           </div>
                         ) : (
                           <>
@@ -1211,8 +1426,16 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 </div>
 
                 <div className='mt-6 text-right bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 p-4 rounded-xl'>
-                  <p className='text-3xl font-bold text-gray-900'>
-                    Total: C$ {calculateTotal().toFixed(2)}
+                  <p className='text-xl text-gray-700'>
+                    Productos: C$ {calculateTotal().toFixed(2)}
+                  </p>
+                  {formData.delivery_method === 'delivery' && formData.delivery_fee > 0 && (
+                    <p className='text-sm text-gray-500 mt-1'>
+                      Delivery: C$ {parseFloat(formData.delivery_fee).toFixed(2)}
+                    </p>
+                  )}
+                  <p className='text-3xl font-bold text-gray-900 mt-1'>
+                    Total: C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0)).toFixed(2)}
                   </p>
                 </div>
               </div>

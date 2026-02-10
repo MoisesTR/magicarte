@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
+import toast from 'react-hot-toast'
 
 export default function CategoryManager({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false)
@@ -33,14 +34,14 @@ export default function CategoryManager({ isOpen, onClose }) {
           .insert([{ name: formData.name, order: parseInt(formData.order) }])
       }
       if (result.error) {
-        alert(`Error: ${result.error.message}`)
+        toast.error(`Error: ${result.error.message}`)
       } else {
-        alert(editingCategory ? 'Categoría actualizada' : 'Categoría creada')
+        toast.success(editingCategory ? 'Categoría actualizada' : 'Categoría creada')
         resetForm()
         refetch()
       }
     } catch (error) {
-      alert('Error al procesar la solicitud')
+      toast.error('Error al procesar la solicitud')
     } finally {
       setLoading(false)
     }
@@ -60,9 +61,9 @@ export default function CategoryManager({ isOpen, onClose }) {
     if (!confirm('¿Estás seguro de eliminar esta categoría?')) return
     const { error } = await supabase.from('categories').delete().eq('id', id)
     if (error) {
-      alert('Error al eliminar la categoría')
+      toast.error('Error al eliminar la categoría')
     } else {
-      alert('Categoría eliminada')
+      toast.success('Categoría eliminada')
       refetch()
     }
   }
@@ -122,12 +123,12 @@ export default function CategoryManager({ isOpen, onClose }) {
       }))
       const { error } = await supabase.from('categories').upsert(updates)
       if (error) {
-        alert('Error al reordenar: ' + error.message)
+        toast.error('Error al reordenar: ' + error.message)
       } else {
         refetch()
       }
     } catch (err) {
-      alert('Error al guardar el orden')
+      toast.error('Error al guardar el orden')
     } finally {
       setReordering(false)
     }

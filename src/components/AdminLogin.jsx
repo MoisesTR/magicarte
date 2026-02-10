@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../config/supabaseClient'
+import toast from 'react-hot-toast'
 
 export default function AdminLogin({ onLogin }) {
   const [email, setEmail] = useState('')
@@ -17,12 +18,12 @@ export default function AdminLogin({ onLogin }) {
       })
 
       if (error) {
-        alert('Error de login: ' + error.message)
+        toast.error('Error de login: ' + error.message)
       } else {
         onLogin(data.user)
       }
     } catch (error) {
-      alert('Error: ' + error.message)
+      toast.error('Error: ' + error.message)
     } finally {
       setLoading(false)
     }
