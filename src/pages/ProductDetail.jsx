@@ -36,6 +36,38 @@ export default function ProductDetail() {
   const category = categories.find(c => c.id === product?.category_id)
 
   useEffect(() => {
+    if (!product) return
+    const title = `${product.name} - MagicArte`
+    document.title = title
+
+    const setMeta = (attr, key, content) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`)
+      if (el) el.setAttribute('content', content)
+    }
+
+    setMeta('name', 'description', product.description || '')
+    setMeta('property', 'og:title', title)
+    setMeta('property', 'og:description', product.description || '')
+    setMeta('property', 'og:image', getImageUrl(product.image_url))
+    setMeta('property', 'og:url', window.location.href)
+    setMeta('name', 'twitter:title', title)
+    setMeta('name', 'twitter:description', product.description || '')
+    setMeta('name', 'twitter:image', getImageUrl(product.image_url))
+
+    return () => {
+      document.title = 'MagicArte - Arte Hecho con Amor'
+      setMeta('name', 'description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
+      setMeta('property', 'og:title', 'MagicArte - Arte Hecho con Amor')
+      setMeta('property', 'og:description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
+      setMeta('property', 'og:image', '/assets/magic-arte-preview.webp')
+      setMeta('property', 'og:url', 'https://www.magicarte.lat')
+      setMeta('name', 'twitter:title', 'MagicArte - Arte Hecho con Amor')
+      setMeta('name', 'twitter:description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
+      setMeta('name', 'twitter:image', '/assets/magic-arte-preview.webp')
+    }
+  }, [product])
+
+  useEffect(() => {
     if (product?.image_url) {
       setSelectedImage(product.image_url)
     }
