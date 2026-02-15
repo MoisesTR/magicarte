@@ -638,7 +638,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     in_progress: filteredOrders.filter(o => o.status === 'in_progress').length,
     completed: filteredOrders.filter(o => o.status === 'completed').length,
     revenue: totalRevenue,
-    expectedRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
+    expectedRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0),
+    pending_payment: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0) - totalRevenue
   }
 
   // Build available months from orders for the dropdown
@@ -689,7 +690,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
           </div>
 
           {/* Stats */}
-          <div className='grid grid-cols-2 md:grid-cols-6 gap-4'>
+          <div className='grid grid-cols-2 md:grid-cols-7 gap-4'>
             <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl'>
               <p className='text-sm text-blue-600 font-medium'>Total Pedidos</p>
               <p className='text-3xl font-bold text-blue-900'>{stats.total}</p>
@@ -713,6 +714,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             <div className='bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl'>
               <p className='text-sm text-amber-600 font-medium'>Esperado</p>
               <p className='text-2xl font-bold text-amber-900'>C$ {stats.expectedRevenue.toFixed(2)}</p>
+            </div>
+            <div className='bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-xl'>
+              <p className='text-sm text-red-600 font-medium'>Por Cobrar</p>
+              <p className='text-2xl font-bold text-red-900'>C$ {stats.pending_payment.toFixed(2)}</p>
             </div>
           </div>
         </div>

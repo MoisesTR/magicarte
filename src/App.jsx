@@ -16,8 +16,9 @@ if (import.meta.env.VITE_GA_ENABLED === 'true') {
   ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID)
 }
 
+const queryClient = new QueryClient()
+
 export default function App() {
-  const queryClient = new QueryClient()
 
   useEffect(() => {
     ReactGA.send('pageview')
