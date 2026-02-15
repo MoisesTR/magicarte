@@ -21,6 +21,7 @@ export default function Orders() {
   const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState('list')
+  const [filterMonth, setFilterMonth] = useState('all')
   const [draggedOrderId, setDraggedOrderId] = useState(null)
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -600,6 +601,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   const filteredOrders = orders.filter(order => {
     if (filterStatus !== 'all' && order.status !== filterStatus) return false
     if (filterPriority !== 'all' && order.priority !== filterPriority) return false
+    if (filterMonth !== 'all') {
+      const orderDate = order.order_date || order.created_at
+      if (!orderDate || !orderDate.startsWith(filterMonth)) return false
+    }
     return true
   }).sort((a, b) => {
     // Primary: payment status (paid first, then partial, then unpaid)
@@ -623,17 +628,24 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     return 0
   })
 
-  const totalRevenue = orders
-    .filter(o => o.status === 'completed')
-    .reduce((sum, o) => sum + parseFloat(o.total_amount), 0)
+  const totalRevenue = filteredOrders
+    .filter(o => o.payment_status === 'paid')
+    .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
 
   const stats = {
-    total: orders.length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    in_progress: orders.filter(o => o.status === 'in_progress').length,
-    completed: orders.filter(o => o.status === 'completed').length,
-    revenue: totalRevenue
+    total: filteredOrders.length,
+    pending: filteredOrders.filter(o => o.status === 'pending').length,
+    in_progress: filteredOrders.filter(o => o.status === 'in_progress').length,
+    completed: filteredOrders.filter(o => o.status === 'completed').length,
+    revenue: totalRevenue,
+    expectedRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
   }
+
+  // Build available months from orders for the dropdown
+  const availableMonths = [...new Set(orders.map(o => {
+    const d = o.order_date || o.created_at
+    return d ? d.slice(0, 7) : null
+  }).filter(Boolean))].sort().reverse()
 
   if (checkingAuth) {
     return (
@@ -677,7 +689,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
           </div>
 
           {/* Stats */}
-          <div className='grid grid-cols-2 md:grid-cols-5 gap-4'>
+          <div className='grid grid-cols-2 md:grid-cols-6 gap-4'>
             <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl'>
               <p className='text-sm text-blue-600 font-medium'>Total Pedidos</p>
               <p className='text-3xl font-bold text-blue-900'>{stats.total}</p>
@@ -697,6 +709,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-4 rounded-xl'>
               <p className='text-sm text-[#51c879] font-medium'>Ingresos</p>
               <p className='text-2xl font-bold text-gray-900'>C$ {stats.revenue.toFixed(2)}</p>
+            </div>
+            <div className='bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl'>
+              <p className='text-sm text-amber-600 font-medium'>Esperado</p>
+              <p className='text-2xl font-bold text-amber-900'>C$ {stats.expectedRevenue.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -733,6 +749,22 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   {Object.entries(priorityLabels).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
+                </select>
+
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className='px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-emerald-50'
+                >
+                  <option value='all'>Todos los meses</option>
+                  {availableMonths.map(m => {
+                    const [y, mo] = m.split('-')
+                    return (
+                      <option key={m} value={m}>
+                        {new Date(y, mo - 1).toLocaleDateString('es', { year: 'numeric', month: 'long' })}
+                      </option>
+                    )
+                  })}
                 </select>
 
                 <select
