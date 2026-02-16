@@ -8,8 +8,7 @@ import CartNotification from '../components/CartNotification'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
-import ValentineBanner from '../components/ValentineBanner'
-import ValentineHero from '../components/ValentineHero'
+
 
 export default function Home() {
   const { showCartModal, setShowCartModal } = useApp()
@@ -55,18 +54,10 @@ export default function Home() {
           selectedCategory={selectedCategory}
           onCategorySelect={setSelectedCategory}
         />
-        <ValentineBanner />
 
       <main className='pt-32'>
         {/* Main Content */}
         <div className='max-w-7xl mx-auto px-6 py-12'>
-          {/* Valentine Hero - only on "Todos" view */}
-          {selectedCategory?.name === 'Todos' && (
-            <ValentineHero
-              categories={modifiedCategories}
-              onCategorySelect={setSelectedCategory}
-            />
-          )}
 
           {/* Current Category Header */}
           <div className='mb-12 mt-10 text-center'>
