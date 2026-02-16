@@ -501,6 +501,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     return { text: `${diffDays} días`, color: 'bg-emerald-100 text-emerald-800 border border-emerald-300' }
   }
 
+  const fmtPhone = (p) => p?.replace(/\D/g, '').replace(/(.{4})/g, '$1-').replace(/-$/, '') || ''
+
   const printLabels = (ordersToPrint) => {
     const labelHtml = ordersToPrint.map(order => {
       const items = order.order_items.map(i =>
@@ -520,7 +522,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
         <div class="brand">MagicArte Nicaragua</div>
         <div class="spacer"></div>
         <div class="customer">${labelName}</div>
-        ${labelPhone ? `<div class="phone">Telefono: ${labelPhone}</div>` : ''}
+        ${labelPhone ? `<div class="phone">Telefono: ${fmtPhone(labelPhone)}</div>` : ''}
         <div class="divider"></div>
         <div class="section-title">Productos</div>
         <div class="items">${items}</div>
@@ -571,6 +573,74 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   .qr-wrap { text-align: center; flex-shrink: 0; }
   .qr-label { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
   .qr { width: 45px; height: 45px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style></head><body>${labelHtml}</body></html>`)
+    win.document.close()
+    setTimeout(() => { win.print() }, 300)
+  }
+
+  const printLabels4x6 = (ordersToPrint) => {
+    const labelHtml = ordersToPrint.map(order => {
+      const items = order.order_items.map(i =>
+        `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
+      ).join('')
+      const labelName = order.recipient_name || order.customer_name
+      const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
+
+      return `<div class="label">
+        <div class="brand">MagicArte Nicaragua</div>
+        <div class="tagline">Creaciones únicas en MDF</div>
+        <div class="divider"></div>
+        <div class="customer">${labelName}</div>
+        ${labelPhone ? `<div class="phone">Telefono: ${fmtPhone(labelPhone)}</div>` : ''}
+        <div class="divider"></div>
+        <div class="section-title">Productos</div>
+        <div class="items">${items}</div>
+        <div class="divider"></div>
+        ${order.delivery_method === 'pickup'
+          ? `<div class="detail">Recoger en Tienda</div>`
+          : order.delivery_address
+            ? `<div class="section-title">Dirección de Entrega</div><div class="detail">${order.delivery_address}</div>`
+            : ''
+        }
+        ${order.notes ? `<div class="notes">${order.notes}</div>` : ''}
+        <div class="qr-section">
+          <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://magicarte.net" alt="QR" />
+          <div class="qr-label">magicarte.net</div>
+        </div>
+        <div class="thanks">¡Gracias por tu compra! ✨</div>
+      </div>`
+    }).join('')
+
+    const win = window.open('', '_blank', 'width=500,height=700')
+    win.document.write(`<!DOCTYPE html>
+<html><head><title>Etiquetas MagicArte 4x6</title>
+<style>
+  @page { size: 4in 6in; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; }
+  .label {
+    width: 4in; height: 6in; padding: 16px 20px;
+    page-break-after: auto; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .label:last-child { page-break-after: avoid; }
+  .brand { text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; }
+  .tagline { text-align: center; font-size: 12px; font-style: italic; color: #555; margin-top: 2px; letter-spacing: 0.5px; }
+  .customer { font-size: 20px; font-weight: bold; text-align: center; }
+  .phone { font-size: 16px; text-align: center; margin-top: 4px; }
+  .divider { border-top: 1px solid #000; margin: 10px 0; width: 100%; }
+  .section-title { font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 6px; }
+  .items { margin-top: 4px; width: 100%; }
+  .item { font-size: 16px; line-height: 1.6; }
+  .detail { font-size: 14px; text-align: center; margin-top: 4px; }
+  .notes { font-size: 13px; text-align: center; margin-top: 6px; font-style: italic; }
+  .qr-section { text-align: center; margin-top: auto; padding-top: 12px; }
+  .qr { width: 100px; height: 100px; }
+  .qr-label { font-size: 11px; margin-top: 4px; letter-spacing: 0.5px; color: #333; }
+  .thanks { font-size: 14px; font-style: italic; text-align: center; margin-top: 10px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -817,7 +887,13 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       onClick={() => printLabels(selectedOrderObjects)}
                       className='bg-gray-700 text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow-md'
                     >
-                      🖨️ Imprimir ({selectedOrders.size})
+                      🖨️ 4×2 ({selectedOrders.size})
+                    </button>
+                    <button
+                      onClick={() => printLabels4x6(selectedOrderObjects)}
+                      className='bg-gray-700 text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow-md'
+                    >
+                      🖨️ 4×6 ({selectedOrders.size})
                     </button>
                     <button
                       onClick={() => setSelectedOrders(new Set())}
@@ -1066,7 +1142,13 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         onClick={() => printLabels([order])}
                         className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
                       >
-                        🖨️ Imprimir
+                        🖨️ 4×2
+                      </button>
+                      <button
+                        onClick={() => printLabels4x6([order])}
+                        className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
+                      >
+                        🖨️ 4×6
                       </button>
                       <button
                         onClick={() => deleteOrder(order.id)}
