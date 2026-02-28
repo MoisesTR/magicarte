@@ -15,14 +15,18 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [products, setProducts] = useState([])
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('active')
   const [filterPriority, setFilterPriority] = useState('all')
   const [sortBy, setSortBy] = useState('created_at')
   const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState('list')
   const [filterMonth, setFilterMonth] = useState('all')
+  const [filterDelivery, setFilterDelivery] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [draggedOrderId, setDraggedOrderId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_phone: '',
@@ -55,6 +59,10 @@ export default function Orders() {
 
     checkUser()
   }, [])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery])
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -668,12 +676,37 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
 
   const selectedOrderObjects = orders.filter(o => selectedOrders.has(o.id))
 
+  const ACTIVE_STATUSES = ['pending', 'confirmed', 'in_progress', 'ready']
+
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  // Current week: Monday to Sunday (local time)
+  const dayOfWeek = now.getDay() // 0=Sun, 1=Mon...
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diffToMonday)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
+  const weekEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`
+
   const filteredOrders = orders.filter(order => {
-    if (filterStatus !== 'all' && order.status !== filterStatus) return false
+    if (filterStatus === 'active' && !ACTIVE_STATUSES.includes(order.status)) return false
+    if (filterStatus !== 'all' && filterStatus !== 'active' && order.status !== filterStatus) return false
     if (filterPriority !== 'all' && order.priority !== filterPriority) return false
     if (filterMonth !== 'all') {
       const orderDate = order.order_date || order.created_at
       if (!orderDate || !orderDate.startsWith(filterMonth)) return false
+    }
+    if (filterDelivery === 'today' && order.estimated_delivery_date !== today) return false
+    if (filterDelivery === 'week' && (!order.estimated_delivery_date || order.estimated_delivery_date < weekStart || order.estimated_delivery_date > weekEnd)) return false
+    if (filterDelivery === 'overdue' && (!order.estimated_delivery_date || order.estimated_delivery_date >= today || ['completed', 'canceled'].includes(order.status))) return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      const matchesName = order.customer_name?.toLowerCase().includes(q)
+      const matchesPhone = order.customer_phone?.toLowerCase().includes(q)
+      const matchesNumber = String(order.order_number).includes(q)
+      if (!matchesName && !matchesPhone && !matchesNumber) return false
     }
     return true
   }).sort((a, b) => {
@@ -717,6 +750,9 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     const d = o.order_date || o.created_at
     return d ? d.slice(0, 7) : null
   }).filter(Boolean))].sort().reverse()
+
+  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE)
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
   if (checkingAuth) {
     return (
@@ -795,8 +831,9 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
         {!showForm ? (
           <>
             {/* Filters and Actions */}
-            <div className='bg-white rounded-2xl shadow-lg p-6 mb-6'>
-              <div className='flex flex-wrap gap-4'>
+            <div className='bg-white rounded-2xl shadow-lg p-6 mb-6 space-y-4'>
+              {/* Row 1: Action + Search */}
+              <div className='flex flex-wrap items-center gap-3'>
                 <button
                   onClick={() => setShowForm(true)}
                   className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all shadow-lg'
@@ -804,12 +841,68 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   + Nuevo Pedido
                 </button>
 
+                <div className='relative flex-1 min-w-[240px] max-w-md'>
+                  <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>🔍</span>
+                  <input
+                    type='text'
+                    placeholder='Buscar cliente, teléfono o # pedido...'
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className='w-full px-4 py-3 pl-10 pr-8 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-[#51c879] transition-colors'
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600'
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className='flex items-center gap-2 ml-auto'>
+                  <button
+                    onClick={() => setViewMode(viewMode === 'list' ? 'board' : 'list')}
+                    className={`px-4 py-3 rounded-xl font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                  >
+                    {viewMode === 'board' ? '📋 Lista' : '📊 Tablero'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Delivery quick filters */}
+              <div className='flex flex-wrap items-center gap-2'>
+                <span className='text-xs font-semibold text-gray-400 uppercase tracking-wide mr-1'>Entregas:</span>
+                {[
+                  { key: 'all', label: 'Todas', icon: '📅' },
+                  { key: 'today', label: 'Hoy', icon: '📌' },
+                  { key: 'week', label: 'Esta semana', icon: '🗓️' },
+                  { key: 'overdue', label: 'Vencidos', icon: '⚠️' },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setFilterDelivery(opt.key)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterDelivery === opt.key
+                      ? opt.key === 'overdue' ? 'bg-red-100 text-red-700 ring-1 ring-red-300' : 'bg-[#51c879]/15 text-[#3a9e5c] ring-1 ring-[#51c879]/40'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {opt.icon} {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Row 3: Filters */}
+              <div className='flex flex-wrap items-center gap-3 pt-3 border-t border-gray-100'>
+                <span className='text-xs font-semibold text-gray-400 uppercase tracking-wide mr-1'>Filtros:</span>
+
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className='px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                  className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterStatus !== 'all' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-300 text-gray-700'}`}
                 >
                   <option value='all'>Todos los estados</option>
+                  <option value='active'>🟢 Activos (Pend · Conf · Proceso · Listo)</option>
                   {Object.entries(statusLabels).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
@@ -818,7 +911,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 <select
                   value={filterPriority}
                   onChange={(e) => setFilterPriority(e.target.value)}
-                  className='px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
+                  className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterPriority !== 'all' ? 'bg-purple-50 border-purple-300 text-purple-700' : 'border-gray-300 text-gray-700'}`}
                 >
                   <option value='all'>Todas las prioridades</option>
                   {Object.entries(priorityLabels).map(([key, label]) => (
@@ -829,7 +922,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 <select
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
-                  className='px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-emerald-50'
+                  className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterMonth !== 'all' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-gray-300 text-gray-700'}`}
                 >
                   <option value='all'>Todos los meses</option>
                   {availableMonths.map(m => {
@@ -842,23 +935,27 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   })}
                 </select>
 
+                <div className='h-6 w-px bg-gray-200 mx-1 hidden sm:block' />
+
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className='px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-blue-50'
+                  className='px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#51c879] text-gray-700'
                 >
-                  <option value='created_at'>Ordenar: Más recientes</option>
-                  <option value='order_date'>Ordenar: Fecha de encargo</option>
-                  <option value='priority'>Ordenar: Prioridad</option>
-                  <option value='delivery_date'>Ordenar: Fecha de entrega</option>
+                  <option value='created_at'>↕ Más recientes</option>
+                  <option value='order_date'>↕ Fecha de encargo</option>
+                  <option value='priority'>↕ Prioridad</option>
+                  <option value='delivery_date'>↕ Fecha de entrega</option>
                 </select>
 
-                <button
-                  onClick={() => setViewMode(viewMode === 'list' ? 'board' : 'list')}
-                  className={`px-4 py-2 rounded-xl font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
-                >
-                  {viewMode === 'board' ? '📋 Tablero' : '📋 Tablero'}
-                </button>
+                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || searchQuery) && (
+                  <button
+                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setSearchQuery('') }}
+                    className='px-3 py-2 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
+                  >
+                    ✕ Limpiar filtros
+                  </button>
+                )}
               </div>
 
               {/* Selection controls */}
@@ -1001,7 +1098,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               </div>
             ) : (
               <div className='space-y-4'>
-                {filteredOrders.map((order) => (
+                {paginatedOrders.map((order) => (
                   <div key={order.id} className={`bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
                     <div className='flex justify-between items-start mb-4'>
                       <div className='flex-1'>
@@ -1159,6 +1256,33 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                     </div>
                   </div>
                 ))}
+
+                {totalPages > 1 && (
+                  <div className='flex items-center justify-between bg-white rounded-2xl shadow-lg px-6 py-4 mt-2'>
+                    <p className='text-sm text-gray-500'>
+                      Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} pedidos
+                    </p>
+                    <div className='flex items-center gap-2'>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className='px-4 py-2 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+                      >
+                        ← Anterior
+                      </button>
+                      <span className='text-gray-700 font-medium px-2'>
+                        {currentPage} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className='px-4 py-2 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+                      >
+                        Siguiente →
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {filteredOrders.length === 0 && (
                   <div className='bg-white rounded-2xl shadow-lg p-12 text-center'>
