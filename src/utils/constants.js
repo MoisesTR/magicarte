@@ -1,4 +1,5 @@
 export const MAGIC_ARTE = 'MagicArte'
+export const CONTACT_PHONE = '50587795222'
 
 export const TABLE = {
   PRODUCT: 'products',

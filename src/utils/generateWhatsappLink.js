@@ -1,6 +1,8 @@
+import {CONTACT_PHONE} from "./constants.js";
+
 export function generateWhatsAppLinkForProducts(
   products,
-  phoneNumber = '50557503212'
+  phoneNumber = CONTACT_PHONE
 ) {
   if (window.fbq) {
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
@@ -14,13 +16,13 @@ export function generateWhatsAppLinkForProducts(
   const footer = '\n\nGracias!'
   const message = `${header}${productMessages.join('\n')}${footer}`
   const encodedMessage = encodeURIComponent(message)
-  
+
   return `https://wa.me/${phoneNumber}?text=${encodedMessage}`
 }
 
 export function generateWhatsAppLinkForSingleProduct(
   product,
-  phoneNumber = '50557503212'
+  phoneNumber = CONTACT_PHONE
 ) {
   if (window.fbq) {
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
@@ -31,7 +33,7 @@ export function generateWhatsAppLinkForSingleProduct(
 - ${product.name}: C$${product.price}
 
 Gracias!`
-  
+
   const encodedMessage = encodeURIComponent(message)
   return `https://wa.me/${phoneNumber}?text=${encodedMessage}`
 }
