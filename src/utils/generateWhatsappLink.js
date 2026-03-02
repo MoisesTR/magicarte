@@ -8,7 +8,7 @@ export function generateWhatsAppLinkForProducts(
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
 
-  const header = 'Hola! 👋 Me gustaría cotizar:\n\n'
+  const header = 'Hola! Me gustaría cotizar:\n\n'
   const productMessages = products.map((product) => {
     return `- ${product.name}: C$${product.price}`
   })
@@ -28,7 +28,7 @@ export function generateWhatsAppLinkForSingleProduct(
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
 
-  const message = `Hola! 👋 Me gustaría cotizar:
+  const message = `Hola! Me gustaría cotizar:
 
 - ${product.name}: C$${product.price}
 
