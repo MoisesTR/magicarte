@@ -21,6 +21,7 @@ export default function OrdersManager({ isOpen, onClose }) {
     priority: 'normal',
     notes: '',
     estimated_delivery_date: '',
+    is_gift: false,
     items: []
   })
 
@@ -120,7 +121,8 @@ export default function OrdersManager({ isOpen, onClose }) {
         priority: formData.priority,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
-        total_amount: calculateTotal()
+        total_amount: calculateTotal(),
+        is_gift: formData.is_gift
       }
 
       let orderId
@@ -185,6 +187,7 @@ export default function OrdersManager({ isOpen, onClose }) {
       priority: 'normal',
       notes: '',
       estimated_delivery_date: '',
+      is_gift: false,
       items: []
     })
     setEditingOrder(null)
@@ -201,6 +204,7 @@ export default function OrdersManager({ isOpen, onClose }) {
       priority: order.priority,
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
+      is_gift: order.is_gift || false,
       items: order.order_items.map(item => ({
         product_id: item.product_id,
         product_name: item.product_name,
@@ -360,6 +364,11 @@ export default function OrdersManager({ isOpen, onClose }) {
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
                             {priorityLabels[order.priority]}
                           </span>
+                          {order.is_gift && (
+                            <span className='px-3 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
+                              🎁 Regalo
+                            </span>
+                          )}
                         </div>
                         <p className='text-gray-600'><strong>Cliente:</strong> {order.customer_name}</p>
                         {order.customer_phone && <p className='text-gray-600'><strong>Teléfono:</strong> {order.customer_phone}</p>}
@@ -517,6 +526,16 @@ export default function OrdersManager({ isOpen, onClose }) {
                   className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
                 />
               </div>
+
+              <label className='flex items-center gap-3 cursor-pointer'>
+                <input
+                  type='checkbox'
+                  checked={formData.is_gift}
+                  onChange={(e) => setFormData({ ...formData, is_gift: e.target.checked })}
+                  className='w-5 h-5 rounded border-gray-300 text-pink-500 focus:ring-pink-500'
+                />
+                <span className='text-sm font-medium text-gray-700'>🎁 Es un regalo</span>
+              </label>
 
               <div className='border-t pt-6'>
                 <div className='flex justify-between items-center mb-4'>

@@ -20,11 +20,13 @@ export default function Orders() {
   const [sortBy, setSortBy] = useState('created_at')
   const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
-  const [viewMode, setViewMode] = useState('list')
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('ordersViewMode') || 'list')
   const [filterMonth, setFilterMonth] = useState('all')
   const [filterDelivery, setFilterDelivery] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [draggedOrderId, setDraggedOrderId] = useState(null)
+  const [filterGift, setFilterGift] = useState('no_gifts')
+  const [selectedDay, setSelectedDay] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
   const [formData, setFormData] = useState({
@@ -42,6 +44,7 @@ export default function Orders() {
     delivery_fee: 0,
     recipient_name: '',
     recipient_phone: '',
+    is_gift: false,
     items: []
   })
 
@@ -62,7 +65,7 @@ export default function Orders() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery])
+  }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery, filterGift, selectedDay])
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -235,6 +238,7 @@ export default function Orders() {
         delivery_fee: formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0,
         recipient_name: formData.delivery_method === 'delivery' ? (formData.recipient_name || null) : null,
         recipient_phone: formData.delivery_method === 'delivery' ? (formData.recipient_phone || null) : null,
+        is_gift: formData.is_gift,
         total_amount: calculateTotal()
       }
 
@@ -306,6 +310,7 @@ export default function Orders() {
       delivery_fee: 0,
       recipient_name: '',
       recipient_phone: '',
+      is_gift: false,
       items: []
     })
     setEditingOrder(null)
@@ -328,6 +333,7 @@ export default function Orders() {
       delivery_fee: order.delivery_fee || 0,
       recipient_name: order.recipient_name || '',
       recipient_phone: order.recipient_phone || '',
+      is_gift: order.is_gift || false,
       items: order.order_items.map(item => ({
         product_id: item.product_id,
         product_query: item.product_id ? item.product_name : '',
@@ -690,6 +696,13 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
   const weekEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`
 
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return { date: d, dateStr }
+  })
+
   const filteredOrders = orders.filter(order => {
     if (filterStatus === 'active' && !ACTIVE_STATUSES.includes(order.status)) return false
     if (filterStatus !== 'all' && filterStatus !== 'active' && order.status !== filterStatus) return false
@@ -701,6 +714,9 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     if (filterDelivery === 'today' && order.estimated_delivery_date !== today) return false
     if (filterDelivery === 'week' && (!order.estimated_delivery_date || order.estimated_delivery_date < weekStart || order.estimated_delivery_date > weekEnd)) return false
     if (filterDelivery === 'overdue' && (!order.estimated_delivery_date || order.estimated_delivery_date >= today || ['completed', 'canceled'].includes(order.status))) return false
+    if (filterGift === 'no_gifts' && order.is_gift) return false
+    if (filterGift === 'only_gifts' && !order.is_gift) return false
+    if (selectedDay && order.estimated_delivery_date !== selectedDay) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       const matchesName = order.customer_name?.toLowerCase().includes(q)
@@ -730,6 +746,25 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     }
     return 0
   })
+
+  // Count deliveries per weekday using all filters except selectedDay
+  const weekDayCounts = (() => {
+    const base = orders.filter(order => {
+      if (filterStatus === 'active' && !ACTIVE_STATUSES.includes(order.status)) return false
+      if (filterStatus !== 'all' && filterStatus !== 'active' && order.status !== filterStatus) return false
+      if (filterPriority !== 'all' && order.priority !== filterPriority) return false
+      if (filterGift === 'no_gifts' && order.is_gift) return false
+      if (filterGift === 'only_gifts' && !order.is_gift) return false
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        if (!order.customer_name?.toLowerCase().includes(q) && !order.customer_phone?.toLowerCase().includes(q) && !String(order.order_number).includes(q)) return false
+      }
+      return true
+    })
+    const counts = {}
+    weekDays.forEach(({ dateStr }) => { counts[dateStr] = base.filter(o => o.estimated_delivery_date === dateStr).length })
+    return counts
+  })()
 
   const totalRevenue = filteredOrders
     .filter(o => o.payment_status === 'paid')
@@ -830,6 +865,52 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
 
         {!showForm ? (
           <>
+            {/* Week Calendar */}
+            <div className='bg-white rounded-2xl shadow-lg p-4 mb-6'>
+              <div className='flex items-center justify-between mb-3'>
+                <h3 className='text-sm font-semibold text-gray-500 uppercase tracking-wide'>📅 Entregas esta semana</h3>
+                {selectedDay && (
+                  <button
+                    onClick={() => setSelectedDay(null)}
+                    className='text-xs text-gray-500 hover:text-red-500 transition-colors'
+                  >
+                    ✕ Quitar filtro
+                  </button>
+                )}
+              </div>
+              <div className='grid grid-cols-7 gap-2'>
+                {weekDays.map(({ date, dateStr }) => {
+                  const isToday = dateStr === today
+                  const isSelected = selectedDay === dateStr
+                  const dayName = date.toLocaleDateString('es', { weekday: 'short' })
+                  const count = weekDayCounts[dateStr] || 0
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() => setSelectedDay(isSelected ? null : dateStr)}
+                      className={`flex flex-col items-center py-2 px-1 rounded-xl transition-all ${
+                        isSelected
+                          ? 'bg-[#51c879] text-white shadow-md'
+                          : isToday
+                            ? 'bg-blue-100 text-blue-800 ring-2 ring-blue-300'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className='text-[10px] font-semibold uppercase'>{dayName}</span>
+                      <span className='text-lg font-bold'>{date.getDate()}</span>
+                      {count > 0 && (
+                        <span className={`text-[10px] font-bold px-1.5 rounded-full ${
+                          isSelected ? 'bg-white/30' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Filters and Actions */}
             <div className='bg-white rounded-2xl shadow-lg p-6 mb-6 space-y-4'>
               {/* Row 1: Action + Search */}
@@ -862,7 +943,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
 
                 <div className='flex items-center gap-2 ml-auto'>
                   <button
-                    onClick={() => setViewMode(viewMode === 'list' ? 'board' : 'list')}
+                    onClick={() => { const next = viewMode === 'list' ? 'board' : 'list'; setViewMode(next); localStorage.setItem('ordersViewMode', next) }}
                     className={`px-4 py-3 rounded-xl font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
                   >
                     {viewMode === 'board' ? '📋 Lista' : '📊 Tablero'}
@@ -935,6 +1016,16 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   })}
                 </select>
 
+                <select
+                  value={filterGift}
+                  onChange={(e) => setFilterGift(e.target.value)}
+                  className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterGift !== 'no_gifts' ? 'bg-pink-50 border-pink-300 text-pink-700' : 'border-gray-300 text-gray-700'}`}
+                >
+                  <option value='no_gifts'>Sin regalos</option>
+                  <option value='all'>Todos</option>
+                  <option value='only_gifts'>🎁 Solo regalos</option>
+                </select>
+
                 <div className='h-6 w-px bg-gray-200 mx-1 hidden sm:block' />
 
                 <select
@@ -948,9 +1039,9 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   <option value='delivery_date'>↕ Fecha de entrega</option>
                 </select>
 
-                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || searchQuery) && (
+                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || filterGift !== 'no_gifts' || selectedDay || searchQuery) && (
                   <button
-                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setSearchQuery('') }}
+                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
                     className='px-3 py-2 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
                   >
                     ✕ Limpiar filtros
@@ -1018,7 +1109,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   { key: 'in_progress', label: 'En Proceso', color: 'purple', icon: '⚙️' },
                   { key: 'ready', label: 'Listo para Entregar', color: 'teal', icon: '📦' }
                 ].map(col => {
-                  const colOrders = orders
+                  const colOrders = filteredOrders
                     .filter(o => o.status === col.key)
                     .sort((a, b) => {
                       const priorityOrder = { urgent: 0, normal: 1, low: 2 }
@@ -1119,6 +1210,11 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
                             {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                           </span>
+                          {order.is_gift && (
+                            <span className='px-3 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
+                              🎁 Regalo
+                            </span>
+                          )}
                         </div>
                         
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-600'>
@@ -1466,6 +1562,16 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   placeholder='Notas adicionales sobre el pedido...'
                 />
               </div>
+
+              <label className='flex items-center gap-3 cursor-pointer'>
+                <input
+                  type='checkbox'
+                  checked={formData.is_gift}
+                  onChange={(e) => setFormData({ ...formData, is_gift: e.target.checked })}
+                  className='w-5 h-5 rounded border-gray-300 text-pink-500 focus:ring-pink-500'
+                />
+                <span className='text-sm font-medium text-gray-700'>🎁 Es un regalo</span>
+              </label>
 
               {/* Products Section */}
               <div className='border-t pt-6'>
