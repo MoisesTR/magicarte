@@ -9,7 +9,9 @@ export default function AdminProductForm({ product, onSave, onCancel, loading })
     price: '',
     description: '',
     category_id: '',
-    stock_quantity: 1
+    stock_quantity: 1,
+    material_technique: '',
+    care_instructions: ''
   })
   
   const [imageFiles, setImageFiles] = useState({
@@ -28,7 +30,9 @@ export default function AdminProductForm({ product, onSave, onCancel, loading })
         price: product.price || '',
         description: product.description || '',
         category_id: product.category_id || '',
-        stock_quantity: product.stock_quantity || 1
+        stock_quantity: product.stock_quantity || 1,
+        material_technique: product.material_technique || '',
+        care_instructions: product.care_instructions || ''
       })
     }
   }, [product])
@@ -108,6 +112,34 @@ export default function AdminProductForm({ product, onSave, onCancel, loading })
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                 className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                 placeholder='Describe tu producto en MDF...'
+              />
+            </div>
+
+            {/* Material y Técnica */}
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
+                🎨 Material y Técnica
+              </label>
+              <textarea
+                rows={3}
+                value={formData.material_technique}
+                onChange={(e) => setFormData({...formData, material_technique: e.target.value})}
+                className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
+                placeholder='Ej: Trabajo realizado en madera mediante técnica de corte láser (mdf) calado...'
+              />
+            </div>
+
+            {/* Cuidados */}
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-2'>
+                🧤 Cuidados del Producto
+              </label>
+              <textarea
+                rows={3}
+                value={formData.care_instructions}
+                onChange={(e) => setFormData({...formData, care_instructions: e.target.value})}
+                className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
+                placeholder='Ej: Evitar exposición directa al sol, limpiar con paño seco...'
               />
             </div>
 
