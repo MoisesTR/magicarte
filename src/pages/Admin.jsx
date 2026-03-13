@@ -8,6 +8,7 @@ import { uploadCompressedImage } from '../utils/uploadImage'
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 import toast from 'react-hot-toast'
+import heic2any from 'heic2any'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -18,6 +19,24 @@ export default function Admin() {
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [mainPreviewUrl, setMainPreviewUrl] = useState(null)
+
+  const isHeic = (file) => file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
+
+  const setMainImage = async (file) => {
+    setImageFiles(prev => ({ ...prev, main: file }))
+    if (isHeic(file)) {
+      try {
+        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.5 })
+        setMainPreviewUrl(URL.createObjectURL(Array.isArray(blob) ? blob[0] : blob))
+      } catch {
+        setMainPreviewUrl(null)
+      }
+    } else {
+      setMainPreviewUrl(URL.createObjectURL(file))
+    }
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -219,6 +238,7 @@ export default function Admin() {
       secondary_images: []
     })
     setImageFiles({ main: null, secondary: [] })
+    setMainPreviewUrl(null)
     setEditingProduct(null)
     setShowForm(false)
   }
@@ -525,51 +545,130 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  {/* Image Upload */}
+                  {/* Main Image Upload */}
                   <div>
                     <label className='block text-sm font-medium text-gray-700 mb-2'>
                       Imagen Principal
                     </label>
+                    <div
+                      className={`relative border-2 border-dashed rounded-xl overflow-hidden transition-colors cursor-pointer ${
+                        dragging ? 'border-[#51c879] bg-[#51c879]/5' : 'border-gray-300 hover:border-[#51c879]'
+                      }`}
+                      onClick={() => document.getElementById('mainImageInput').click()}
+                      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragging(false)
+                        const file = e.dataTransfer.files[0]
+                        if (file && (file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name))) {
+                          setMainImage(file)
+                        }
+                      }}
+                    >
+                      {(imageFiles.main || formData.image_url) ? (
+                        <div className='relative aspect-[4/3]'>
+                          <img
+                            src={imageFiles.main ? (mainPreviewUrl || getImageUrl(null)) : getImageUrl(formData.image_url)}
+                            alt='Preview'
+                            className='w-full h-full object-cover'
+                          />
+                          <div className='absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center'>
+                            <span className='text-white font-medium text-sm'>Cambiar imagen</span>
+                          </div>
+                          <button
+                            type='button'
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setImageFiles({ ...imageFiles, main: null })
+                              setMainPreviewUrl(null)
+                            }}
+                            className='absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-red-600'
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <div className='flex flex-col items-center justify-center py-10 text-gray-400'>
+                          <svg className='w-10 h-10 mb-2' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={1.5} d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' />
+                          </svg>
+                          <span className='text-sm font-medium'>{dragging ? 'Soltar imagen aquí' : 'Click o arrastra una imagen'}</span>
+                          <span className='text-xs mt-1'>JPG, PNG, HEIC</span>
+                        </div>
+                      )}
+                    </div>
                     <input
+                      id='mainImageInput'
                       type='file'
                       accept='image/*'
-                      onChange={(e) => setImageFiles({ ...imageFiles, main: e.target.files[0] })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      className='hidden'
+                      onChange={(e) => e.target.files[0] && setMainImage(e.target.files[0])}
                     />
-                    {formData.image_url && (
-                      <div className='mt-2'>
-                        <img
-                          src={getImageUrl(formData.image_url)}
-                          alt='Preview'
-                          className='w-20 h-20 object-cover rounded-lg'
-                        />
-                      </div>
-                    )}
                   </div>
 
+                  {/* Secondary Images */}
                   <div>
                     <label className='block text-sm font-medium text-gray-700 mb-2'>
                       Imágenes Adicionales
                     </label>
+                    <div className='flex flex-wrap gap-3'>
+                      {/* Existing images */}
+                      {formData.secondary_images?.map((img, index) => (
+                        <div key={`existing-${index}`} className='relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200'>
+                          <img src={getImageUrl(img)} alt={`Imagen ${index + 1}`} className='w-full h-full object-cover' />
+                          <button
+                            type='button'
+                            onClick={() => setFormData({
+                              ...formData,
+                              secondary_images: formData.secondary_images.filter((_, i) => i !== index)
+                            })}
+                            className='absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs hover:bg-red-600'
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      {/* New file previews */}
+                      {imageFiles.secondary.map((file, index) => (
+                        <div key={`new-${index}`} className='relative w-24 h-24 rounded-lg overflow-hidden border-2 border-[#51c879]'>
+                          <img src={URL.createObjectURL(file)} alt={`Nueva ${index + 1}`} className='w-full h-full object-cover' />
+                          <button
+                            type='button'
+                            onClick={() => setImageFiles({
+                              ...imageFiles,
+                              secondary: imageFiles.secondary.filter((_, i) => i !== index)
+                            })}
+                            className='absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs hover:bg-red-600'
+                          >
+                            ×
+                          </button>
+                          <span className='absolute bottom-0 left-0 right-0 bg-[#51c879] text-white text-[10px] text-center'>Nueva</span>
+                        </div>
+                      ))}
+                      {/* Add button */}
+                      <button
+                        type='button'
+                        onClick={() => document.getElementById('secondaryImageInput').click()}
+                        className='w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-[#51c879] hover:text-[#51c879] transition-colors'
+                      >
+                        <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                        </svg>
+                        <span className='text-xs mt-1'>Agregar</span>
+                      </button>
+                    </div>
                     <input
+                      id='secondaryImageInput'
                       type='file'
                       accept='image/*'
                       multiple
-                      onChange={(e) => setImageFiles({ ...imageFiles, secondary: Array.from(e.target.files) })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      className='hidden'
+                      onChange={(e) => setImageFiles({
+                        ...imageFiles,
+                        secondary: [...imageFiles.secondary, ...Array.from(e.target.files)]
+                      })}
                     />
-                    {formData.secondary_images?.length > 0 && (
-                      <div className='mt-2 flex space-x-2'>
-                        {formData.secondary_images.map((img, index) => (
-                          <img
-                            key={index}
-                            src={getImageUrl(img)}
-                            alt={`Preview ${index + 1}`}
-                            className='w-16 h-16 object-cover rounded-lg'
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   {/* Submit Buttons */}
@@ -586,7 +685,15 @@ export default function Admin() {
                       disabled={loading}
                       className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 disabled:opacity-50'
                     >
-                      {loading ? 'Guardando...' : (editingProduct ? 'Actualizar' : 'Crear Producto')}
+                      {loading ? (
+                        <span className='flex items-center justify-center gap-2'>
+                          <svg className='animate-spin h-5 w-5' viewBox='0 0 24 24'>
+                            <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none'/>
+                            <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z'/>
+                          </svg>
+                          Subiendo imágenes...
+                        </span>
+                      ) : (editingProduct ? 'Actualizar' : 'Crear Producto')}
                     </button>
                   </div>
                 </form>

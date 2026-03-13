@@ -8,7 +8,7 @@ async function convertHeicToJpeg(file) {
   const blob = await heic2any({
     blob: file,
     toType: 'image/jpeg',
-    quality: 0.95,
+    quality: 0.7,
   })
   const resultBlob = Array.isArray(blob) ? blob[0] : blob
   return new File([resultBlob], file.name.replace(/\.[^.]+$/, '.jpg'), {
@@ -66,15 +66,16 @@ export async function uploadCompressedImage(file, folder = 'products') {
   }
 }
 
-/** Direct upload fallback (no compression) */
+/** Direct upload fallback (converts HEIC to JPEG first) */
 async function uploadDirect(file, folder) {
-  const fileExt = file.name.split('.').pop()
+  const prepared = await prepareFile(file)
+  const fileExt = prepared.name.split('.').pop()
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
   const filePath = `${folder}/${fileName}`
 
   const { error } = await supabase.storage
     .from('images')
-    .upload(filePath, file, { cacheControl: '3600', upsert: false })
+    .upload(filePath, prepared, { cacheControl: '3600', upsert: false })
 
   if (error) throw error
   return filePath
