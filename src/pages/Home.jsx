@@ -52,7 +52,7 @@ export default function Home() {
           onCartClick={() => setShowCartModal(true)}
           categories={modifiedCategories}
           selectedCategory={selectedCategory}
-          onCategorySelect={setSelectedCategory}
+          onCategorySelect={(cat) => { setSelectedCategory(cat); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
         />
 
       <main className='pt-32'>
@@ -60,12 +60,6 @@ export default function Home() {
         <div className='max-w-7xl mx-auto px-6 py-12'>
 
           {/* Current Category Header */}
-          <div className='mb-12 mt-10 text-center'>
-            <h1 className='text-4xl font-bold text-gray-900 mb-2'>
-              {selectedCategory?.name || 'Cargando...'}
-            </h1>
-            <p className='text-gray-600 text-lg'>Descubre nuestras creaciones únicas en MDF</p>
-          </div>
 
           <Products selectedCategory={selectedCategory} categories={modifiedCategories} />
         </div>

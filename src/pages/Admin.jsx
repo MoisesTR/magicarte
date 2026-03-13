@@ -38,6 +38,15 @@ export default function Admin() {
     }
   }
 
+  const DEFAULT_MATERIAL = 'Trabajo realizado en MDF (Fibrán) mediante técnica de corte láser. Cada pieza es lijada, pintada a mano y barnizada con capa protectora 🎨'
+  const DEFAULT_CARE = `Para limpiar tu producto te recomendamos usar una brocha seca (como las de maquillaje) o un plumero para sacar el polvo de los relieves y rendijas de forma delicada.
+
+No recomendamos usar ningún producto líquido, ya sea agua o químicos de limpieza, ya que pueden afectar el acabado de la madera (MDF) o la pintura.
+
+No exponer a los rayos directos del sol durante períodos prolongados de tiempo, ya que podría opacar la pintura y perder su brillo.
+
+Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cuidado y cariño. El MDF no resiste impactos fuertes ni caídas.`
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -46,7 +55,9 @@ export default function Admin() {
     category_id: '',
     stock_quantity: 1,
     image_url: '',
-    secondary_images: []
+    secondary_images: [],
+    material_technique: DEFAULT_MATERIAL,
+    care_instructions: DEFAULT_CARE
   })
 
   const [imageFiles, setImageFiles] = useState({
@@ -235,7 +246,9 @@ export default function Admin() {
       category_id: '',
       stock_quantity: 1,
       image_url: '',
-      secondary_images: []
+      secondary_images: [],
+      material_technique: DEFAULT_MATERIAL,
+      care_instructions: DEFAULT_CARE
     })
     setImageFiles({ main: null, secondary: [] })
     setMainPreviewUrl(null)
@@ -253,7 +266,9 @@ export default function Admin() {
       length: product.length || '',
       stock_quantity: product.stock_quantity || 1,
       image_url: product.image_url || '',
-      secondary_images: product.secondary_images || []
+      secondary_images: product.secondary_images || [],
+      material_technique: product.material_technique || '',
+      care_instructions: product.care_instructions || ''
     })
     setEditingProduct(product)
     setShowForm(true)
@@ -507,6 +522,34 @@ export default function Admin() {
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                       placeholder='Describe tu producto...'
+                    />
+                  </div>
+
+                  {/* Material y Técnica */}
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-2'>
+                      🎨 Material y Técnica
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={formData.material_technique}
+                      onChange={(e) => setFormData({ ...formData, material_technique: e.target.value })}
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Ej: Trabajo realizado en MDF (Fibrán) mediante técnica de corte láser...'
+                    />
+                  </div>
+
+                  {/* Cuidados */}
+                  <div>
+                    <label className='block text-sm font-medium text-gray-700 mb-2'>
+                      ✨ Cuidados del Producto
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formData.care_instructions}
+                      onChange={(e) => setFormData({ ...formData, care_instructions: e.target.value })}
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Ej: Para limpiar tu producto te recomendamos usar una brocha seca...'
                     />
                   </div>
 

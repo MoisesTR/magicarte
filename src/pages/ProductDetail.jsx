@@ -152,9 +152,9 @@ export default function ProductDetail() {
           Volver
         </button>
 
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-12'>
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-12'>
           {/* Mobile-only: Title above image */}
-          <div className='lg:hidden space-y-3'>
+          <div className='lg:hidden space-y-2'>
             {category && (
               <span className='inline-block bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-3 py-1 rounded-full text-xs font-medium'>
                 {category.name}
@@ -244,7 +244,7 @@ export default function ProductDetail() {
             {/* Dimensions */}
             {(product.width > 0 || product.length > 0) && (
               <div className='bg-white rounded-2xl p-6 shadow-lg'>
-                <h3 className='text-xl font-semibold text-gray-900 mb-3'>Medidas</h3>
+                <h3 className='text-xl font-semibold text-gray-900 mb-3'>📐 Medidas</h3>
                 <div className='flex gap-6'>
                   {product.length > 0 && (
                     <div className='flex items-center gap-2'>
