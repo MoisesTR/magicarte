@@ -153,6 +153,18 @@ export default function ProductDetail() {
         </button>
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-12'>
+          {/* Mobile-only: Title above image */}
+          <div className='lg:hidden space-y-3'>
+            {category && (
+              <span className='inline-block bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-3 py-1 rounded-full text-xs font-medium'>
+                {category.name}
+              </span>
+            )}
+            <h1 className='text-2xl font-bold text-gray-900 leading-tight'>
+              {product.name}
+            </h1>
+          </div>
+
           {/* Image Gallery */}
           <div className='space-y-4'>
             {/* Main Image */}
@@ -192,23 +204,23 @@ export default function ProductDetail() {
 
           {/* Product Info */}
           <div className='space-y-6'>
-            {/* Category Badge */}
+            {/* Desktop-only: Category, Name, Price */}
+            <div className='hidden lg:block space-y-6'>
             {category && (
               <span className='inline-block bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-4 py-2 rounded-full text-sm font-medium'>
                 {category.name}
               </span>
             )}
 
-            {/* Product Name */}
             <h1 className='text-4xl font-bold text-gray-900 leading-tight'>
               {product.name}
             </h1>
 
-            {/* Price */}
             <div className='flex items-center gap-4'>
               <span className='text-4xl font-bold text-gray-800'>
                 C$ {product.price}
               </span>
+            </div>
             </div>
 
             {/* Description */}
@@ -316,7 +328,7 @@ export default function ProductDetail() {
             Productos Relacionados
           </h2>
           
-          <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6'>
+          <div className='grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 sm:gap-6'>
             {products
               .filter(p => p.id !== product.id && p.category_id === product.category_id)
               .slice(0, 4)

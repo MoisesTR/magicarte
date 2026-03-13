@@ -54,7 +54,7 @@ export default function ProductCard({ product }) {
       onClick={handleCardClick}
       className='group relative overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
     >
-      <div className='relative h-80 sm:h-96 overflow-hidden bg-gray-50 p-3 sm:p-4 flex items-center justify-center'>
+      <div className='relative h-48 sm:h-96 overflow-hidden bg-gray-50 p-2 sm:p-4 flex items-center justify-center'>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
@@ -77,18 +77,18 @@ export default function ProductCard({ product }) {
 
 
 
-      <div className='relative flex flex-col justify-between p-6 text-center'>
-        <div className='mb-4'>
-          <h3 className='text-lg font-semibold text-gray-900 mb-3'>
+      <div className='relative flex flex-col justify-between p-3 sm:p-6 text-center'>
+        <div className='mb-2 sm:mb-4'>
+          <h3 className='text-sm sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-3 line-clamp-2'>
             {product.name}
           </h3>
-          <p className='text-2xl font-bold text-gray-800'>C$ {product.price}</p>
+          <p className='text-lg sm:text-2xl font-bold text-gray-800'>C$ {product.price}</p>
         </div>
 
         <div className='flex flex-col items-center'>
         </div>
 
-        <div className='mt-6'>
+        <div className='mt-3 sm:mt-6 hidden sm:block'>
           <button
             onClick={onQuoteClick}
             disabled={isOutOfStock}

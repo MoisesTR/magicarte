@@ -20,15 +20,7 @@ export default function Products({ selectedCategory, categories = [] }) {
     selectedCategory.name === 'Todos' ||
     product.category_id === selectedCategory.id
 
-  const productsToShow = products.filter(productFilter).sort((a, b) => {
-    // When viewing "Todos", sort by category order first, then by created_at within same category
-    if (selectedCategory?.name === 'Todos') {
-      const orderA = categoryOrderMap[a.category_id] ?? 999
-      const orderB = categoryOrderMap[b.category_id] ?? 999
-      if (orderA !== orderB) return orderA - orderB
-    }
-    return 0
-  })
+  const productsToShow = products.filter(productFilter)
 
   return (
     <section className='py-8'>
@@ -67,7 +59,7 @@ export default function Products({ selectedCategory, categories = [] }) {
           </div>
         )}
 
-        <div className='grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'>
+        <div className='grid grid-cols-2 gap-4 sm:gap-8 md:grid-cols-3 lg:grid-cols-4'>
           {productsToShow.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
