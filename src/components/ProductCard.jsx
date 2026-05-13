@@ -46,48 +46,41 @@ export default function ProductCard({ product }) {
 
 
 
-  // Only show "Agotado" for out of stock items
   const isOutOfStock = product.stock_quantity === 0
 
   return (
-    <article 
+    <article
       onClick={handleCardClick}
-      className='group relative overflow-hidden rounded-xl sm:rounded-2xl bg-white shadow-md sm:shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer'
+      className='group relative flex flex-col overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm transition-all duration-300 sm:hover:shadow-lg sm:hover:-translate-y-1 cursor-pointer'
     >
-      <div className='relative h-52 sm:h-96 overflow-hidden bg-gray-50 p-0 sm:p-4 flex items-center justify-center'>
+      {/* Image */}
+      <div className='relative aspect-square overflow-hidden bg-gray-50'>
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
-          className='max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300'
+          className='w-full h-full object-contain sm:group-hover:scale-105 transition-transform duration-500'
         />
-        
-        {/* View Details Overlay */}
-        <div className='absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center'>
-          <div className='opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full'>
-            <span className='text-sm font-semibold text-gray-800 flex items-center gap-2'>
-              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
-                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' />
-              </svg>
-              Ver detalles
-            </span>
+
+        {isOutOfStock && (
+          <div className='absolute top-2 right-2 bg-gray-800/80 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full'>
+            Agotado
           </div>
+        )}
+
+        {/* Hover overlay — desktop only */}
+        <div className='absolute inset-0 hidden sm:flex items-center justify-center bg-black/0 group-hover:bg-black/15 transition-all duration-300'>
+          <span className='opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm text-gray-800 text-sm font-semibold px-4 py-2 rounded-full shadow'>
+            Ver detalles
+          </span>
         </div>
       </div>
 
-
-
-      <div className='relative flex flex-col justify-between p-3 sm:p-6 text-center'>
-        <div className='mb-2 sm:mb-4'>
-          <h3 className='text-[15px] sm:text-[18px] font-semibold text-gray-900 mb-1 sm:mb-3 line-clamp-2'>
-            {product.name}
-          </h3>
-          <p className='text-xl sm:text-2xl font-bold text-gray-800'>C$ {product.price}</p>
-        </div>
-
-        <div className='flex flex-col items-center'>
-        </div>
-
+      {/* Text */}
+      <div className='flex flex-col gap-1 p-3 sm:p-4 text-center'>
+        <h3 className='text-[13px] sm:text-[15px] font-semibold text-gray-800 line-clamp-2 leading-snug'>
+          {product.name}
+        </h3>
+        <p className='text-xl sm:text-2xl font-bold text-gray-800'>C$ {product.price}</p>
       </div>
     </article>
   )

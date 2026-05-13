@@ -3,9 +3,10 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
+import MothersDayBanner from './MothersDayBanner'
 
 
-export default function Header({ onCartClick, categories = [], selectedCategory, onCategorySelect }) {
+export default function Header({ onCartClick, categories = [], selectedCategory, onCategorySelect, onBannerDismiss }) {
   const navigate = useNavigate()
   const { cart, setItemAdded, itemAdded } = useApp()
   const [cartEffect, setCartEffect] = useState(false)
@@ -36,6 +37,7 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
 
   return (
     <header className='bg-white fixed top-0 left-0 z-50 w-full shadow-lg border-b border-gray-100'>
+      <MothersDayBanner onDismiss={onBannerDismiss} />
       {/* Top bar with logo and cart */}
       <div className='border-b border-gray-100'>
         <div className='container mx-auto flex items-center justify-between py-4 px-6'>
@@ -81,7 +83,9 @@ export default function Header({ onCartClick, categories = [], selectedCategory,
 
       {/* Category Navigation */}
       {categories.length > 0 && (
-        <div className='bg-gray-50'>
+        <div className='bg-gray-50 relative'>
+          {/* Fade hint for horizontal scroll on mobile */}
+          <div className='pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-gray-50 to-transparent z-10 md:hidden' />
           <div className='overflow-x-auto scrollbar-hide'>
             <div className='flex items-center justify-start md:justify-center gap-3 px-6 py-3 min-w-min'>
               {categories.map((category) => (

@@ -34,7 +34,7 @@ export default function Footer() {
             </a>
           </div>
         </div>
-        <p className='text-gray-400'>&copy; 2025 {MAGIC_ARTE}. Todos los derechos reservados.</p>
+        <p className='text-gray-400'>&copy; {new Date().getFullYear()} {MAGIC_ARTE}. Todos los derechos reservados.</p>
       </div>
     </footer>
   )

@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import Header from '../components/Header'
 import CartModal from '../components/CartModal'
 import CartNotification from '../components/CartNotification'
+import MothersDayHero from '../components/MothersDayHero'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
@@ -16,6 +17,13 @@ export default function Home() {
   const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
     order,
   })
+  const [showBackToTop, setShowBackToTop] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 400)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const modifiedCategories =
     categories.length > 0 && categories[0].name !== 'Todos'
       ? [{ id: 0, name: 'Todos' }, ...categories]
@@ -23,7 +31,17 @@ export default function Home() {
 
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
   const dropdownRef = useRef(null)
+  const productsRef = useRef(null)
+
+  // Determine if Mother's Day banner is in range (May 10–June 1)
+  const mothersDayBannerActive = (() => {
+    const year = new Date().getFullYear()
+    const mothersDay = new Date(year, 4, 30)
+    const diff = Math.ceil((mothersDay - new Date()) / (1000 * 60 * 60 * 24))
+    return diff >= -2 && diff <= 20
+  })()
   
   useEffect(() => {
     if (!selectedCategory && modifiedCategories.length > 0) {
@@ -47,21 +65,28 @@ export default function Home() {
 
   return (
     <>
-      <div className='min-h-screen bg-gradient-to-br from-pink-50/40 to-red-50/30'>
-        <Header 
+      <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
+        <Header
           onCartClick={() => setShowCartModal(true)}
           categories={modifiedCategories}
           selectedCategory={selectedCategory}
           onCategorySelect={(cat) => { setSelectedCategory(cat); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          onBannerDismiss={() => setBannerDismissed(true)}
         />
 
-      <main className='pt-32'>
+      <main className={mothersDayBannerActive && !bannerDismissed ? 'pt-44' : 'pt-32'}>
         {/* Main Content */}
-        <div className='max-w-7xl mx-auto px-6 py-12'>
-
-          {/* Current Category Header */}
-
-          <Products selectedCategory={selectedCategory} categories={modifiedCategories} />
+        <div className='max-w-7xl mx-auto px-6 pt-16 pb-6'>
+          <MothersDayHero
+            categories={modifiedCategories}
+            onCategorySelect={(cat) => {
+              setSelectedCategory(cat)
+              productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
+          <div ref={productsRef}>
+            <Products selectedCategory={selectedCategory} categories={modifiedCategories} />
+          </div>
         </div>
       </main>
 
@@ -72,6 +97,19 @@ export default function Home() {
         <CartModal isOpen={showCartModal} />
         <CartNotification />
       </div>
+
+      {/* Back to top */}
+      {showBackToTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className='fixed bottom-6 right-6 z-50 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white p-3 rounded-full shadow-lg hover:opacity-90 transition-opacity duration-200'
+          aria-label='Volver arriba'
+        >
+          <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M5 15l7-7 7 7' />
+          </svg>
+        </button>
+      )}
     </div>
     </>
   )

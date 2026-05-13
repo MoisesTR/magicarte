@@ -97,9 +97,16 @@ export default function ProductDetail() {
     navigate(-1) // Go back to previous page
   }
 
+  const isBannerActive = (() => {
+    const year = new Date().getFullYear()
+    const mothersDay = new Date(year, 4, 30)
+    const diff = Math.ceil((mothersDay - new Date()) / (1000 * 60 * 60 * 24))
+    return diff >= -2 && diff <= 20
+  })()
+
   if (isLoading) {
     return (
-      <div className='min-h-screen bg-gradient-to-br from-blue-50/40 to-green-50/40'>
+      <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
         <Header onCartClick={() => setShowCartModal(true)} />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
@@ -113,7 +120,7 @@ export default function ProductDetail() {
 
   if (error || !product) {
     return (
-      <div className='min-h-screen bg-gradient-to-br from-blue-50/40 to-green-50/40'>
+      <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
         <Header onCartClick={() => setShowCartModal(true)} />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
@@ -137,14 +144,14 @@ export default function ProductDetail() {
   const allImages = [product.image_url, ...(product.secondary_images || [])]
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-blue-50/40 to-green-50/40'>
+    <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
       <Header onCartClick={() => setShowCartModal(true)} />
-      
-      <main className='max-w-7xl mx-auto px-6 py-8 pt-24 lg:px-8'>
+
+      <main className={`max-w-7xl mx-auto px-6 pb-8 lg:px-8 ${isBannerActive ? 'pt-40' : 'pt-28'}`}>
         {/* Back Button */}
         <button
           onClick={handleBackClick}
-          className='flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors duration-200'
+          className='hidden sm:flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors duration-200'
         >
           <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
             <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 19l-7-7 7-7' />
@@ -152,8 +159,8 @@ export default function ProductDetail() {
           Volver
         </button>
 
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-12'>
-          {/* Mobile-only: Title above image */}
+        <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12'>
+          {/* Mobile-only: Title + price above image */}
           <div className='lg:hidden space-y-2'>
             {category && (
               <span className='inline-block bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-3 py-1 rounded-full text-xs font-medium'>
@@ -163,13 +170,14 @@ export default function ProductDetail() {
             <h1 className='text-2xl font-bold text-gray-900 leading-tight'>
               {product.name}
             </h1>
+            <p className='text-2xl font-bold text-gray-800'>C$ {product.price}</p>
           </div>
 
           {/* Image Gallery */}
           <div className='space-y-4'>
             {/* Main Image */}
-            <div className='rounded-2xl overflow-hidden bg-gray-50 shadow-lg p-6'>
-              <div className='aspect-[3/4] w-full'>
+            <div className='rounded-2xl overflow-hidden bg-gray-50 shadow-sm p-3 sm:p-6'>
+              <div className='aspect-square lg:aspect-[3/4] w-full'>
                 <LazyImage
                   src={getImageUrl(selectedImage)}
                   alt={product.name}
@@ -307,14 +315,14 @@ export default function ProductDetail() {
               </button>
 
               {/* Delivery Info */}
-              <div className='bg-blue-50 rounded-xl p-4 border border-blue-200'>
+              <div className='bg-green-50 rounded-xl p-4 border border-green-200'>
                 <div className='flex items-center gap-3'>
-                  <svg className='w-6 h-6 text-blue-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <svg className='w-6 h-6 text-[#51c879]' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                     <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' />
                   </svg>
                   <div>
-                    <p className='font-semibold text-blue-900'>Tiempo de entrega</p>
-                    <p className='text-blue-700'>de 3 a 5 días hábiles</p>
+                    <p className='font-semibold text-gray-800'>Tiempo de entrega</p>
+                    <p className='text-gray-600'>de 3 a 5 días hábiles</p>
                   </div>
                 </div>
               </div>
@@ -338,11 +346,11 @@ export default function ProductDetail() {
                   onClick={() => navigate(`/product/${relatedProduct.id}`)}
                   className='group cursor-pointer bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-105'
                 >
-                  <div className='aspect-square overflow-hidden'>
+                  <div className='aspect-square overflow-hidden bg-gray-50'>
                     <img
                       src={getImageUrl(relatedProduct.image_url)}
                       alt={relatedProduct.name}
-                      className='w-full h-full object-cover group-hover:scale-110 transition-transform duration-300'
+                      className='w-full h-full object-contain sm:group-hover:scale-105 transition-transform duration-300'
                     />
                   </div>
                   <div className='p-4'>

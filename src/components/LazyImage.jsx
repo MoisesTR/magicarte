@@ -6,9 +6,9 @@ function LazyImage({ src, alt, className = '', ...props }) {
   return (
     <div className='relative'>
       {!loaded && (
-        <div className='absolute inset-0 flex items-center justify-center bg-gray-100'>
+        <div className='absolute inset-0 flex items-center justify-center bg-gray-50'>
           <svg
-            className='h-8 w-8 animate-spin text-gray-500'
+            className='h-8 w-8 animate-spin text-[#51c879]'
             xmlns='http://www.w3.org/2000/svg'
             fill='none'
             viewBox='0 0 24 24'

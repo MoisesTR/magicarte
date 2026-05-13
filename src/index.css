@@ -65,6 +65,36 @@ body {
   font-size: var(--font-size-xl);
 }
 
+/* Petal float animation for Mother's Day (upward drift) */
+@keyframes petalFloat {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-55vh) rotate(180deg) scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-115vh) rotate(340deg) scale(0.7);
+    opacity: 0;
+  }
+}
+
+.animate-petalFloat {
+  animation: petalFloat linear infinite;
+}
+
+/* Shimmer sweep animation for hero banner */
+@keyframes shimmer {
+  0%   { transform: translateX(-150%) skewX(-15deg); }
+  100% { transform: translateX(250%)  skewX(-15deg); }
+}
+
+.animate-shimmer {
+  animation: shimmer 3.2s ease-in-out infinite;
+}
+
 /* Heart float animation for Valentine's */
 @keyframes heartFloat {
   0% {
