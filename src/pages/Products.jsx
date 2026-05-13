@@ -21,7 +21,16 @@ export default function Products({ selectedCategory, categories = [] }) {
     selectedCategory.name === 'Todos' ||
     product.category_id === selectedCategory.id)
 
-  const productsToShow = products.filter(productFilter)
+  const productsToShow = products.filter(productFilter).sort((a, b) => {
+    const categoryOrderA = categoryOrderMap[a.category_id] ?? Number.MAX_SAFE_INTEGER
+    const categoryOrderB = categoryOrderMap[b.category_id] ?? Number.MAX_SAFE_INTEGER
+
+    if (categoryOrderA !== categoryOrderB) {
+      return categoryOrderA - categoryOrderB
+    }
+
+    return new Date(b.created_at) - new Date(a.created_at)
+  })
 
   return (
     <section className='py-3'>
