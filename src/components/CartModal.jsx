@@ -15,7 +15,7 @@ export default function CartModal({ isOpen }) {
     window.open(url, '_blank')
   }
 
-  const totalPrice = products.reduce((acc, product) => acc + product.price, 0);
+  const totalPrice = products.reduce((acc, product) => acc + product.price * product.quantity, 0)
 
   useEffect(() => {
     if (isOpen) {

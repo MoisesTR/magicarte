@@ -60,7 +60,8 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     image_url: '',
     secondary_images: [],
     material_technique: DEFAULT_MATERIAL,
-    care_instructions: DEFAULT_CARE
+    care_instructions: DEFAULT_CARE,
+    is_visible: true
   })
 
   const [imageFiles, setImageFiles] = useState({
@@ -241,6 +242,19 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     }
   }
 
+  const toggleVisibility = async (product) => {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_visible: !product.is_visible })
+      .eq('id', product.id)
+    if (error) {
+      toast.error('Error al actualizar visibilidad')
+    } else {
+      toast.success(product.is_visible ? 'Producto ocultado' : 'Producto publicado')
+      fetchProducts()
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -253,7 +267,8 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       image_url: '',
       secondary_images: [],
       material_technique: DEFAULT_MATERIAL,
-      care_instructions: DEFAULT_CARE
+      care_instructions: DEFAULT_CARE,
+      is_visible: true
     })
     setImageFiles({ main: null, secondary: [] })
     setMainPreviewUrl(null)
@@ -273,7 +288,8 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       image_url: product.image_url || '',
       secondary_images: product.secondary_images || [],
       material_technique: product.material_technique || '',
-      care_instructions: product.care_instructions || ''
+      care_instructions: product.care_instructions || '',
+      is_visible: product.is_visible !== false
     })
     setEditingProduct(product)
     setShowForm(true)
@@ -432,13 +448,18 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
 
           {/* Product cards */}
           {!loadingProducts && filteredProducts.map((product) => (
-            <div key={product.id} className='bg-white rounded-2xl shadow-soft overflow-hidden'>
+            <div key={product.id} className={`bg-white rounded-2xl shadow-soft overflow-hidden transition-opacity ${product.is_visible === false ? 'opacity-50' : ''}`}>
               <div className='relative aspect-square bg-gray-50'>
                 <img
                   src={getImageUrl(product.image_url)}
                   alt={product.name}
                   className='w-full h-full object-contain'
                 />
+                {product.is_visible === false && (
+                  <div className='absolute top-2 left-2'>
+                    <span className='bg-gray-800/80 text-white text-xs font-semibold px-2 py-1 rounded-lg'>Oculto</span>
+                  </div>
+                )}
                 {/* Inline delete confirmation */}
                 {confirmDeleteId === product.id ? (
                   <div className='absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3 rounded-t-2xl'>
@@ -460,6 +481,22 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                   </div>
                 ) : (
                   <div className='absolute top-2 right-2 flex gap-1.5'>
+                    <button
+                      onClick={() => toggleVisibility(product)}
+                      className={`p-2 rounded-lg shadow transition-colors ${product.is_visible === false ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                      title={product.is_visible === false ? 'Publicar' : 'Ocultar'}
+                    >
+                      {product.is_visible === false ? (
+                        <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21' />
+                        </svg>
+                      ) : (
+                        <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' />
+                        </svg>
+                      )}
+                    </button>
                     <button
                       onClick={() => editProduct(product)}
                       className='bg-white text-gray-600 p-2 rounded-lg shadow hover:bg-gray-50 transition-colors'
@@ -642,6 +679,33 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                     </div>
 
                     <div>
+                      <label className='block text-sm font-medium text-gray-700 mb-2'>
+                        Visibilidad
+                      </label>
+                      <button
+                        type='button'
+                        onClick={() => setFormData({ ...formData, is_visible: !formData.is_visible })}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border font-medium text-sm transition-colors ${
+                          formData.is_visible
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-gray-50 border-gray-200 text-gray-500'
+                        }`}
+                      >
+                        <span>{formData.is_visible ? 'Visible al público' : 'Oculto al público'}</span>
+                        <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          {formData.is_visible ? (
+                            <>
+                              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 12a3 3 0 11-6 0 3 3 0 016 0z' />
+                              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' />
+                            </>
+                          ) : (
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21' />
+                          )}
+                        </svg>
+                      </button>
+                    </div>
+
+                  <div>
                       <label className='block text-sm font-medium text-gray-700 mb-2'>
                         Stock
                       </label>

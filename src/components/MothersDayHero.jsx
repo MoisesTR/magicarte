@@ -1,12 +1,10 @@
-export default function MothersDayHero({ categories, onCategorySelect }) {
-  const year = new Date().getFullYear()
-  const mothersDay = new Date(year, 4, 30)
-  const now = new Date()
-  const daysLeft = Math.ceil((mothersDay - now) / (1000 * 60 * 60 * 24))
+import { getMothersDay } from '../utils/holidays'
 
+export default function MothersDayHero({ categories, onCategorySelect }) {
+  const { isActive, daysLeft } = getMothersDay()
   const featuredCategory = categories.find((cat) => cat.name !== 'Todos')
 
-  if (!featuredCategory || daysLeft < -2 || daysLeft > 20) return null
+  if (!featuredCategory || !isActive) return null
 
   const handleClick = () => onCategorySelect?.(featuredCategory)
 

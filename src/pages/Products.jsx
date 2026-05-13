@@ -16,9 +16,10 @@ export default function Products({ selectedCategory, categories = [] }) {
   })
 
   const productFilter = (product) =>
-    !selectedCategory ||
+    product.is_visible !== false &&
+    (!selectedCategory ||
     selectedCategory.name === 'Todos' ||
-    product.category_id === selectedCategory.id
+    product.category_id === selectedCategory.id)
 
   const productsToShow = products.filter(productFilter)
 

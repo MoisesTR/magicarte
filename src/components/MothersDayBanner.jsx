@@ -1,23 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { getMothersDay } from '../utils/holidays'
 
 export default function MothersDayBanner({ onDismiss }) {
   const [dismissed, setDismissed] = useState(false)
-  const [daysLeft, setDaysLeft] = useState(null)
-
-  useEffect(() => {
-    const year = new Date().getFullYear()
-    const mothersDay = new Date(year, 4, 30) // May 30 (Nicaragua)
-    const now = new Date()
-    const diff = Math.ceil((mothersDay - now) / (1000 * 60 * 60 * 24))
-    setDaysLeft(diff)
-  }, [])
+  const { isActive, daysLeft } = getMothersDay()
 
   const handleDismiss = () => {
     setDismissed(true)
     onDismiss?.()
   }
 
-  if (daysLeft === null || daysLeft < -2 || daysLeft > 20 || dismissed) return null
+  if (!isActive || dismissed) return null
 
   return (
     <div className='relative bg-gradient-to-r from-rose-400 via-pink-400 to-purple-300 text-white overflow-hidden'>

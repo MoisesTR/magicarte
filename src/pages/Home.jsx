@@ -9,6 +9,7 @@ import MothersDayHero from '../components/MothersDayHero'
 import { TABLE } from '../utils/constants'
 import { useApp } from '../context/AppContext'
 import { FEATURES } from '../config/features'
+import { getMothersDay } from '../utils/holidays'
 
 
 export default function Home() {
@@ -35,13 +36,7 @@ export default function Home() {
   const dropdownRef = useRef(null)
   const productsRef = useRef(null)
 
-  // Determine if Mother's Day banner is in range (May 10–June 1)
-  const mothersDayBannerActive = (() => {
-    const year = new Date().getFullYear()
-    const mothersDay = new Date(year, 4, 30)
-    const diff = Math.ceil((mothersDay - new Date()) / (1000 * 60 * 60 * 24))
-    return diff >= -2 && diff <= 20
-  })()
+  const mothersDayBannerActive = getMothersDay().isActive
   
   useEffect(() => {
     if (!selectedCategory && modifiedCategories.length > 0) {

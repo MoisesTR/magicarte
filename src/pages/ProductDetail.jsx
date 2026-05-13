@@ -7,6 +7,7 @@ import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappL
 import { trackAddToCart } from '../utils/analytics'
 import { FEATURES } from '../config/features'
 import { useApp } from '../context/AppContext'
+import { getMothersDay } from '../utils/holidays'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import CartModal from '../components/CartModal'
@@ -97,12 +98,7 @@ export default function ProductDetail() {
     navigate(-1) // Go back to previous page
   }
 
-  const isBannerActive = (() => {
-    const year = new Date().getFullYear()
-    const mothersDay = new Date(year, 4, 30)
-    const diff = Math.ceil((mothersDay - new Date()) / (1000 * 60 * 60 * 24))
-    return diff >= -2 && diff <= 20
-  })()
+  const isBannerActive = getMothersDay().isActive
 
   if (isLoading) {
     return (
