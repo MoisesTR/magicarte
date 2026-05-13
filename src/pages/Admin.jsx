@@ -102,7 +102,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       `Precio: C$ ${product.price ?? ''}`,
       `Categoria: ${categoryName}`,
       `Dimensiones: ${dimensions}`,
-      'Tiempo de entrega: de 3 a 5 dias habiles',
+      'Tiempo de entrega: de 7 a 15 dias habiles',
       'Pago: Se debe dar o cancelar la mitad del producto personalizado 2 dias antes de la entrega como maximo para poder dar inicio.'
     ]
 

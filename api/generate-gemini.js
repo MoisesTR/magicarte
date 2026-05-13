@@ -114,7 +114,7 @@ Podemos personalizarlo con nombres, mensajes o detalles especiales.
 
 📏 Medidas: [dimensiones en cm o "consultar medidas"]
 💰 Precio: [precio en C$ o "consultar precio"]
-⏱️ Tiempo de entrega: 3 a 5 días hábiles
+⏱️ Tiempo de entrega: 7 a 15 días hábiles
 💳 Pago: 50% de adelanto para iniciar el pedido personalizado
 
 Escríbenos por WhatsApp para cotizar y apartar el tuyo.

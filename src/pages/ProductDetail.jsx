@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
@@ -301,9 +301,12 @@ export default function ProductDetail() {
                 </svg>
                 <div>
                   <p className='font-semibold text-gray-800'>Tiempo de entrega</p>
-                  <p className='text-gray-600'>de 3 a 5 días hábiles</p>
+                  <p className='text-gray-600'>de 7 a 15 días hábiles</p>
                 </div>
               </div>
+              <Link to='/politica-de-envio' className='mt-3 block text-xs text-[#51c879] hover:underline'>
+                Ver política de envío →
+              </Link>
             </div>
           </div>
         </div>

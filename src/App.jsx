@@ -11,6 +11,8 @@ const Products = lazy(() => import('./pages/Products'))
 const ProductDetail = lazy(() => import('./pages/ProductDetail'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Orders = lazy(() => import('./pages/Orders'))
+const ShippingPolicy = lazy(() => import('./pages/ShippingPolicy'))
+const FAQ = lazy(() => import('./pages/FAQ'))
 
 if (import.meta.env.VITE_GA_ENABLED === 'true') {
   ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID)
@@ -37,6 +39,8 @@ export default function App() {
                 <Route path='/product/:id' element={<ProductDetail />} />
                 <Route path='/admin' element={<Admin />} />
                 <Route path='/admin/orders' element={<Orders />} />
+                <Route path='/politica-de-envio' element={<ShippingPolicy />} />
+                <Route path='/faq' element={<FAQ />} />
               </Routes>
             </ErrorBoundary>
           </Suspense>

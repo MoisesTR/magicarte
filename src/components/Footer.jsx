@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { MAGIC_ARTE } from '../utils/constants'
 export default function Footer() {
   return (
@@ -33,6 +34,14 @@ export default function Footer() {
               </svg>
             </a>
           </div>
+        </div>
+        <div className='mb-3 flex justify-center gap-6'>
+          <Link to='/politica-de-envio' className='text-gray-400 hover:text-[#51c879] text-sm transition-colors'>
+            Políticas
+          </Link>
+          <Link to='/faq' className='text-gray-400 hover:text-[#51c879] text-sm transition-colors'>
+            Preguntas Frecuentes
+          </Link>
         </div>
         <p className='text-gray-400'>&copy; {new Date().getFullYear()} {MAGIC_ARTE}. Todos los derechos reservados.</p>
       </div>
