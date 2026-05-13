@@ -4,6 +4,7 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 
 const normalizeText = (text) => text?.trim().replace(/\n{3,}/g, '\n\n') || ''
+const endsCompleteSentence = (text) => /[.!?…][)"'”’\]]*$/.test(normalizeText(text))
 
 const getRetrySeconds = (message) => {
   const match = message?.match(/retry in ([\d.]+)s/i)
@@ -32,6 +33,31 @@ const getGeminiError = (status, payload) => {
   return message
 }
 
+const getBlockedResponseMessage = (payload) => {
+  const promptFeedback = payload?.promptFeedback
+  const finishReason = payload?.candidates?.[0]?.finishReason
+  const safetyRatings = payload?.candidates?.[0]?.safetyRatings || promptFeedback?.safetyRatings || []
+  const blockedCategories = safetyRatings
+    .filter((rating) => rating.blocked || ['MEDIUM', 'HIGH'].includes(rating.probability))
+    .map((rating) => rating.category?.replace('HARM_CATEGORY_', '').toLowerCase())
+    .filter(Boolean)
+
+  if (promptFeedback?.blockReason) {
+    return `Gemini bloqueó la solicitud (${promptFeedback.blockReason}). Ajusta el nombre o las notas del producto.`
+  }
+
+  if (finishReason === 'SAFETY') {
+    const categories = blockedCategories.length ? ` Categorías: ${blockedCategories.join(', ')}.` : ''
+    return `Gemini bloqueó la respuesta por filtros de seguridad.${categories} Ajusta las notas del producto e intenta de nuevo.`
+  }
+
+  if (finishReason === 'RECITATION') {
+    return 'Gemini evitó responder por posible texto demasiado parecido a una fuente existente. Cambia las notas e intenta de nuevo.'
+  }
+
+  return null
+}
+
 const formatProductContext = (product) => {
   const dimensions = [product.length, product.width].filter(Boolean).join(' x ')
 
@@ -48,11 +74,21 @@ const formatProductContext = (product) => {
 const buildDescriptionPrompt = (product) => `
 Eres copywriter para MagicArte Nicaragua, un negocio pequeño de productos artesanales personalizados.
 
-Escribe una descripción breve, cálida y vendedora en español para este producto.
-Debe sonar natural, cercana y lista para mostrar en una tienda online.
-Menciona que es hecho a mano, personalizado si aplica, y evita exageraciones.
-No incluyas título, hashtags, precio, viñetas ni comillas.
-Extensión ideal: 2 a 3 oraciones.
+Escribe una descripción premium para la página del producto en español.
+Debe sonar cálida, emocional y profesional, como una marca artesanal cuidada, no como texto genérico.
+La descripción debe ayudar a una persona a imaginar por qué este producto sería un buen regalo o detalle especial.
+
+Estructura obligatoria:
+- Exactamente 3 oraciones completas.
+- Oración 1: gancho emocional sobre el propósito, ocasión o sentimiento del producto.
+- Oración 2: describe detalles visuales, personalización o valor decorativo usando la información disponible.
+- Oración 3: menciona que es hecho a mano en MDF con corte láser, pintado a mano y acabado con cuidado.
+
+Reglas:
+- No incluyas título, hashtags, precio, viñetas, emojis ni comillas.
+- No inventes colores, nombres, personajes, fechas o detalles que no estén en los datos.
+- Cada oración debe ser clara, completa y terminar con punto final.
+No dejes frases a medias.
 
 Datos del producto:
 ${formatProductContext(product)}
@@ -145,9 +181,12 @@ export default async function handler(req, res) {
           },
         ],
         generationConfig: {
-          temperature: 0.8,
+          temperature: type === 'description' ? 0.7 : 0.8,
           topP: 0.95,
-          maxOutputTokens: 1000,
+          maxOutputTokens: 1500,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         },
       }),
     })
@@ -162,9 +201,12 @@ export default async function handler(req, res) {
       ?.map((part) => part.text)
       .filter(Boolean)
       .join('\n')
+    const finishReason = payload?.candidates?.[0]?.finishReason
 
     if (!text) {
-      return res.status(502).json({ error: 'Gemini no devolvió contenido' })
+      return res.status(502).json({
+        error: getBlockedResponseMessage(payload) || `Gemini no devolvió contenido${finishReason ? ` (${finishReason})` : ''}. Intenta de nuevo.`,
+      })
     }
 
     return res.status(200).json({ text: normalizeText(text) })

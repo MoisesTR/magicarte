@@ -627,7 +627,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
-                        placeholder='Ej: Piñata decorativa'
+                        placeholder='Ej: Cuadro personalizado para mamá con nombres'
                       />
                     </div>
 
@@ -677,9 +677,14 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
 
                   <div>
                     <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
-                      <label className='text-sm font-medium text-gray-700'>
-                        Descripción
-                      </label>
+                      <div>
+                        <label className='text-sm font-medium text-gray-700'>
+                          Descripción
+                        </label>
+                        <p className='mt-1 text-xs text-gray-400'>
+                          Mejor resultado con nombre, categoría, precio, medidas y notas.
+                        </p>
+                      </div>
                       <div className='flex flex-wrap items-center gap-2'>
                         <button
                           type='button'
@@ -717,7 +722,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
-                      placeholder='Describe tu producto...'
+                      placeholder='Agrega notas para la IA: ocasión, colores, nombres, estilo, detalles personalizados...'
                     />
                   </div>
 

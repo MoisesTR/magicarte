@@ -33,3 +33,4 @@ dist-ssr
 *.pem
 *.p12
 config/secrets.js
+.env*.local
