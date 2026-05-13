@@ -26,6 +26,7 @@ export default function Orders() {
   const [filterGift, setFilterGift] = useState('no_gifts')
   const [selectedDay, setSelectedDay] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const ITEMS_PER_PAGE = 10
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -351,8 +352,6 @@ export default function Orders() {
   }
 
   const deleteOrder = async (id) => {
-    if (!confirm('¿Eliminar este pedido?')) return
-
     const { error } = await supabase
       .from(TABLE.ORDERS)
       .delete()
@@ -362,6 +361,7 @@ export default function Orders() {
       toast.error('Error al eliminar')
     } else {
       toast.success('Pedido eliminado')
+      setConfirmDeleteId(null)
       fetchOrders()
     }
   }
@@ -444,6 +444,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
 
   const getStatusColor = (status) => {
     const colors = {
+      backlog: 'bg-gray-100 text-gray-500',
       pending: 'bg-yellow-100 text-yellow-800',
       confirmed: 'bg-blue-100 text-blue-800',
       in_progress: 'bg-purple-100 text-purple-800',
@@ -473,6 +474,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   }
 
   const statusLabels = {
+    backlog: 'Backlog',
     pending: 'Pendiente',
     confirmed: 'Confirmado',
     in_progress: 'En Proceso',
@@ -768,6 +770,8 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
     .filter(o => o.payment_status === 'paid')
     .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
 
+  const backlogCount = orders.filter(o => o.status === 'backlog').length
+
   const stats = {
     total: filteredOrders.length,
     pending: filteredOrders.filter(o => o.status === 'pending').length,
@@ -803,25 +807,25 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
   }
 
   return (
-    <div className='min-h-screen bg-gray-50 py-8'>
+    <div className='min-h-screen bg-gray-50 py-6'>
       <div className='max-w-7xl mx-auto px-4'>
         {/* Header */}
-        <div className='bg-white rounded-2xl shadow-lg p-6 mb-8'>
-          <div className='flex justify-between items-center mb-6'>
+        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
+          <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4'>
             <div>
-              <h1 className='text-3xl font-bold text-gray-800'>Gestión de Pedidos</h1>
-              <p className='text-gray-600 mt-2'>{user.email}</p>
+              <h1 className='text-xl font-bold text-gray-800'>Gestión de Pedidos</h1>
+              <p className='text-xs text-gray-400 mt-0.5'>{user.email}</p>
             </div>
-            <div className='flex gap-3'>
+            <div className='flex gap-2'>
               <button
                 onClick={() => navigate('/admin')}
-                className='bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-all'
+                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
               >
-                ← Volver a Admin
+                ← Admin
               </button>
               <button
                 onClick={handleLogout}
-                className='bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-all'
+                className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
               >
                 Cerrar Sesión
               </button>
@@ -829,34 +833,41 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
           </div>
 
           {/* Stats */}
-          <div className='grid grid-cols-2 md:grid-cols-7 gap-4'>
-            <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl'>
-              <p className='text-sm text-blue-600 font-medium'>Total Pedidos</p>
-              <p className='text-3xl font-bold text-blue-900'>{stats.total}</p>
+          <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3'>
+            <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl'>
+              <p className='text-xs text-blue-600 font-medium'>Total</p>
+              <p className='text-2xl font-bold text-blue-900'>{stats.total}</p>
             </div>
-            <div className='bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-xl'>
-              <p className='text-sm text-yellow-600 font-medium'>Pendientes</p>
-              <p className='text-3xl font-bold text-yellow-900'>{stats.pending}</p>
+            <div className='bg-gradient-to-br from-yellow-50 to-yellow-100 p-3 rounded-xl'>
+              <p className='text-xs text-yellow-600 font-medium'>Pendientes</p>
+              <p className='text-2xl font-bold text-yellow-900'>{stats.pending}</p>
             </div>
-            <div className='bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl'>
-              <p className='text-sm text-purple-600 font-medium'>En Proceso</p>
-              <p className='text-3xl font-bold text-purple-900'>{stats.in_progress}</p>
+            <div className='bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl'>
+              <p className='text-xs text-purple-600 font-medium'>En Proceso</p>
+              <p className='text-2xl font-bold text-purple-900'>{stats.in_progress}</p>
             </div>
-            <div className='bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl'>
-              <p className='text-sm text-green-600 font-medium'>Completados</p>
-              <p className='text-3xl font-bold text-green-900'>{stats.completed}</p>
+            <div className='bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl'>
+              <p className='text-xs text-green-600 font-medium'>Completados</p>
+              <p className='text-2xl font-bold text-green-900'>{stats.completed}</p>
             </div>
-            <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-4 rounded-xl'>
-              <p className='text-sm text-[#51c879] font-medium'>Ingresos</p>
-              <p className='text-2xl font-bold text-gray-900'>C$ {stats.revenue.toFixed(2)}</p>
+            <button
+              onClick={() => { setFilterStatus('backlog'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
+              className={`p-3 rounded-xl text-left transition-all ${filterStatus === 'backlog' ? 'bg-gray-300 ring-2 ring-gray-400' : 'bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300'}`}
+            >
+              <p className='text-xs text-gray-500 font-medium'>Backlog</p>
+              <p className='text-2xl font-bold text-gray-700'>{backlogCount}</p>
+            </button>
+            <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-3 rounded-xl'>
+              <p className='text-xs text-[#51c879] font-medium'>Ingresos</p>
+              <p className='text-lg font-bold text-gray-900'>C$ {stats.revenue.toFixed(0)}</p>
             </div>
-            <div className='bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl'>
-              <p className='text-sm text-amber-600 font-medium'>Esperado</p>
-              <p className='text-2xl font-bold text-amber-900'>C$ {stats.expectedRevenue.toFixed(2)}</p>
+            <div className='bg-gradient-to-br from-amber-50 to-amber-100 p-3 rounded-xl'>
+              <p className='text-xs text-amber-600 font-medium'>Esperado</p>
+              <p className='text-lg font-bold text-amber-900'>C$ {stats.expectedRevenue.toFixed(0)}</p>
             </div>
-            <div className='bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-xl'>
-              <p className='text-sm text-red-600 font-medium'>Por Cobrar</p>
-              <p className='text-2xl font-bold text-red-900'>C$ {stats.pending_payment.toFixed(2)}</p>
+            <div className='bg-gradient-to-br from-red-50 to-red-100 p-3 rounded-xl'>
+              <p className='text-xs text-red-600 font-medium'>Por Cobrar</p>
+              <p className='text-lg font-bold text-red-900'>C$ {stats.pending_payment.toFixed(0)}</p>
             </div>
           </div>
         </div>
@@ -864,15 +875,15 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
         {!showForm ? (
           <>
             {/* Week Calendar */}
-            <div className='bg-white rounded-2xl shadow-lg p-4 mb-6'>
+            <div className='bg-white rounded-2xl shadow-soft p-4 mb-5'>
               <div className='flex items-center justify-between mb-3'>
-                <h3 className='text-sm font-semibold text-gray-500 uppercase tracking-wide'>📅 Entregas esta semana</h3>
+                <h3 className='text-sm font-semibold text-gray-500 uppercase tracking-wide'>Entregas esta semana</h3>
                 {selectedDay && (
                   <button
                     onClick={() => setSelectedDay(null)}
-                    className='text-xs text-gray-500 hover:text-red-500 transition-colors'
+                    className='text-xs px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg font-medium transition-colors'
                   >
-                    ✕ Quitar filtro
+                    Quitar filtro
                   </button>
                 )}
               </div>
@@ -910,7 +921,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             </div>
 
             {/* Filters and Actions */}
-            <div className='bg-white rounded-2xl shadow-lg p-6 mb-6 space-y-4'>
+            <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 space-y-4'>
               {/* Row 1: Action + Search */}
               <div className='flex flex-wrap items-center gap-3'>
                 <button
@@ -921,7 +932,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 </button>
 
                 <div className='relative flex-1 min-w-[240px] max-w-md'>
-                  <span className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>🔍</span>
+                  <svg className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' /></svg>
                   <input
                     type='text'
                     placeholder='Buscar cliente, teléfono o # pedido...'
@@ -942,9 +953,9 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 <div className='flex items-center gap-2 ml-auto'>
                   <button
                     onClick={() => { const next = viewMode === 'list' ? 'board' : 'list'; setViewMode(next); localStorage.setItem('ordersViewMode', next) }}
-                    className={`px-4 py-3 rounded-xl font-semibold transition-colors ${viewMode === 'board' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${viewMode === 'board' ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                   >
-                    {viewMode === 'board' ? '📋 Lista' : '📊 Tablero'}
+                    {viewMode === 'board' ? 'Vista Lista' : 'Vista Tablero'}
                   </button>
                 </div>
               </div>
@@ -953,10 +964,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               <div className='flex flex-wrap items-center gap-2'>
                 <span className='text-xs font-semibold text-gray-400 uppercase tracking-wide mr-1'>Entregas:</span>
                 {[
-                  { key: 'all', label: 'Todas', icon: '📅' },
-                  { key: 'today', label: 'Hoy', icon: '📌' },
-                  { key: 'week', label: 'Esta semana', icon: '🗓️' },
-                  { key: 'overdue', label: 'Vencidos', icon: '⚠️' },
+                  { key: 'all',     label: 'Todas'       },
+                  { key: 'today',   label: 'Hoy'         },
+                  { key: 'week',    label: 'Esta semana' },
+                  { key: 'overdue', label: 'Vencidos'    },
                 ].map(opt => (
                   <button
                     key={opt.key}
@@ -966,7 +977,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {opt.icon} {opt.label}
+                    {opt.label}
                   </button>
                 ))}
               </div>
@@ -981,7 +992,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                   className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterStatus !== 'all' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-300 text-gray-700'}`}
                 >
                   <option value='all'>Todos los estados</option>
-                  <option value='active'>🟢 Activos (Pend · Conf · Proceso · Listo)</option>
+                  <option value='active'>Activos (sin backlog)</option>
                   {Object.entries(statusLabels).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
@@ -1096,10 +1107,10 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
               /* Kanban Board */
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
                 {[
-                  { key: 'pending', label: 'Pendiente', color: 'yellow', icon: '🕐' },
-                  { key: 'confirmed', label: 'Confirmado', color: 'blue', icon: '✅' },
-                  { key: 'in_progress', label: 'En Proceso', color: 'purple', icon: '⚙️' },
-                  { key: 'ready', label: 'Listo para Entregar', color: 'teal', icon: '📦' }
+                  { key: 'pending',     label: 'Pendiente',           dot: 'bg-yellow-400', headerBg: 'bg-yellow-50',  textColor: 'text-yellow-800', border: 'border-yellow-100', badgeBg: 'bg-yellow-100' },
+                  { key: 'confirmed',   label: 'Confirmado',          dot: 'bg-blue-400',   headerBg: 'bg-blue-50',    textColor: 'text-blue-800',   border: 'border-blue-100',   badgeBg: 'bg-blue-100'   },
+                  { key: 'in_progress', label: 'En Proceso',          dot: 'bg-purple-400', headerBg: 'bg-purple-50',  textColor: 'text-purple-800', border: 'border-purple-100', badgeBg: 'bg-purple-100' },
+                  { key: 'ready',       label: 'Listo para Entregar', dot: 'bg-teal-400',   headerBg: 'bg-teal-50',    textColor: 'text-teal-800',   border: 'border-teal-100',   badgeBg: 'bg-teal-100'   }
                 ].map(col => {
                   const colOrders = filteredOrders
                     .filter(o => o.status === col.key)
@@ -1112,27 +1123,23 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       return new Date(a.estimated_delivery_date) - new Date(b.estimated_delivery_date)
                     })
 
-                  const colColors = {
-                    yellow: 'from-yellow-400 to-yellow-500',
-                    blue: 'from-blue-400 to-blue-500',
-                    purple: 'from-purple-400 to-purple-500',
-                    teal: 'from-teal-400 to-teal-500'
-                  }
-
                   return (
-                    <div key={col.key} className='flex flex-col'>
-                      <div className={`bg-gradient-to-r ${colColors[col.color]} text-white px-4 py-3 rounded-t-xl flex items-center justify-between`}>
-                        <span className='font-bold text-sm'>{col.icon} {col.label}</span>
-                        <span className='bg-white/30 px-2 py-0.5 rounded-full text-xs font-bold'>{colOrders.length}</span>
+                    <div key={col.key} className='flex flex-col rounded-xl border border-gray-200 overflow-hidden'>
+                      <div className={`${col.headerBg} border-b ${col.border} px-3 py-2.5 flex items-center justify-between`}>
+                        <div className='flex items-center gap-2'>
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${col.dot}`} />
+                          <span className={`font-semibold text-sm ${col.textColor}`}>{col.label}</span>
+                        </div>
+                        <span className={`${col.badgeBg} ${col.textColor} px-2 py-0.5 rounded-full text-xs font-bold`}>{colOrders.length}</span>
                       </div>
                       <div
-                        className={`bg-gray-100 rounded-b-xl p-2 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto transition-colors ${draggedOrderId ? 'border-2 border-dashed border-gray-300' : ''}`}
-                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-gray-200') }}
-                        onDragLeave={(e) => { e.currentTarget.classList.remove('bg-gray-200') }}
-                        onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-gray-200'); handleBoardDrop(col.key) }}
+                        className={`bg-gray-50 p-2 space-y-2 min-h-[200px] max-h-[70vh] overflow-y-auto transition-colors ${draggedOrderId ? 'ring-2 ring-inset ring-gray-300 ring-dashed' : ''}`}
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-gray-100') }}
+                        onDragLeave={(e) => { e.currentTarget.classList.remove('bg-gray-100') }}
+                        onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-gray-100'); handleBoardDrop(col.key) }}
                       >
                         {colOrders.length === 0 && (
-                          <p className='text-center text-gray-400 text-sm py-8'>Sin pedidos</p>
+                          <p className='text-center text-gray-400 text-xs py-8'>Sin pedidos</p>
                         )}
                         {colOrders.map(order => {
                           const countdown = getDeliveryCountdown(order.estimated_delivery_date, order.status)
@@ -1142,33 +1149,33 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                               draggable
                               onDragStart={() => setDraggedOrderId(order.id)}
                               onDragEnd={() => setDraggedOrderId(null)}
-                              className={`bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${draggedOrderId === order.id ? 'opacity-50' : ''}`}
+                              className={`bg-white rounded-xl p-3 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing ${draggedOrderId === order.id ? 'opacity-40 scale-95' : ''}`}
                               onClick={() => editOrder(order)}
                             >
-                              <div className='flex items-center justify-between mb-1'>
-                                <span className='font-bold text-sm text-gray-800 truncate'>{order.customer_name}</span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityColor(order.priority)}`}>
+                              <div className='flex items-start justify-between gap-1 mb-1.5'>
+                                <span className='font-semibold text-sm text-gray-800 leading-tight'>{order.customer_name}</span>
+                                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${getPriorityColor(order.priority)}`}>
                                   {priorityLabels[order.priority]}
                                 </span>
                               </div>
-                              <div className='text-xs text-gray-500 mb-1'>
+                              <div className='text-xs text-gray-400 mb-2'>
                                 {order.order_items?.length || 0} producto{(order.order_items?.length || 0) !== 1 ? 's' : ''}
                                 <span className='mx-1'>·</span>
-                                C$ {parseFloat(order.total_amount).toFixed(0)}
+                                <span className='font-medium text-gray-600'>C$ {parseFloat(order.total_amount).toFixed(0)}</span>
                               </div>
-                              <div className='flex items-center justify-between'>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPaymentColor(order.payment_status)}`}>
+                              <div className='flex items-center justify-between gap-1'>
+                                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
                                   {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                                 </span>
                                 {countdown && (
-                                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${countdown.color}`}>
+                                  <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${countdown.color}`}>
                                     {countdown.text}
                                   </span>
                                 )}
                               </div>
                               {order.estimated_delivery_date && (
-                                <div className='text-[10px] text-gray-400 mt-1'>
-                                  📅 {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
+                                <div className='text-xs text-gray-400 mt-1.5'>
+                                  {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
                                 </div>
                               )}
                             </div>
@@ -1182,47 +1189,50 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
             ) : (
               <div className='space-y-4'>
                 {paginatedOrders.map((order) => (
-                  <div key={order.id} className={`bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
+                  <div key={order.id} className={`bg-white rounded-2xl shadow-soft p-4 sm:p-5 hover:shadow-md transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
                     <div className='flex justify-between items-start mb-4'>
                       <div className='flex-1'>
-                        <div className='flex items-center gap-3 mb-3'>
+                        <div className='flex items-center gap-2 flex-wrap mb-2'>
                           <input
                             type='checkbox'
                             checked={selectedOrders.has(order.id)}
                             onChange={() => toggleOrderSelection(order.id)}
                             className='w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500 flex-shrink-0'
                           />
-                          <h3 className='text-2xl font-bold text-gray-800'>Pedido #{order.order_number}</h3>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
-                            {statusLabels[order.status]}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
-                            {priorityLabels[order.priority]}
-                          </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
-                            {paymentStatusLabels[order.payment_status] || 'No Pagado'}
-                          </span>
-                          {order.is_gift && (
-                            <span className='px-3 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
-                              🎁 Regalo
+                          <h3 className='text-base font-bold text-gray-800'>Pedido #{order.order_number}</h3>
+                          <div className='flex items-center gap-1.5 flex-wrap'>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
+                              {statusLabels[order.status]}
                             </span>
-                          )}
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
+                              {priorityLabels[order.priority]}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
+                              {paymentStatusLabels[order.payment_status] || 'No Pagado'}
+                            </span>
+                            {order.is_gift && (
+                              <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
+                                Regalo
+                              </span>
+                            )}
+                          </div>
                         </div>
                         
-                        <div className='grid grid-cols-1 md:grid-cols-2 gap-2 text-gray-600'>
+                        <div className='grid grid-cols-1 md:grid-cols-2 gap-1.5 text-sm text-gray-600'>
                           <p><strong>Cliente:</strong> {order.customer_name}</p>
                           {order.customer_phone && <p><strong>Teléfono:</strong> {order.customer_phone}</p>}
+                          {order.customer_social_media && <p><strong>Red Social:</strong> {order.customer_social_media}</p>}
                           {order.delivery_address && <p><strong>Dirección:</strong> {order.delivery_address}</p>}
                           {order.recipient_name && (
                             <p><strong>Recibe:</strong> {order.recipient_name}{order.recipient_phone ? ` — ${order.recipient_phone}` : ''}</p>
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
-                          {order.order_date && <p><strong>Fecha del Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
+                          {order.order_date && <p><strong>Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
                       </div>
                       
                       <div className='text-right ml-4'>
-                        <p className='text-3xl font-bold text-[#51c879]'>C$ {parseFloat(order.total_amount).toFixed(2)}</p>
+                        <p className='text-xl font-bold text-gray-900'>C$ {parseFloat(order.total_amount).toFixed(2)}</p>
                         {order.delivery_fee > 0 && (
                           <p className='text-xs text-gray-500'>+ Delivery: C$ {parseFloat(order.delivery_fee).toFixed(2)}</p>
                         )}
@@ -1233,7 +1243,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         {order.estimated_delivery_date && (
                           <div className='mt-1'>
                             <p className='text-sm text-gray-600'>
-                              📅 Entrega: {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
+                              Entrega: {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
                             </p>
                             {getDeliveryCountdown(order.estimated_delivery_date, order.status) && (
                               <span className={`inline-block mt-1 px-3 py-1 rounded-lg text-sm font-bold ${getDeliveryCountdown(order.estimated_delivery_date, order.status).color}`}>
@@ -1281,11 +1291,11 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                     )}
 
                     {/* Actions */}
-                    <div className='flex flex-wrap gap-2 pt-4 border-t'>
+                    <div className='flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100'>
                       <select
                         value={order.status}
                         onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className='px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
+                        className='px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       >
                         {Object.entries(statusLabels).map(([key, label]) => (
                           <option key={key} value={key}>{label}</option>
@@ -1294,53 +1304,85 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                       <select
                         value={order.payment_status || 'unpaid'}
                         onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                        className={`px-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 ${getPaymentColor(order.payment_status)}`}
+                        className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] ${getPaymentColor(order.payment_status)}`}
                       >
                         {Object.entries(paymentStatusLabels).map(([key, label]) => (
                           <option key={key} value={key}>{label}</option>
                         ))}
                       </select>
-                      {order.customer_phone && (
+                      <div className='flex items-center gap-1 ml-auto'>
+                        {order.customer_phone && (
+                          <button
+                            onClick={() => openWhatsApp(order)}
+                            className='p-2 text-[#25D366] hover:bg-green-50 rounded-lg transition-colors'
+                            title='Enviar WhatsApp'
+                          >
+                            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
+                              <path d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.787'/>
+                            </svg>
+                          </button>
+                        )}
                         <button
-                          onClick={() => openWhatsApp(order)}
-                          className='px-4 py-2 text-sm bg-[#25D366] text-white rounded-lg hover:bg-[#20BA5A] transition-colors flex items-center gap-2'
+                          onClick={() => editOrder(order)}
+                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
+                          title='Editar pedido'
                         >
-                          <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                            <path d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.787'/>
+                          <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' />
                           </svg>
-                          WhatsApp
                         </button>
-                      )}
-                      <button
-                        onClick={() => editOrder(order)}
-                        className='px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
-                      >
-                        ✏️ Editar
-                      </button>
-                      <button
-                        onClick={() => printLabels([order])}
-                        className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
-                      >
-                        🖨️ 4×2
-                      </button>
-                      <button
-                        onClick={() => printLabels4x6([order])}
-                        className='px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors'
-                      >
-                        🖨️ 4×6
-                      </button>
-                      <button
-                        onClick={() => deleteOrder(order.id)}
-                        className='px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors'
-                      >
-                        🗑️ Eliminar
-                      </button>
+                        <button
+                          onClick={() => printLabels([order])}
+                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
+                          title='Etiqueta 4×2'
+                        >
+                          <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z' />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => printLabels4x6([order])}
+                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
+                          title='Etiqueta 4×6'
+                        >
+                          <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' />
+                          </svg>
+                        </button>
+                        {confirmDeleteId === order.id ? (
+                          <div className='flex items-center gap-1.5'>
+                            <span className='text-xs text-gray-500'>¿Eliminar?</span>
+                            <button
+                              onClick={() => deleteOrder(order.id)}
+                              className='text-xs bg-red-500 text-white px-2.5 py-1 rounded-lg font-medium hover:bg-red-600 transition-colors'
+                            >
+                              Sí
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className='text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg font-medium hover:bg-gray-200 transition-colors'
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(order.id)}
+                            className='p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
+                            title='Eliminar pedido'
+                          >
+                            <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
 
                 {totalPages > 1 && (
-                  <div className='flex items-center justify-between bg-white rounded-2xl shadow-lg px-6 py-4 mt-2'>
+                  <div className='flex items-center justify-between bg-white rounded-2xl shadow-soft px-5 py-3 mt-2'>
                     <p className='text-sm text-gray-500'>
                       Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} pedidos
                     </p>
@@ -1367,7 +1409,7 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 )}
 
                 {filteredOrders.length === 0 && (
-                  <div className='bg-white rounded-2xl shadow-lg p-12 text-center'>
+                  <div className='bg-white rounded-2xl shadow-soft p-12 text-center'>
                     <div className='text-6xl mb-4'>📦</div>
                     <p className='text-xl text-gray-500'>No hay pedidos que mostrar</p>
                   </div>
@@ -1377,423 +1419,464 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
           </>
         ) : (
           <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
-            <div className='bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col'>
-              <div className='flex justify-between items-center p-6 border-b'>
-                <h2 className='text-2xl font-bold text-gray-800'>
-                  {editingOrder ? 'Editar Pedido' : 'Nuevo Pedido'}
-                </h2>
+            <div className='bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col'>
+              <div className='flex justify-between items-center p-5 border-b'>
+                <div>
+                  <h2 className='text-base font-bold text-gray-800'>
+                    {editingOrder ? `Pedido #${editingOrder.order_number}` : 'Nuevo Pedido'}
+                  </h2>
+                  {editingOrder && (
+                    <p className='text-xs text-gray-400 mt-0.5'>{editingOrder.customer_name}</p>
+                  )}
+                </div>
                 <button
                   onClick={resetForm}
-                  className='text-gray-500 hover:text-gray-700 text-3xl leading-none'
+                  className='text-gray-400 hover:text-gray-600 transition-colors'
                 >
-                  ×
+                  <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                  </svg>
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className='flex flex-col flex-1 overflow-hidden'>
-                <div className='flex-1 overflow-y-auto p-6 space-y-6'>
-              {/* Customer Info */}
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Nombre del Cliente *</label>
-                  <input
-                    type='text'
-                    required
-                    value={formData.customer_name}
-                    onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  />
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Teléfono</label>
-                  <input
-                    type='text'
-                    value={formData.customer_phone}
-                    onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  />
-                </div>
-              </div>
+                <div className='flex-1 overflow-y-auto p-5 space-y-5'>
 
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Dirección de Entrega</label>
-                  <input
-                    type='text'
-                    value={formData.delivery_address}
-                    onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  />
-                </div>
-              </div>
-
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Modalidad de Entrega *</label>
-                  <select
-                    value={formData.delivery_method}
-                    onChange={(e) => setFormData({ ...formData, delivery_method: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  >
-                    {Object.entries(deliveryMethodLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Fecha del Encargo *</label>
-                  <input
-                    type='date'
-                    required
-                    value={formData.order_date}
-                    onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  />
-                </div>
-              </div>
-
-              {formData.delivery_method === 'delivery' && (
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                  {/* Cliente */}
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>Costo de Delivery (C$)</label>
-                    <input
-                      type='number'
-                      step='0.01'
-                      min='0'
-                      value={formData.delivery_fee}
-                      onChange={(e) => setFormData({ ...formData, delivery_fee: parseFloat(e.target.value) || 0 })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                      placeholder='0.00'
-                    />
-                  </div>
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>Persona que Recibe</label>
-                    <input
-                      type='text'
-                      value={formData.recipient_name}
-                      onChange={(e) => setFormData({ ...formData, recipient_name: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                      placeholder='Si es diferente al cliente'
-                    />
-                  </div>
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>Teléfono de quien Recibe</label>
-                    <input
-                      type='text'
-                      value={formData.recipient_phone}
-                      onChange={(e) => setFormData({ ...formData, recipient_phone: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                      placeholder='Si es diferente al cliente'
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Order Details */}
-              <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Estado</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  >
-                    {Object.entries(statusLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Prioridad</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  >
-                    {Object.entries(priorityLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Estado de Pago</label>
-                  <select
-                    value={formData.payment_status}
-                    onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  >
-                    {Object.entries(paymentStatusLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-2'>Fecha Estimada de Entrega</label>
-                  <input
-                    type='date'
-                    value={formData.estimated_delivery_date}
-                    onChange={(e) => setFormData({ ...formData, estimated_delivery_date: e.target.value })}
-                    className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className='block text-sm font-medium text-gray-700 mb-2'>Notas</label>
-                <textarea
-                  rows={3}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500'
-                  placeholder='Notas adicionales sobre el pedido...'
-                />
-              </div>
-
-              <label className='flex items-center gap-3 cursor-pointer'>
-                <input
-                  type='checkbox'
-                  checked={formData.is_gift}
-                  onChange={(e) => setFormData({ ...formData, is_gift: e.target.checked })}
-                  className='w-5 h-5 rounded border-gray-300 text-pink-500 focus:ring-pink-500'
-                />
-                <span className='text-sm font-medium text-gray-700'>🎁 Es un regalo</span>
-              </label>
-
-              {/* Products Section */}
-              <div className='border-t pt-6'>
-                <div className='flex justify-between items-center mb-4'>
-                  <h3 className='text-lg font-semibold text-gray-800'>Productos del Pedido</h3>
-                  <button
-                    type='button'
-                    onClick={addItem}
-                    className='px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
-                  >
-                    + Agregar Producto
-                  </button>
-                </div>
-
-                <div className='space-y-4'>
-                  {formData.items.map((item, index) => (
-                    <div key={index} className='bg-gray-50 p-4 rounded-xl border border-gray-200'>
-                      <div className='flex justify-between items-start mb-4'>
-                        <label className='flex items-center gap-2'>
-                          <input
-                            type='checkbox'
-                            checked={item.is_custom}
-                            onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
-                            className='w-4 h-4'
-                          />
-                          <span className='text-sm font-medium text-gray-700'>Producto Personalizado</span>
-                        </label>
-                        <button
-                          type='button'
-                          onClick={() => removeItem(index)}
-                          className='text-red-500 hover:text-red-700 font-semibold'
-                        >
-                          Eliminar
-                        </button>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Cliente</p>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Nombre *</label>
+                        <input
+                          type='text'
+                          required
+                          value={formData.customer_name}
+                          onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
                       </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Teléfono</label>
+                        <input
+                          type='text'
+                          value={formData.customer_phone}
+                          onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
+                        <input
+                          type='text'
+                          value={formData.customer_social_media}
+                          onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                          placeholder='Facebook, Instagram...'
+                        />
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Dirección de Entrega</label>
+                        <input
+                          type='text'
+                          value={formData.delivery_address}
+                          onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                        {!item.is_custom ? (
-                          <div className='md:col-span-2'>
-                            <label className='block text-sm font-medium text-gray-700 mb-2'>Producto del Catálogo</label>
-                            <div className='relative'>
-                              {(() => {
-                                const query = (item.product_query || '').trim().toLowerCase()
-                                const matches = query
-                                  ? products.filter(p => p.name.toLowerCase().includes(query))
-                                  : products
-                                const visible = matches.slice(0, 8)
-                                const activeIndex = item.product_active_index ?? 0
-                                return (
-                                  <>
-                                    <div className='relative'>
-                                      <input
-                                        type='text'
-                                        value={item.product_query || ''}
-                                        onChange={(e) => updateItem(index, 'product_query', e.target.value)}
-                                        onFocus={() => updateItem(index, 'product_open', true)}
-                                        onBlur={() => {
-                                          setTimeout(() => {
-                                            updateItem(index, 'product_open', false)
-                                            updateItem(index, 'product_active_index', -1)
-                                          }, 120)
-                                        }}
-                                        onKeyDown={(e) => handleProductKeyDown(index, e, visible)}
-                                        className='w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white'
-                                        placeholder='Busca un producto por nombre...'
-                                        role='combobox'
-                                        aria-expanded={item.product_open ? 'true' : 'false'}
-                                        aria-controls={`product-list-${index}`}
-                                      />
-                                      <div className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-400'>
-                                        🔎
-                                      </div>
-                                    </div>
+                  {/* Estado del Pedido */}
+                  <div className='border-t border-gray-100 pt-5'>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Estado del Pedido</p>
+                    <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Estado</label>
+                        <select
+                          value={formData.status}
+                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getStatusColor(formData.status)}`}
+                        >
+                          {Object.entries(statusLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                        {formData.status === 'backlog' && (
+                          <p className='text-xs text-gray-400 mt-1'>Los productos son opcionales.</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Prioridad</label>
+                        <select
+                          value={formData.priority}
+                          onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPriorityColor(formData.priority)}`}
+                        >
+                          {Object.entries(priorityLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Pago</label>
+                        <select
+                          value={formData.payment_status}
+                          onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPaymentColor(formData.payment_status)}`}
+                        >
+                          {Object.entries(paymentStatusLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Fecha de Entrega</label>
+                        <input
+                          type='date'
+                          value={formData.estimated_delivery_date}
+                          onChange={(e) => setFormData({ ...formData, estimated_delivery_date: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-                                    {item.product_id && (
-                                      <div className='mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'>
-                                        Seleccionado: {item.product_name} · C$ {parseFloat(item.unit_price).toFixed(2)}
-                                      </div>
-                                    )}
+                  {/* Entrega */}
+                  <div className='border-t border-gray-100 pt-5'>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Entrega</p>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Modalidad *</label>
+                        <select
+                          value={formData.delivery_method}
+                          onChange={(e) => setFormData({ ...formData, delivery_method: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        >
+                          {Object.entries(deliveryMethodLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Fecha del Encargo *</label>
+                        <input
+                          type='date'
+                          required
+                          value={formData.order_date}
+                          onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
+                      </div>
+                    </div>
+                    {formData.delivery_method === 'delivery' && (
+                      <div className='grid grid-cols-1 md:grid-cols-3 gap-3 mt-3'>
+                        <div>
+                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Costo Delivery (C$)</label>
+                          <input
+                            type='number'
+                            step='0.01'
+                            min='0'
+                            value={formData.delivery_fee}
+                            onChange={(e) => setFormData({ ...formData, delivery_fee: parseFloat(e.target.value) || 0 })}
+                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                            placeholder='0.00'
+                          />
+                        </div>
+                        <div>
+                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Persona que Recibe</label>
+                          <input
+                            type='text'
+                            value={formData.recipient_name}
+                            onChange={(e) => setFormData({ ...formData, recipient_name: e.target.value })}
+                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                            placeholder='Si es diferente al cliente'
+                          />
+                        </div>
+                        <div>
+                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Teléfono de quien Recibe</label>
+                          <input
+                            type='text'
+                            value={formData.recipient_phone}
+                            onChange={(e) => setFormData({ ...formData, recipient_phone: e.target.value })}
+                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                            placeholder='Si es diferente al cliente'
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                                    {item.product_open && (
-                                      <div
-                                        id={`product-list-${index}`}
-                                        role='listbox'
-                                        className='absolute z-10 mt-2 w-full max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl'
-                                        onMouseDown={(e) => e.preventDefault()}
-                                      >
-                                        {visible.length === 0 ? (
-                                          <div className='px-4 py-3 text-sm text-gray-500'>No hay resultados.</div>
-                                        ) : (
-                                          visible.map((p, i) => (
-                                            <button
-                                              key={p.id}
-                                              type='button'
-                                              role='option'
-                                              aria-selected={item.product_id === p.id}
-                                              onClick={() => selectProduct(index, p)}
-                                              className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 ${
-                                                i === activeIndex ? 'bg-blue-50' : 'bg-white'
-                                              } hover:bg-blue-50 transition-colors`}
-                                            >
-                                              <div className='truncate font-medium text-gray-800'>
-                                                {highlightMatch(p.name, item.product_query || '')}
-                                              </div>
-                                              <div className='text-sm text-gray-500'>C$ {parseFloat(p.price).toFixed(2)}</div>
-                                            </button>
-                                          ))
+                  {/* Notas y regalo */}
+                  <div className='border-t border-gray-100 pt-5 space-y-3'>
+                    <div>
+                      <label className='block text-xs font-medium text-gray-600 mb-1.5'>Notas</label>
+                      <textarea
+                        rows={2}
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm resize-none'
+                        placeholder='Instrucciones especiales, detalles del diseño...'
+                      />
+                    </div>
+                    <button
+                      type='button'
+                      onClick={() => setFormData({ ...formData, is_gift: !formData.is_gift })}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                        formData.is_gift
+                          ? 'bg-pink-50 border-pink-200 text-pink-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className='w-4 h-4' fill={formData.is_gift ? 'currentColor' : 'none'} stroke='currentColor' viewBox='0 0 24 24'>
+                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v13m0-13V6a2 2 0 112.83 2.83L12 12m0-4V6a2 2 0 10-2.83 2.83L12 12m0 0l-2.83-2.83M12 12l2.83-2.83M4 12h16v9a1 1 0 01-1 1H5a1 1 0 01-1-1v-9z' />
+                      </svg>
+                      {formData.is_gift ? 'Es un regalo' : 'Marcar como regalo'}
+                    </button>
+                  </div>
+
+                  {/* Productos */}
+                  <div className='border-t border-gray-100 pt-5'>
+                    <div className='flex items-center justify-between mb-3'>
+                      <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide'>Productos</p>
+                      <button
+                        type='button'
+                        onClick={addItem}
+                        className='flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity'
+                      >
+                        <svg className='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
+                        </svg>
+                        Agregar
+                      </button>
+                    </div>
+
+                    <div className='space-y-3'>
+                      {formData.items.map((item, index) => (
+                        <div key={index} className='bg-gray-50 p-3 rounded-xl border border-gray-200'>
+                          <div className='flex items-center justify-between mb-3'>
+                            <label className='flex items-center gap-2 cursor-pointer'>
+                              <input
+                                type='checkbox'
+                                checked={item.is_custom}
+                                onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
+                                className='w-3.5 h-3.5 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
+                              />
+                              <span className='text-xs font-medium text-gray-600'>Producto personalizado</span>
+                            </label>
+                            <button
+                              type='button'
+                              onClick={() => removeItem(index)}
+                              className='p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
+                              title='Eliminar producto'
+                            >
+                              <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' />
+                              </svg>
+                            </button>
+                          </div>
+
+                          <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                            {!item.is_custom ? (
+                              <div className='md:col-span-2'>
+                                <label className='block text-xs font-medium text-gray-600 mb-1.5'>Producto del Catálogo</label>
+                                <div className='relative'>
+                                  {(() => {
+                                    const query = (item.product_query || '').trim().toLowerCase()
+                                    const matches = query
+                                      ? products.filter(p => p.name.toLowerCase().includes(query))
+                                      : products
+                                    const visible = matches.slice(0, 8)
+                                    const activeIndex = item.product_active_index ?? 0
+                                    return (
+                                      <>
+                                        <div className='relative'>
+                                          <input
+                                            type='text'
+                                            value={item.product_query || ''}
+                                            onChange={(e) => updateItem(index, 'product_query', e.target.value)}
+                                            onFocus={() => updateItem(index, 'product_open', true)}
+                                            onBlur={() => {
+                                              setTimeout(() => {
+                                                updateItem(index, 'product_open', false)
+                                                updateItem(index, 'product_active_index', -1)
+                                              }, 120)
+                                            }}
+                                            onKeyDown={(e) => handleProductKeyDown(index, e, visible)}
+                                            className='w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent bg-white text-sm'
+                                            placeholder='Busca un producto...'
+                                            role='combobox'
+                                            aria-expanded={item.product_open ? 'true' : 'false'}
+                                            aria-controls={`product-list-${index}`}
+                                          />
+                                          <svg className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z' />
+                                          </svg>
+                                        </div>
+
+                                        {item.product_id && (
+                                          <div className='mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'>
+                                            {item.product_name} · C$ {parseFloat(item.unit_price).toFixed(2)}
+                                          </div>
                                         )}
-                                      </div>
-                                    )}
-                                  </>
-                                )
-                              })()}
+
+                                        {item.product_open && (
+                                          <div
+                                            id={`product-list-${index}`}
+                                            role='listbox'
+                                            className='absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl'
+                                            onMouseDown={(e) => e.preventDefault()}
+                                          >
+                                            {visible.length === 0 ? (
+                                              <div className='px-4 py-3 text-sm text-gray-400'>Sin resultados.</div>
+                                            ) : (
+                                              visible.map((p, i) => (
+                                                <button
+                                                  key={p.id}
+                                                  type='button'
+                                                  role='option'
+                                                  aria-selected={item.product_id === p.id}
+                                                  onClick={() => selectProduct(index, p)}
+                                                  className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 text-sm transition-colors ${
+                                                    i === activeIndex ? 'bg-[#51c879]/10' : 'bg-white'
+                                                  } hover:bg-[#51c879]/10`}
+                                                >
+                                                  <span className='truncate font-medium text-gray-800'>
+                                                    {highlightMatch(p.name, item.product_query || '')}
+                                                  </span>
+                                                  <span className='text-gray-500 flex-shrink-0'>C$ {parseFloat(p.price).toFixed(2)}</span>
+                                                </button>
+                                              ))
+                                            )}
+                                          </div>
+                                        )}
+                                      </>
+                                    )
+                                  })()}
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div>
+                                  <label className='block text-xs font-medium text-gray-600 mb-1.5'>Nombre</label>
+                                  <input
+                                    type='text'
+                                    value={item.product_name}
+                                    onChange={(e) => updateItem(index, 'product_name', e.target.value)}
+                                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                    placeholder='Ej: Piñata personalizada'
+                                  />
+                                </div>
+                                <div>
+                                  <label className='block text-xs font-medium text-gray-600 mb-1.5'>Descripción</label>
+                                  <input
+                                    type='text'
+                                    value={item.product_description}
+                                    onChange={(e) => updateItem(index, 'product_description', e.target.value)}
+                                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                    placeholder='Detalles del producto'
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            <div>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Cantidad</label>
+                              <input
+                                type='number'
+                                min='1'
+                                value={item.quantity}
+                                onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                              />
+                            </div>
+
+                            <div>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Precio Unitario (C$)</label>
+                              <input
+                                type='number'
+                                step='0.01'
+                                min='0'
+                                value={item.unit_price}
+                                onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                              />
+                            </div>
+
+                            <div>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Horas Necesarias</label>
+                              <input
+                                type='number'
+                                min='0'
+                                value={item.hours_needed}
+                                onChange={(e) => updateItem(index, 'hours_needed', parseInt(e.target.value) || 0)}
+                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                              />
+                            </div>
+
+                            <div>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Cargo Urgencia (C$)</label>
+                              <input
+                                type='number'
+                                step='0.01'
+                                min='0'
+                                value={item.rush_fee}
+                                onChange={(e) => updateItem(index, 'rush_fee', parseFloat(e.target.value) || 0)}
+                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                              />
                             </div>
                           </div>
-                        ) : (
-                          <>
-                            <div>
-                              <label className='block text-sm font-medium text-gray-700 mb-2'>Nombre del Producto</label>
-                              <input
-                                type='text'
-                                value={item.product_name}
-                                onChange={(e) => updateItem(index, 'product_name', e.target.value)}
-                                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                                placeholder='Ej: Piñata personalizada'
-                              />
-                            </div>
-                            <div>
-                              <label className='block text-sm font-medium text-gray-700 mb-2'>Descripción</label>
-                              <input
-                                type='text'
-                                value={item.product_description}
-                                onChange={(e) => updateItem(index, 'product_description', e.target.value)}
-                                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                                placeholder='Detalles del producto'
-                              />
-                            </div>
-                          </>
-                        )}
 
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700 mb-2'>Cantidad</label>
-                          <input
-                            type='number'
-                            min='1'
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                          />
+                          <div className='mt-2 text-right'>
+                            <span className='text-xs font-semibold text-gray-600'>
+                              Subtotal: C$ {((item.quantity * item.unit_price) + (item.rush_fee || 0)).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
+                      ))}
 
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700 mb-2'>Precio Unitario (C$)</label>
-                          <input
-                            type='number'
-                            step='0.01'
-                            min='0'
-                            value={item.unit_price}
-                            onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                          />
+                      {formData.items.length === 0 && (
+                        <div className='text-center py-6 border-2 border-dashed border-gray-200 rounded-xl'>
+                          <p className='text-sm text-gray-400'>
+                            {formData.status === 'backlog' ? 'Puedes guardar sin productos por ahora.' : 'Agrega al menos un producto para crear el pedido.'}
+                          </p>
                         </div>
-
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700 mb-2'>Horas Necesarias</label>
-                          <input
-                            type='number'
-                            min='0'
-                            value={item.hours_needed}
-                            onChange={(e) => updateItem(index, 'hours_needed', parseInt(e.target.value) || 0)}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                          />
-                        </div>
-
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700 mb-2'>Cargo por Urgencia (C$)</label>
-                          <input
-                            type='number'
-                            step='0.01'
-                            min='0'
-                            value={item.rush_fee}
-                            onChange={(e) => updateItem(index, 'rush_fee', parseFloat(e.target.value) || 0)}
-                            className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500'
-                          />
-                        </div>
-                      </div>
-
-                      <div className='mt-3 text-right'>
-                        <span className='text-sm font-semibold text-gray-700'>
-                          Subtotal: C$ {((item.quantity * item.unit_price) + (item.rush_fee || 0)).toFixed(2)}
-                        </span>
-                      </div>
+                      )}
                     </div>
-                  ))}
 
-                  {formData.items.length === 0 && (
-                    <div className='text-center py-8 text-gray-500'>
-                      No hay productos agregados. Haz clic en "Agregar Producto" para comenzar.
-                    </div>
-                  )}
+                    {formData.items.length > 0 && (
+                      <div className='mt-4 flex items-center justify-between bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 px-4 py-3 rounded-xl'>
+                        <div className='text-sm text-gray-600 space-y-0.5'>
+                          <p>Productos: <span className='font-semibold'>C$ {calculateTotal().toFixed(2)}</span></p>
+                          {formData.delivery_method === 'delivery' && formData.delivery_fee > 0 && (
+                            <p>Delivery: <span className='font-semibold'>C$ {parseFloat(formData.delivery_fee).toFixed(2)}</span></p>
+                          )}
+                        </div>
+                        <p className='text-xl font-bold text-gray-900'>
+                          C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0)).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
-
-                <div className='mt-6 text-right bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 p-4 rounded-xl'>
-                  <p className='text-xl text-gray-700'>
-                    Productos: C$ {calculateTotal().toFixed(2)}
-                  </p>
-                  {formData.delivery_method === 'delivery' && formData.delivery_fee > 0 && (
-                    <p className='text-sm text-gray-500 mt-1'>
-                      Delivery: C$ {parseFloat(formData.delivery_fee).toFixed(2)}
-                    </p>
-                  )}
-                  <p className='text-3xl font-bold text-gray-900 mt-1'>
-                    Total: C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0)).toFixed(2)}
-                  </p>
+                <div className='flex gap-3 p-4 border-t bg-white rounded-b-2xl'>
+                  <button
+                    type='button'
+                    onClick={resetForm}
+                    className='px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors text-sm font-semibold'
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type='submit'
+                    disabled={loading || (formData.items.length === 0 && formData.status !== 'backlog')}
+                    className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all'
+                  >
+                    {loading ? 'Guardando...' : editingOrder ? 'Actualizar' : 'Crear Pedido'}
+                  </button>
                 </div>
-              </div>
-
-              {/* Submit Buttons */}
-              </div>
-              <div className='flex gap-4 p-6 border-t bg-white rounded-b-2xl'>
-                <button
-                  type='button'
-                  onClick={resetForm}
-                  className='flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold'
-                >
-                  Cancelar
-                </button>
-                <button
-                  type='submit'
-                  disabled={loading || formData.items.length === 0}
-                  className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] disabled:opacity-50 transition-all shadow-lg'
-                >
-                  {loading ? 'Guardando...' : (editingOrder ? 'Actualizar Pedido' : 'Crear Pedido')}
-                </button>
-              </div>
-            </form>
+              </form>
           </div>
           </div>
         )}
