@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const faqs = [
@@ -71,8 +71,6 @@ function AccordionItem({ faq }) {
 
 export default function FAQ() {
   const navigate = useNavigate()
-
-  useEffect(() => { window.scrollTo(0, 0) }, [])
 
   return (
     <div className='min-h-screen bg-gray-50'>

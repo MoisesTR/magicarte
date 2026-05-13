@@ -76,9 +76,6 @@ export default function ProductDetail() {
     }
   }, [product])
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [id])
 
   const handleQuoteClick = () => {
     const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
