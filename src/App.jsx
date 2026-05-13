@@ -1,15 +1,16 @@
 import { Toaster } from 'react-hot-toast'
 import ReactGA from 'react-ga4'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import Home from './pages/Home'
-import Products from './pages/Products'
-import ProductDetail from './pages/ProductDetail'
-import Admin from './pages/Admin'
-import Orders from './pages/Orders'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import AppProvider from './context/AppContext'
+
+const Home = lazy(() => import('./pages/Home'))
+const Products = lazy(() => import('./pages/Products'))
+const ProductDetail = lazy(() => import('./pages/ProductDetail'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Orders = lazy(() => import('./pages/Orders'))
 
 if (import.meta.env.VITE_GA_ENABLED === 'true') {
   ReactGA.initialize(import.meta.env.VITE_GA_MEASUREMENT_ID)
@@ -29,13 +30,15 @@ export default function App() {
       <AppProvider>
         <Toaster position='top-right' toastOptions={{ duration: 3000, style: { borderRadius: '12px', padding: '12px 16px' } }} />
         <Router>
-          <Routes>
-            <Route path='/' element={<Home />} />
-            <Route path='/products' element={<Products />} />
-            <Route path='/product/:id' element={<ProductDetail />} />
-            <Route path='/admin' element={<Admin />} />
-            <Route path='/admin/orders' element={<Orders />} />
-          </Routes>
+          <Suspense fallback={<div className='min-h-screen bg-gray-50 flex items-center justify-center text-gray-600'>Cargando...</div>}>
+            <Routes>
+              <Route path='/' element={<Home />} />
+              <Route path='/products' element={<Products />} />
+              <Route path='/product/:id' element={<ProductDetail />} />
+              <Route path='/admin' element={<Admin />} />
+              <Route path='/admin/orders' element={<Orders />} />
+            </Routes>
+          </Suspense>
         </Router>
       </AppProvider>
     </QueryClientProvider>
