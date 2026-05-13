@@ -421,25 +421,43 @@ export default function Orders() {
       return
     }
 
-    // Clean phone number (remove spaces, dashes, etc.)
     phone = phone.replace(/\D/g, '')
-    
-    // Generate simple message without special characters
+
+    const statusOpening = {
+      backlog: 'Hemos recibido tu solicitud y la tenemos en lista de espera.',
+      pending: 'Hemos recibido tu pedido y estamos revisando los detalles.',
+      confirmed: 'Tu pedido ha sido confirmado y pronto comenzaremos a trabajar en el.',
+      in_progress: 'Tu pedido esta en proceso, pronto estara listo.',
+      ready: order.delivery_method === 'delivery'
+        ? 'Tu pedido esta listo y en camino!'
+        : 'Tu pedido esta listo para recoger!',
+      completed: 'Gracias por tu compra! Esperamos que hayas quedado satisfecho.',
+    }
+
+    const opening = statusOpening[order.status] || 'Te escribo sobre tu pedido.'
+
+    const itemsList = order.order_items.map(item => `- ${item.product_name}, cantidad: ${item.quantity}`).join('\n')
+    const totalLine = `Total productos: C$ ${parseFloat(order.total_amount).toFixed(2)}`
+    const deliveryLine = order.delivery_fee > 0
+      ? `Delivery: C$ ${parseFloat(order.delivery_fee).toFixed(2)}\nTotal: C$ ${(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}`
+      : ''
+    const dateLine = order.estimated_delivery_date
+      ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}`
+      : ''
+
     const message = `Hola ${order.customer_name}!
 
-Te escribo sobre tu pedido.
+${opening}
 
 Detalles del pedido:
-${order.order_items.map(item => `- ${item.product_name}, cantidad: ${item.quantity}`).join('\n')}
+${itemsList}
 
-Total productos: C$ ${parseFloat(order.total_amount).toFixed(2)}
-${order.delivery_fee > 0 ? `Delivery: C$ ${parseFloat(order.delivery_fee).toFixed(2)}\nTotal: C$ ${(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}` : ''}
-${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}` : ''}`
+${totalLine}
+${deliveryLine}
+${dateLine}`.trim()
 
     const encodedMessage = encodeURIComponent(message)
-    const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`
-    
-    window.open(whatsappUrl, '_blank')
+    window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank')
   }
 
   const getStatusColor = (status) => {

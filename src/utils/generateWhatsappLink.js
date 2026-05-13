@@ -28,9 +28,11 @@ export function generateWhatsAppLinkForSingleProduct(
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
 
+  const productUrl = `${window.location.origin}/product/${product.id}`
   const message = `Hola! Me gustaría cotizar:
 
 - ${product.name}: C$${product.price}
+${productUrl}
 
 Gracias!`
 
