@@ -61,11 +61,11 @@ export default function ProductCard({ product }) {
       </div>
 
       {/* Text */}
-      <div className='flex flex-col gap-1 p-3 sm:p-4 text-center'>
-        <h3 className='text-[13px] sm:text-[15px] font-semibold text-gray-800 line-clamp-2 leading-snug'>
+      <div className='flex flex-col gap-2 p-3 sm:p-4 text-center'>
+        <h3 className='text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 leading-snug'>
           {product.name}
         </h3>
-        <p className='text-xl sm:text-2xl font-bold text-gray-800'>C$ {product.price}</p>
+        <p className='text-xl sm:text-2xl font-bold text-[#51c879]'>C$ {product.price}</p>
       </div>
     </article>
   )

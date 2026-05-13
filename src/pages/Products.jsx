@@ -59,7 +59,7 @@ export default function Products({ selectedCategory, categories = [] }) {
           </div>
         )}
 
-        <div className='grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4'>
+        <div className='grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4'>
           {productsToShow.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
