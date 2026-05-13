@@ -6,7 +6,6 @@ import Products from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
 import Admin from './pages/Admin'
 import Orders from './pages/Orders'
-import Calculator from './pages/Calculator'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -36,7 +35,6 @@ export default function App() {
             <Route path='/product/:id' element={<ProductDetail />} />
             <Route path='/admin' element={<Admin />} />
             <Route path='/admin/orders' element={<Orders />} />
-            <Route path='/admin/calculator' element={<Calculator />} />
           </Routes>
         </Router>
       </AppProvider>

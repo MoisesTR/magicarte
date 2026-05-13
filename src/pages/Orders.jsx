@@ -3,7 +3,6 @@ import { supabase } from '../config/supabaseClient'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { TABLE } from '../utils/constants'
-import OrderCalculator from '../components/OrderCalculator'
 import toast from 'react-hot-toast'
 
 export default function Orders() {
@@ -18,7 +17,6 @@ export default function Orders() {
   const [filterStatus, setFilterStatus] = useState('active')
   const [filterPriority, setFilterPriority] = useState('all')
   const [sortBy, setSortBy] = useState('created_at')
-  const [calcOrder, setCalcOrder] = useState(null)
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('ordersViewMode') || 'list')
   const [filterMonth, setFilterMonth] = useState('all')
@@ -1066,12 +1064,6 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                 {selectedOrders.size > 0 && (
                   <>
                     <button
-                      onClick={() => setCalcOrder(selectedOrderObjects)}
-                      className='bg-amber-500 text-white px-5 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors shadow-md'
-                    >
-                      🧮 Calcular {selectedOrders.size} pedido{selectedOrders.size > 1 ? 's' : ''}
-                    </button>
-                    <button
                       onClick={() => printLabels(selectedOrderObjects)}
                       className='bg-gray-700 text-white px-5 py-2 rounded-xl font-semibold hover:bg-gray-800 transition-colors shadow-md'
                     >
@@ -1324,12 +1316,6 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
                         className='px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
                       >
                         ✏️ Editar
-                      </button>
-                      <button
-                        onClick={() => setCalcOrder([order])}
-                        className='px-4 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors'
-                      >
-                        🧮 Calcular
                       </button>
                       <button
                         onClick={() => printLabels([order])}
@@ -1812,10 +1798,6 @@ ${order.estimated_delivery_date ? `Fecha estimada de entrega: ${new Date(order.e
           </div>
         )}
 
-        {/* Calculator Modal */}
-        {calcOrder && (
-          <OrderCalculator orders={calcOrder} onClose={() => setCalcOrder(null)} />
-        )}
       </div>
     </div>
   )

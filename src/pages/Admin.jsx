@@ -19,8 +19,11 @@ export default function Admin() {
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingProducts, setLoadingProducts] = useState(true)
   const [dragging, setDragging] = useState(false)
   const [mainPreviewUrl, setMainPreviewUrl] = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const isHeic = (file) => file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
 
@@ -126,6 +129,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const fetchProducts = async () => {
+    setLoadingProducts(true)
     try {
       const { data, error } = await supabase
         .from('products')
@@ -135,11 +139,12 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       if (error) {
         toast.error(`Error al cargar productos: ${error.message}`)
       } else {
-        // Products loaded successfully
         setProducts(data || [])
       }
     } catch (error) {
       toast.error('Error inesperado al cargar productos')
+    } finally {
+      setLoadingProducts(false)
     }
   }
 
@@ -275,8 +280,6 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const deleteProduct = async (id) => {
-    if (!confirm('¿Estás seguro de eliminar este producto?')) return
-
     const { error } = await supabase
       .from('products')
       .delete()
@@ -286,6 +289,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       toast.error('Error al eliminar el producto')
     } else {
       toast.success('Producto eliminado')
+      setConfirmDeleteId(null)
       fetchProducts()
     }
   }
@@ -335,48 +339,43 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     return <AdminLogin onLogin={handleLogin} />
   }
 
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <div className='min-h-screen bg-gray-50 py-8'>
       <div className='max-w-7xl mx-auto px-4'>
+
         {/* Header */}
-        <div className='bg-white rounded-2xl shadow-soft p-6 mb-8'>
-          <div className='flex justify-between items-center'>
+        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-6 mb-6'>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div>
-              <h1 className='text-3xl font-bold text-gray-800'>
-                Panel de Administración
-              </h1>
-              <p className='text-gray-600 mt-2'>
-                Gestiona tus productos de MDF • {user.email}
-              </p>
+              <h1 className='text-2xl sm:text-3xl font-bold text-gray-800'>Panel de Administración</h1>
+              <p className='text-gray-500 text-sm mt-1'>{user.email}</p>
             </div>
-            <div className='flex flex-wrap gap-3'>
+            <div className='flex flex-wrap gap-2'>
               <button
                 onClick={() => setShowForm(true)}
-                className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
+                className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm'
               >
                 + Nuevo Producto
               </button>
               <button
                 onClick={() => navigate('/admin/orders')}
-                className='bg-gradient-to-r from-[#ff6b6b] to-[#feca57] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#ee5a52] hover:to-[#f5b942] transition-all duration-200 shadow-lg hover:shadow-xl'
+                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
               >
                 📦 Pedidos
               </button>
               <button
-                onClick={() => navigate('/admin/calculator')}
-                className='bg-gradient-to-r from-[#f59e0b] to-[#f97316] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#d97706] hover:to-[#ea580c] transition-all duration-200 shadow-lg hover:shadow-xl'
-              >
-                🧮 Calculadora
-              </button>
-              <button
                 onClick={() => setShowCategoryManager(true)}
-                className='bg-gradient-to-r from-[#9966cc] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#8555b3] hover:to-[#42a8d1] transition-all duration-200 shadow-lg hover:shadow-xl'
+                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
               >
                 📁 Categorías
               </button>
               <button
                 onClick={handleLogout}
-                className='bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-all duration-200'
+                className='bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-red-100 transition-colors'
               >
                 Cerrar Sesión
               </button>
@@ -384,41 +383,110 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
           </div>
         </div>
 
+        {/* Search + count */}
+        <div className='flex flex-col sm:flex-row sm:items-center gap-3 mb-4'>
+          <input
+            type='text'
+            placeholder='Buscar producto...'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className='flex-1 px-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+          />
+          <p className='text-sm text-gray-500 whitespace-nowrap'>
+            {loadingProducts ? 'Cargando...' : `${filteredProducts.length} producto${filteredProducts.length !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+
         {/* Products Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-          {products.map((product) => (
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
+
+          {/* Loading skeletons */}
+          {loadingProducts && Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className='bg-white rounded-2xl shadow-soft overflow-hidden animate-pulse'>
+              <div className='aspect-square bg-gray-200' />
+              <div className='p-4 space-y-2'>
+                <div className='h-4 bg-gray-200 rounded w-3/4' />
+                <div className='h-3 bg-gray-200 rounded w-full' />
+                <div className='h-3 bg-gray-200 rounded w-1/2' />
+                <div className='h-8 bg-gray-200 rounded-lg mt-3' />
+              </div>
+            </div>
+          ))}
+
+          {/* Empty state */}
+          {!loadingProducts && filteredProducts.length === 0 && (
+            <div className='col-span-full flex flex-col items-center justify-center py-20 text-gray-400'>
+              <svg className='w-14 h-14 mb-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={1.5} d='M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' />
+              </svg>
+              <p className='font-semibold text-gray-500 text-lg'>
+                {searchQuery ? 'No se encontraron productos' : 'No hay productos todavía'}
+              </p>
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className='mt-2 text-sm text-[#51c879] hover:underline'>
+                  Limpiar búsqueda
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Product cards */}
+          {!loadingProducts && filteredProducts.map((product) => (
             <div key={product.id} className='bg-white rounded-2xl shadow-soft overflow-hidden'>
-              <div className='relative h-48'>
+              <div className='relative aspect-square bg-gray-50'>
                 <img
                   src={getImageUrl(product.image_url)}
                   alt={product.name}
-                  className='w-full h-full object-cover'
+                  className='w-full h-full object-contain'
                 />
-                <div className='absolute top-2 right-2 flex space-x-2'>
-                  <button
-                    onClick={() => editProduct(product)}
-                    className='bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition-colors'
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className='bg-red-500 text-white p-2 rounded-lg hover:bg-red-600 transition-colors'
-                  >
-                    🗑️
-                  </button>
-                </div>
+                {/* Inline delete confirmation */}
+                {confirmDeleteId === product.id ? (
+                  <div className='absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3 rounded-t-2xl'>
+                    <p className='text-white font-semibold text-sm'>¿Eliminar este producto?</p>
+                    <div className='flex gap-2'>
+                      <button
+                        onClick={() => deleteProduct(product.id)}
+                        className='bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-red-600 transition-colors'
+                      >
+                        Sí, eliminar
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className='bg-white text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors'
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className='absolute top-2 right-2 flex gap-1.5'>
+                    <button
+                      onClick={() => editProduct(product)}
+                      className='bg-white text-gray-600 p-2 rounded-lg shadow hover:bg-gray-50 transition-colors'
+                      title='Editar'
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(product.id)}
+                      className='bg-white text-red-500 p-2 rounded-lg shadow hover:bg-red-50 transition-colors'
+                      title='Eliminar'
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
               </div>
               <div className='p-4'>
-                <h3 className='font-semibold text-gray-800 mb-2'>{product.name}</h3>
-                <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.description}</p>
+                <h3 className='font-semibold text-gray-800 mb-1 line-clamp-1'>{product.name}</h3>
+                <p className='text-gray-500 text-sm mb-3 line-clamp-2'>{product.description}</p>
                 <div className='flex justify-between items-center mb-3'>
-                  <span className='text-lg font-bold text-gray-800'>C$ {product.price}</span>
-                  <span className='text-sm text-gray-500'>Stock: {product.stock_quantity}</span>
+                  <span className='text-base font-bold text-gray-800'>C$ {product.price}</span>
+                  <span className='text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full'>Stock: {product.stock_quantity}</span>
                 </div>
                 <button
                   onClick={() => copyListing(product)}
-                  className='w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200 transition-colors'
+                  className='w-full bg-gray-50 border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors'
                 >
                   Copiar listing (Facebook)
                 </button>
@@ -462,7 +530,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                         placeholder='Ej: Piñata decorativa'
                       />
                     </div>
@@ -477,7 +545,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         step='0.01'
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                         placeholder='250.00'
                       />
                     </div>
@@ -493,7 +561,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         required
                         value={formData.length}
                         onChange={(e) => setFormData({ ...formData, length: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       />
                     </div>
 
@@ -506,7 +574,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         required
                         value={formData.width}
                         onChange={(e) => setFormData({ ...formData, width: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       />
                     </div>
                   </div>
@@ -520,7 +588,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                       rows={3}
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       placeholder='Describe tu producto...'
                     />
                   </div>
@@ -534,7 +602,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                       rows={2}
                       value={formData.material_technique}
                       onChange={(e) => setFormData({ ...formData, material_technique: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       placeholder='Ej: Trabajo realizado en MDF (Fibrán) mediante técnica de corte láser...'
                     />
                   </div>
@@ -548,7 +616,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                       rows={3}
                       value={formData.care_instructions}
                       onChange={(e) => setFormData({ ...formData, care_instructions: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       placeholder='Ej: Para limpiar tu producto te recomendamos usar una brocha seca...'
                     />
                   </div>
@@ -562,7 +630,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         required
                         value={formData.category_id}
                         onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       >
                         <option value=''>Selecciona una categoría</option>
                         {categoriesData.map((category) => (
@@ -583,7 +651,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                         min='0'
                         value={formData.stock_quantity}
                         onChange={(e) => setFormData({ ...formData, stock_quantity: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       />
                     </div>
                   </div>
