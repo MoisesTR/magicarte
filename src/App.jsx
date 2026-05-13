@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect } from 'react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import AppProvider from './context/AppContext'
 import ErrorBoundary from './components/ErrorBoundary'
 
 const Home = lazy(() => import('./pages/Home'))
@@ -28,8 +27,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <AppProvider>
-        <Toaster position='top-right' toastOptions={{ duration: 3000, style: { borderRadius: '12px', padding: '12px 16px' } }} />
+      <Toaster position='top-right' toastOptions={{ duration: 3000, style: { borderRadius: '12px', padding: '12px 16px' } }} />
         <Router>
           <Suspense fallback={<div className='min-h-screen bg-gray-50 flex items-center justify-center text-gray-600'>Cargando...</div>}>
             <ErrorBoundary>
@@ -43,7 +41,6 @@ export default function App() {
             </ErrorBoundary>
           </Suspense>
         </Router>
-      </AppProvider>
     </QueryClientProvider>
   )
 }

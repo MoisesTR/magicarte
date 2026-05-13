@@ -1,37 +1,22 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useApp } from '../context/AppContext'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
 import { trackAddToCart } from '../utils/analytics'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
-import { FEATURES } from '../config/features'
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate()
-  const { addItem, hasItem } = useApp()
   const [selectedImage, setSelectedImage] = useState(product.image_url)
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
 
   const onQuoteClick = (e) => {
-    e.stopPropagation() // Prevent card click when clicking button
-    
-    if (FEATURES.CART_ENABLED) {
-      // Cart functionality
-      addItem(product)
-      trackAddToCart(product)
-    } else {
-      // Direct WhatsApp functionality
-      const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
-      window.open(whatsappUrl, '_blank')
-      setIsQuoteRequested(true)
-      trackAddToCart(product)
-      
-      // Reset the state after 3 seconds for better UX
-      setTimeout(() => {
-        setIsQuoteRequested(false)
-      }, 3000)
-    }
+    e.stopPropagation()
+    const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
+    window.open(whatsappUrl, '_blank')
+    setIsQuoteRequested(true)
+    trackAddToCart(product)
+    setTimeout(() => setIsQuoteRequested(false), 3000)
   }
 
   const handleCardClick = () => {

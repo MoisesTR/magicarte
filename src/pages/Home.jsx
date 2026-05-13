@@ -3,17 +3,11 @@ import { useEffect, useState, useRef } from 'react'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
-import CartModal from '../components/CartModal'
-import CartNotification from '../components/CartNotification'
 import MothersDayHero from '../components/MothersDayHero'
 import { TABLE } from '../utils/constants'
-import { useApp } from '../context/AppContext'
-import { FEATURES } from '../config/features'
 import { getMothersDay } from '../utils/holidays'
 
-
 export default function Home() {
-  const { showCartModal, setShowCartModal } = useApp()
   const order = { column: 'order' }
   const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
     order,
@@ -62,7 +56,6 @@ export default function Home() {
     <>
       <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
         <Header
-          onCartClick={() => setShowCartModal(true)}
           categories={modifiedCategories}
           selectedCategory={selectedCategory}
           onCategorySelect={(cat) => { setSelectedCategory(cat); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
@@ -86,12 +79,6 @@ export default function Home() {
       </main>
 
       <Footer />
-
-      {/* Cart functionality - controlled by feature flags */}
-      <div className={!FEATURES.SHOW_CART_COMPONENTS ? 'hidden' : ''}>
-        <CartModal isOpen={showCartModal} />
-        <CartNotification />
-      </div>
 
       {/* Back to top */}
       {showBackToTop && (
