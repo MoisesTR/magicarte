@@ -5,6 +5,7 @@ import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
 import { uploadCompressedImage } from '../utils/uploadImage'
+import { generateFacebookMarketplaceListing, generateProductDescription } from '../utils/gemini'
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 import toast from 'react-hot-toast'
@@ -24,6 +25,10 @@ export default function Admin() {
   const [mainPreviewUrl, setMainPreviewUrl] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const [generatingListing, setGeneratingListing] = useState(false)
+  const [showListingModal, setShowListingModal] = useState(false)
+  const [generatedListing, setGeneratedListing] = useState('')
 
   const isHeic = (file) => file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
 
@@ -102,6 +107,58 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     ]
 
     return lines.filter(Boolean).join('\n')
+  }
+
+  const getFormProductContext = () => ({
+    ...formData,
+    category: getCategoryName(formData.category_id),
+  })
+
+  const handleGenerateDescription = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Escribe el nombre del producto primero')
+      return
+    }
+
+    setGeneratingDescription(true)
+    try {
+      const description = await generateProductDescription(getFormProductContext())
+      setFormData((prev) => ({ ...prev, description }))
+      toast.success('Descripción generada')
+    } catch (error) {
+      toast.error(error.message || 'No se pudo generar la descripción')
+    } finally {
+      setGeneratingDescription(false)
+    }
+  }
+
+  const handleGenerateListing = async () => {
+    if (!formData.name.trim()) {
+      toast.error('Escribe el nombre del producto primero')
+      return
+    }
+
+    setGeneratingListing(true)
+    try {
+      const listing = await generateFacebookMarketplaceListing(getFormProductContext())
+      setGeneratedListing(listing)
+      setShowListingModal(true)
+    } catch (error) {
+      toast.error(error.message || 'No se pudo generar el listing')
+    } finally {
+      setGeneratingListing(false)
+    }
+  }
+
+  const copyGeneratedListing = async () => {
+    if (!generatedListing) return
+
+    try {
+      await navigator.clipboard.writeText(generatedListing)
+      toast.success('Listing copiado al portapapeles')
+    } catch {
+      toast.error('No se pudo copiar el listing')
+    }
   }
 
   const copyListing = async (product) => {
@@ -274,6 +331,8 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     setMainPreviewUrl(null)
     setEditingProduct(null)
     setShowForm(false)
+    setGeneratedListing('')
+    setShowListingModal(false)
   }
 
   const editProduct = (product) => {
@@ -617,9 +676,41 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                   </div>
 
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Descripción
-                    </label>
+                    <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
+                      <label className='text-sm font-medium text-gray-700'>
+                        Descripción
+                      </label>
+                      <div className='flex flex-wrap items-center gap-2'>
+                        <button
+                          type='button'
+                          onClick={handleGenerateDescription}
+                          disabled={generatingDescription}
+                          className='inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60'
+                        >
+                          {generatingDescription && (
+                            <svg className='h-3.5 w-3.5 animate-spin' viewBox='0 0 24 24'>
+                              <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
+                              <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z' />
+                            </svg>
+                          )}
+                          {generatingDescription ? 'Generando...' : '✨ Generar'}
+                        </button>
+                        <button
+                          type='button'
+                          onClick={handleGenerateListing}
+                          disabled={generatingListing}
+                          className='inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#51c879] to-[#50bfe6] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60'
+                        >
+                          {generatingListing && (
+                            <svg className='h-3.5 w-3.5 animate-spin' viewBox='0 0 24 24'>
+                              <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
+                              <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z' />
+                            </svg>
+                          )}
+                          {generatingListing ? 'Generando...' : '✨ Listing para Facebook'}
+                        </button>
+                      </div>
+                    </div>
                     <textarea
                       required
                       rows={3}
@@ -872,6 +963,49 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+        {showListingModal && (
+          <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4'>
+            <div className='bg-white rounded-2xl max-w-lg w-full shadow-xl'>
+              <div className='p-6'>
+                <div className='mb-4 flex items-start justify-between gap-4'>
+                  <div>
+                    <h3 className='text-xl font-bold text-gray-800'>Listing para Facebook</h3>
+                    <p className='mt-1 text-sm text-gray-500'>Revisa el texto antes de publicarlo.</p>
+                  </div>
+                  <button
+                    type='button'
+                    onClick={() => setShowListingModal(false)}
+                    className='text-2xl leading-none text-gray-400 transition-colors hover:text-gray-600'
+                  >
+                    ×
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  rows={12}
+                  value={generatedListing}
+                  className='w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-700 focus:outline-none'
+                />
+                <div className='mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+                  <button
+                    type='button'
+                    onClick={() => setShowListingModal(false)}
+                    className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50'
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type='button'
+                    onClick={copyGeneratedListing}
+                    className='rounded-xl bg-gradient-to-r from-[#51c879] to-[#50bfe6] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90'
+                  >
+                    Copiar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
