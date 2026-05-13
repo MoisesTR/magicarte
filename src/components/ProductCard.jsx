@@ -43,7 +43,7 @@ export default function ProductCard({ product }) {
         <LazyImage
           src={getImageUrl(selectedImage)}
           alt={product.name}
-          className='w-full h-full object-contain sm:group-hover:scale-105 transition-transform duration-500'
+          className='w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500'
         />
 
         {isOutOfStock && (
