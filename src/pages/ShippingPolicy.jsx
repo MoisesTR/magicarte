@@ -12,11 +12,11 @@ const sections = [
   },
   {
     title: 'Costo de Envío',
-    body: 'El costo varía según el tamaño del paquete y el destino. Te informamos el valor exacto al confirmar tu pedido. Tratamos de ser lo más cuidadosos posible en cómo empacamos y enviamos cada pedido.',
+    body: 'El costo varía según el tamaño del paquete y el destino. Te informamos el valor exacto al confirmar tu pedido.',
   },
   {
     title: 'Pedido Dañado',
-    body: 'Si tu pedido llega en mal estado, escríbenos por WhatsApp con una foto que muestre el daño y lo evaluamos para hacer la reposición sin costo adicional.',
+    body: 'Nos esforzamos por empacar cada pedido con el mayor cuidado posible. Si aun así llega en mal estado, escríbenos por WhatsApp con una foto que muestre el daño y lo evaluamos para hacer la reposición sin costo adicional.',
   },
   {
     title: 'Color del Producto',
