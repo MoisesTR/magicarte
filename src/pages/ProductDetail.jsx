@@ -15,6 +15,8 @@ export default function ProductDetail() {
   const navigate = useNavigate()
   const [selectedImage, setSelectedImage] = useState('')
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   // Fetch only this product by ID
   const { data: productArr = [], isLoading, error } = useSupabaseQuery(TABLE.PRODUCT, {
@@ -161,7 +163,10 @@ export default function ProductDetail() {
           {/* Image Gallery */}
           <div className='space-y-4'>
             {/* Main Image */}
-            <div className='rounded-2xl overflow-hidden bg-gray-50 shadow-sm p-3 sm:p-6'>
+            <div
+              className='rounded-2xl overflow-hidden bg-gray-50 shadow-sm p-3 sm:p-6 cursor-zoom-in'
+              onClick={() => { setLightboxIndex(allImages.indexOf(selectedImage)); setLightboxOpen(true) }}
+            >
               <div className='aspect-square lg:aspect-[3/4] w-full'>
                 <LazyImage
                   src={getImageUrl(selectedImage)}
@@ -169,6 +174,7 @@ export default function ProductDetail() {
                   className='w-full h-full object-contain'
                 />
               </div>
+              <p className='text-center text-xs text-gray-400 mt-2'>Toca para ampliar</p>
             </div>
 
             {/* Thumbnail Images */}
@@ -377,6 +383,54 @@ export default function ProductDetail() {
       </div>
 
       <Footer />
+
+      {/* Lightbox */}
+      {lightboxOpen && (
+        <div
+          className='fixed inset-0 z-50 bg-black/95 flex items-center justify-center'
+          onClick={() => setLightboxOpen(false)}
+        >
+          {/* Close */}
+          <button className='absolute top-4 right-4 text-white/70 hover:text-white p-2'>
+            <svg className='w-7 h-7' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+              <path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
+            </svg>
+          </button>
+
+          {/* Image */}
+          <img
+            src={getImageUrl(allImages[lightboxIndex])}
+            alt={product.name}
+            className='max-w-full max-h-full object-contain p-4'
+            onClick={e => e.stopPropagation()}
+          />
+
+          {/* Prev / Next */}
+          {allImages.length > 1 && (
+            <>
+              <button
+                className='absolute left-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2'
+                onClick={e => { e.stopPropagation(); setLightboxIndex((lightboxIndex - 1 + allImages.length) % allImages.length) }}
+              >
+                <svg className='w-8 h-8' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M15 19l-7-7 7-7' />
+                </svg>
+              </button>
+              <button
+                className='absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2'
+                onClick={e => { e.stopPropagation(); setLightboxIndex((lightboxIndex + 1) % allImages.length) }}
+              >
+                <svg className='w-8 h-8' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
+                  <path strokeLinecap='round' strokeLinejoin='round' d='M9 5l7 7-7 7' />
+                </svg>
+              </button>
+              <div className='absolute bottom-4 text-white/50 text-sm'>
+                {lightboxIndex + 1} / {allImages.length}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
