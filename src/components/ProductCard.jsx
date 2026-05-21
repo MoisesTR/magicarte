@@ -32,6 +32,7 @@ export default function ProductCard({ product }) {
 
 
   const isOutOfStock = product.stock_quantity === 0
+  const isNew = product.created_at && (Date.now() - new Date(product.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000
 
   return (
     <article
@@ -46,6 +47,11 @@ export default function ProductCard({ product }) {
           className='w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500'
         />
 
+        {isNew && !isOutOfStock && (
+          <div className='absolute top-2 left-2 bg-[#51c879] text-white text-[11px] font-semibold px-2 py-0.5 rounded-full'>
+            Nuevo
+          </div>
+        )}
         {isOutOfStock && (
           <div className='absolute top-2 right-2 bg-gray-800/80 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full'>
             Agotado
