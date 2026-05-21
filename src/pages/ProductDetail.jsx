@@ -131,6 +131,9 @@ export default function ProductDetail() {
   }
 
   const allImages = [product.image_url, ...(product.secondary_images || [])]
+  const activeImageIndex = allImages.indexOf(selectedImage)
+  const resolvedLightboxIndex = activeImageIndex >= 0 ? activeImageIndex : 0
+  const lightboxImage = allImages[lightboxIndex] || allImages[resolvedLightboxIndex]
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
@@ -165,7 +168,10 @@ export default function ProductDetail() {
             {/* Main Image */}
             <div
               className='rounded-2xl overflow-hidden bg-gray-50 shadow-sm p-3 sm:p-6 cursor-zoom-in'
-              onClick={() => { setLightboxIndex(allImages.indexOf(selectedImage)); setLightboxOpen(true) }}
+              onClick={() => {
+                setLightboxIndex(resolvedLightboxIndex)
+                setLightboxOpen(true)
+              }}
             >
               <div className='aspect-square lg:aspect-[3/4] w-full'>
                 <LazyImage
@@ -399,7 +405,7 @@ export default function ProductDetail() {
 
           {/* Image */}
           <img
-            src={getImageUrl(allImages[lightboxIndex])}
+            src={getImageUrl(lightboxImage)}
             alt={product.name}
             className='max-w-full max-h-full object-contain p-4'
             onClick={e => e.stopPropagation()}
