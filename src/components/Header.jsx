@@ -24,7 +24,7 @@ export default function Header({ categories = [], selectedCategory, onCategorySe
               <span className='text-[#51c879]'>Magic</span>
               <span className='text-[#50bfe6]'>Arte</span>
             </h1>
-            <p className='text-sm text-gray-500 font-medium'>Artesanía en MDF</p>
+            <p className='text-sm text-gray-500 font-medium'>Artesanía en Madera</p>
           </div>
         </div>
       </div>

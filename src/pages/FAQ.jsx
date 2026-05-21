@@ -87,7 +87,7 @@ export default function FAQ() {
         </button>
 
         <h1 className='text-2xl font-bold text-gray-900 mb-1'>Preguntas Frecuentes</h1>
-        <p className='text-sm text-gray-400 mb-8'>MagicArte · Artesanía en MDF</p>
+        <p className='text-sm text-gray-400 mb-8'>MagicArte · Artesanía en Madera</p>
 
         <div>
           {faqs.map((faq) => (

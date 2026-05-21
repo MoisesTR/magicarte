@@ -8,7 +8,7 @@ export default function Footer() {
           <h3 className='text-xl font-bold mb-2'>
             <span className='text-[#51c879]'>Magic</span><span className='text-[#50bfe6]'>Arte</span>
           </h3>
-          <p className='text-gray-400 text-sm mb-4'>Artesanía en MDF</p>
+          <p className='text-gray-400 text-sm mb-4'>Artesanía en Madera</p>
           
           {/* Social Media Links */}
           <div className='flex justify-center space-x-4 mb-4'>

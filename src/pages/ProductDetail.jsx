@@ -228,16 +228,6 @@ export default function ProductDetail() {
               </p>
             </div>
 
-            {/* Material & Technique */}
-            {product.material_technique && (
-              <div className='bg-white rounded-2xl p-6 shadow-lg'>
-                <h3 className='text-xl font-semibold text-gray-900 mb-3'>🎨 Material y Técnica</h3>
-                <p className='text-gray-700 leading-relaxed whitespace-pre-line'>
-                  {product.material_technique}
-                </p>
-              </div>
-            )}
-
             {/* Dimensions */}
             {(product.width > 0 || product.length > 0) && (
               <div className='bg-white rounded-2xl p-6 shadow-lg'>
@@ -256,6 +246,16 @@ export default function ProductDetail() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Material & Technique */}
+            {product.material_technique && (
+              <div className='bg-white rounded-2xl p-6 shadow-lg'>
+                <h3 className='text-xl font-semibold text-gray-900 mb-3'>🎨 Material y Técnica</h3>
+                <p className='text-gray-700 leading-relaxed whitespace-pre-line'>
+                  {product.material_technique}
+                </p>
               </div>
             )}
 

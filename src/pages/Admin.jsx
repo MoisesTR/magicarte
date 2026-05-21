@@ -718,10 +718,10 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                     </div>
                     <textarea
                       required
-                      rows={3}
+                      rows={8}
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
+                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent resize-y'
                       placeholder='Agrega notas para la IA: ocasión, colores, nombres, estilo, detalles personalizados...'
                     />
                   </div>

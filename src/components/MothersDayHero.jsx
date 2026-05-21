@@ -24,7 +24,7 @@ export default function MothersDayHero({ categories, onCategorySelect }) {
             Regala amor a mamá
           </h2>
           <p className='text-pink-100 text-base md:text-lg mb-7 max-w-sm'>
-            Detalles únicos en MDF, personalizados con el cariño que ella merece.
+            Detalles únicos en madera, personalizados con el cariño que ella merece.
           </p>
 
           <div className='flex flex-col sm:flex-row items-start gap-3'>
@@ -52,7 +52,7 @@ export default function MothersDayHero({ categories, onCategorySelect }) {
             <div className='flex flex-col gap-2.5'>
               <div className='bg-white/10 rounded-xl px-3 py-2.5 flex items-center gap-3'>
                 <span className='text-lg'>✨</span>
-                <span className='text-white/90 text-sm font-medium'>Diseños únicos en MDF</span>
+                <span className='text-white/90 text-sm font-medium'>Diseños únicos en madera</span>
               </div>
               <div className='bg-white/10 rounded-xl px-3 py-2.5 flex items-center gap-3'>
                 <span className='text-lg'>🎨</span>
