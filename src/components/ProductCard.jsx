@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
-import { trackAddToCart } from '../utils/analytics'
+import { trackGenerateLead, trackSelectItem } from '../utils/analytics'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
 
 export default function ProductCard({ product }) {
@@ -15,11 +15,12 @@ export default function ProductCard({ product }) {
     const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
     window.open(whatsappUrl, '_blank')
     setIsQuoteRequested(true)
-    trackAddToCart(product)
+    trackGenerateLead(product)
     setTimeout(() => setIsQuoteRequested(false), 3000)
   }
 
   const handleCardClick = () => {
+    trackSelectItem(product)
     navigate(`/product/${product.id}`)
     window.scrollTo(0, 0);
   }

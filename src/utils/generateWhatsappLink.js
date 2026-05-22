@@ -1,4 +1,5 @@
 import {CONTACT_PHONE} from "./constants.js";
+import { trackWhatsAppContact } from './analytics'
 
 export function generateWhatsAppLinkForProducts(
   products,
@@ -7,6 +8,7 @@ export function generateWhatsAppLinkForProducts(
   if (window.fbq) {
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
+  trackWhatsAppContact()
 
   const header = 'Hola! Me gustaría cotizar:\n\n'
   const productMessages = products.map((product) => {
@@ -27,6 +29,7 @@ export function generateWhatsAppLinkForSingleProduct(
   if (window.fbq) {
     window.fbq('track', 'Contact', { method: 'WhatsApp' });
   }
+  trackWhatsAppContact(product)
 
   const productUrl = `${window.location.origin}/product/${product.id}`
   const message = `Hola! Me gustaría cotizar:

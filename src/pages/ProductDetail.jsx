@@ -4,7 +4,7 @@ import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
-import { trackAddToCart } from '../utils/analytics'
+import { trackGenerateLead, trackViewItem } from '../utils/analytics'
 import { getMothersDay } from '../utils/holidays'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
@@ -78,12 +78,15 @@ export default function ProductDetail() {
     }
   }, [product])
 
+  useEffect(() => {
+    trackViewItem(product)
+  }, [product])
 
   const handleQuoteClick = () => {
     const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
     window.open(whatsappUrl, '_blank')
     setIsQuoteRequested(true)
-    trackAddToCart(product)
+    trackGenerateLead(product)
     setTimeout(() => setIsQuoteRequested(false), 3000)
   }
 
