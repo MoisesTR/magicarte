@@ -60,14 +60,14 @@ export default function ProductDetail() {
     setMeta('name', 'twitter:image', getImageUrl(product.image_url))
 
     return () => {
-      document.title = 'MagicArte - Arte Hecho con Amor'
-      setMeta('name', 'description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
-      setMeta('property', 'og:title', 'MagicArte - Arte Hecho con Amor')
-      setMeta('property', 'og:description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
+      document.title = 'MagicArte Nicaragua - Regalos Personalizados en Madera'
+      setMeta('name', 'description', 'Descubre MagicArte Nicaragua, una tienda de regalos personalizados en madera, hechos a mano con amor y creatividad.')
+      setMeta('property', 'og:title', 'MagicArte Nicaragua - Regalos Personalizados en Madera')
+      setMeta('property', 'og:description', 'Descubre MagicArte Nicaragua, una tienda de regalos personalizados en madera, hechos a mano con amor y creatividad.')
       setMeta('property', 'og:image', '/assets/magic-arte-preview.webp')
-      setMeta('property', 'og:url', 'https://www.magicarte.lat')
-      setMeta('name', 'twitter:title', 'MagicArte - Arte Hecho con Amor')
-      setMeta('name', 'twitter:description', 'Descubre MagicArte, una tienda de regalos únicos hechos con amor y creatividad. Encuentra el regalo perfecto para cualquier ocasión.')
+      setMeta('property', 'og:url', 'https://www.magicarte.net')
+      setMeta('name', 'twitter:title', 'MagicArte Nicaragua - Regalos Personalizados en Madera')
+      setMeta('name', 'twitter:description', 'Descubre MagicArte Nicaragua, una tienda de regalos personalizados en madera, hechos a mano con amor y creatividad.')
       setMeta('name', 'twitter:image', '/assets/magic-arte-preview.webp')
     }
   }, [product])

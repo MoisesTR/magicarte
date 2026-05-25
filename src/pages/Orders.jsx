@@ -655,7 +655,7 @@ ${dateLine}`.trim()
 
       return `<div class="label">
         <div class="brand">MagicArte Nicaragua</div>
-        <div class="tagline">Creaciones únicas en MDF</div>
+        <div class="tagline">Creaciones únicas en madera</div>
         <div class="divider"></div>
         <div class="customer">${labelName}</div>
         ${labelPhone ? `<div class="phone">Telefono: ${fmtPhone(labelPhone)}</div>` : ''}
