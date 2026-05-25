@@ -38,6 +38,7 @@ export default function Orders() {
     status: 'pending',
     priority: 'normal',
     payment_status: 'unpaid',
+    payment_method: 'not_specified',
     notes: '',
     estimated_delivery_date: '',
     delivery_fee: 0,
@@ -232,6 +233,7 @@ export default function Orders() {
         status: formData.status,
         priority: formData.priority,
         payment_status: formData.payment_status,
+        payment_method: formData.payment_method,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
         delivery_fee: formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0,
@@ -304,6 +306,7 @@ export default function Orders() {
       status: 'pending',
       priority: 'normal',
       payment_status: 'unpaid',
+      payment_method: 'not_specified',
       notes: '',
       estimated_delivery_date: '',
       delivery_fee: 0,
@@ -327,6 +330,7 @@ export default function Orders() {
       status: order.status,
       priority: order.priority,
       payment_status: order.payment_status || 'unpaid',
+      payment_method: order.payment_method || 'not_specified',
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
       delivery_fee: order.delivery_fee || 0,
@@ -403,6 +407,19 @@ export default function Orders() {
 
     if (error) {
       toast.error('Error al actualizar estado de pago')
+    } else {
+      fetchOrders()
+    }
+  }
+
+  const updatePaymentMethod = async (id, payment_method) => {
+    const { error } = await supabase
+      .from(TABLE.ORDERS)
+      .update({ payment_method })
+      .eq('id', id)
+
+    if (error) {
+      toast.error('Error al actualizar método de pago')
     } else {
       fetchOrders()
     }
@@ -491,6 +508,15 @@ ${dateLine}`.trim()
     return colors[paymentStatus] || 'bg-gray-100 text-gray-800'
   }
 
+  const getPaymentMethodColor = (paymentMethod) => {
+    const colors = {
+      not_specified: 'bg-gray-100 text-gray-600',
+      cash_transfer: 'bg-sky-100 text-sky-800',
+      credit_card: 'bg-violet-100 text-violet-800'
+    }
+    return colors[paymentMethod] || 'bg-gray-100 text-gray-600'
+  }
+
   const statusLabels = {
     backlog: 'Backlog',
     pending: 'Pendiente',
@@ -511,6 +537,12 @@ ${dateLine}`.trim()
     unpaid: 'No Pagado',
     partial: 'Pago Parcial',
     paid: 'Pagado'
+  }
+
+  const paymentMethodLabels = {
+    not_specified: 'Sin método',
+    cash_transfer: 'Efectivo / Transferencia',
+    credit_card: 'Tarjeta'
   }
 
   const deliveryMethodLabels = {
@@ -1185,6 +1217,11 @@ ${dateLine}`.trim()
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
                                   {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                                 </span>
+                                {order.payment_method && order.payment_method !== 'not_specified' && (
+                                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentMethodColor(order.payment_method)}`}>
+                                    {paymentMethodLabels[order.payment_method]}
+                                  </span>
+                                )}
                                 {countdown && (
                                   <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${countdown.color}`}>
                                     {countdown.text}
@@ -1228,6 +1265,11 @@ ${dateLine}`.trim()
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
                               {paymentStatusLabels[order.payment_status] || 'No Pagado'}
                             </span>
+                            {order.payment_method && order.payment_method !== 'not_specified' && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentMethodColor(order.payment_method)}`}>
+                                {paymentMethodLabels[order.payment_method]}
+                              </span>
+                            )}
                             {order.is_gift && (
                               <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
                                 Regalo
@@ -1245,6 +1287,7 @@ ${dateLine}`.trim()
                             <p><strong>Recibe:</strong> {order.recipient_name}{order.recipient_phone ? ` — ${order.recipient_phone}` : ''}</p>
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
+                          <p><strong>Método de pago:</strong> {paymentMethodLabels[order.payment_method] || 'Sin método'}</p>
                           {order.order_date && <p><strong>Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
                       </div>
@@ -1325,6 +1368,15 @@ ${dateLine}`.trim()
                         className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] ${getPaymentColor(order.payment_status)}`}
                       >
                         {Object.entries(paymentStatusLabels).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={order.payment_method || 'not_specified'}
+                        onChange={(e) => updatePaymentMethod(order.id, e.target.value)}
+                        className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] ${getPaymentMethodColor(order.payment_method)}`}
+                      >
+                        {Object.entries(paymentMethodLabels).map(([key, label]) => (
                           <option key={key} value={key}>{label}</option>
                         ))}
                       </select>
@@ -1508,7 +1560,7 @@ ${dateLine}`.trim()
                   {/* Estado del Pedido */}
                   <div className='border-t border-gray-100 pt-5'>
                     <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Estado del Pedido</p>
-                    <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
+                    <div className='grid grid-cols-2 md:grid-cols-5 gap-3'>
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Estado</label>
                         <select
@@ -1544,6 +1596,18 @@ ${dateLine}`.trim()
                           className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPaymentColor(formData.payment_status)}`}
                         >
                           {Object.entries(paymentStatusLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Método</label>
+                        <select
+                          value={formData.payment_method}
+                          onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPaymentMethodColor(formData.payment_method)}`}
+                        >
+                          {Object.entries(paymentMethodLabels).map(([key, label]) => (
                             <option key={key} value={key}>{label}</option>
                           ))}
                         </select>
