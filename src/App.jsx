@@ -1,5 +1,5 @@
 import { Toaster } from 'react-hot-toast'
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect } from 'react'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
@@ -26,6 +26,7 @@ function AnalyticsPageTracker() {
   const { pathname, search } = useLocation()
 
   useEffect(() => {
+    if (pathname.startsWith('/admin')) return
     trackPageView(`${pathname}${search}`)
   }, [pathname, search])
 
@@ -48,7 +49,8 @@ export default function App() {
                 <Route path='/' element={<Home />} />
                 <Route path='/products' element={<Products />} />
                 <Route path='/product/:id' element={<ProductDetail />} />
-                <Route path='/admin' element={<Admin />} />
+                <Route path='/admin' element={<Navigate to='/admin/orders' replace />} />
+                <Route path='/admin/products' element={<Admin />} />
                 <Route path='/admin/orders' element={<Orders />} />
                 <Route path='/politica-de-envio' element={<ShippingPolicy />} />
                 <Route path='/faq' element={<FAQ />} />

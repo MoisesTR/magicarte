@@ -868,10 +868,10 @@ ${dateLine}`.trim()
             </div>
             <div className='flex gap-2'>
               <button
-                onClick={() => navigate('/admin')}
+                onClick={() => navigate('/admin/products')}
                 className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
               >
-                ← Admin
+                ← Productos
               </button>
               <button
                 onClick={handleLogout}
