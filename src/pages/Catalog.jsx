@@ -21,18 +21,17 @@ function formatDimensions(product) {
 
 function ProductCard({ product }) {
   const dimensions = formatDimensions(product)
-  const productUrl = `${PRODUCTION_DOMAIN}/product/${product.id}`
   const isOutOfStock = product.stock_quantity === 0
 
   return (
     <article className='catalog-product border border-gray-200 rounded-2xl overflow-hidden bg-white flex flex-col'>
       {/* Image */}
-      <div className='relative aspect-square bg-gray-50 overflow-hidden'>
+      <div className='catalog-product-image relative aspect-square bg-gray-50 overflow-hidden'>
         <img
-          src={getImageUrl(product.image_url)}
+          src={getImageUrl(product.image_url, { width: 400, quality: 75 })}
           alt={product.name}
           className='w-full h-full object-contain p-2'
-          loading='lazy'
+          loading='eager'
         />
         {isOutOfStock && (
           <div className='absolute top-2 right-2 bg-gray-800/80 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full'>
@@ -42,7 +41,7 @@ function ProductCard({ product }) {
       </div>
 
       {/* Content */}
-      <div className='p-4 flex flex-col flex-1 gap-2'>
+      <div className='catalog-product-body p-4 flex flex-col flex-1 gap-2'>
         <div className='flex items-start justify-between gap-2'>
           <h4 className='text-sm font-bold text-gray-900 leading-snug line-clamp-2 flex-1'>{product.name}</h4>
           <p className='text-base font-bold text-[#51c879] whitespace-nowrap shrink-0'>{formatPrice(product.price)}</p>
@@ -52,19 +51,13 @@ function ProductCard({ product }) {
           {product.description || 'Producto personalizado hecho a mano en madera.'}
         </p>
 
-        <div className='mt-auto pt-2 flex items-center justify-between gap-2'>
-          {dimensions ? (
+        {dimensions && (
+          <div className='mt-auto pt-1'>
             <span className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600'>
               📐 {dimensions}
             </span>
-          ) : <span />}
-          <a
-            href={productUrl}
-            className='text-[10px] text-gray-300 truncate max-w-[140px]'
-          >
-            magicarte.net/product/…
-          </a>
-        </div>
+          </div>
+        )}
       </div>
     </article>
   )
@@ -84,11 +77,21 @@ export default function Catalog() {
     checkUser()
   }, [])
 
-  const { data: categories = [], isLoading: loadingCategories } = useSupabaseQuery(TABLE.CATEGORIES, {
+  const {
+    data: categories = [],
+    isLoading: loadingCategories,
+    error: categoriesError,
+    refetch: refetchCategories,
+  } = useSupabaseQuery(TABLE.CATEGORIES, {
     order: { column: 'order' },
   })
 
-  const { data: products = [], isLoading: loadingProducts } = useSupabaseQuery(TABLE.PRODUCT, {
+  const {
+    data: products = [],
+    isLoading: loadingProducts,
+    error: productsError,
+    refetch: refetchProducts,
+  } = useSupabaseQuery(TABLE.PRODUCT, {
     filters: [{ column: 'is_visible', value: true }],
     order: { column: 'created_at', ascending: false },
   })
@@ -114,6 +117,7 @@ export default function Catalog() {
   }, [categories, products])
 
   const isLoading = checkingAuth || loadingCategories || loadingProducts
+  const loadError = categoriesError || productsError
   const generatedDate = new Date().toLocaleDateString('es-NI', { year: 'numeric', month: 'long', day: 'numeric' })
 
   if (checkingAuth) {
@@ -153,28 +157,38 @@ export default function Catalog() {
       <main className='catalog-document max-w-5xl mx-auto bg-white min-h-screen px-6 py-8 print:max-w-none print:px-0 print:py-0'>
 
         {/* Cover */}
-        <section className='catalog-cover rounded-2xl overflow-hidden mb-10 print:rounded-none print:mb-8' style={{ background: 'linear-gradient(135deg, #51c879 0%, #50bfe6 100%)', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
-          <div className='p-8 sm:p-12 text-white'>
-            <p className='text-xs font-bold uppercase tracking-widest text-white/70 mb-2'>Catálogo de productos</p>
-            <h2 className='text-4xl sm:text-5xl font-bold leading-tight'>MagicArte</h2>
-            <p className='text-base text-white/80 mt-1'>Nicaragua</p>
-            <p className='mt-4 text-base text-white/90 max-w-xl'>
-              Regalos personalizados en madera, hechos a mano con amor y creatividad.
-            </p>
-            <div className='mt-6 flex flex-wrap gap-3 text-sm'>
-              <div className='bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5'>
+        <section
+          className='catalog-cover rounded-2xl overflow-hidden mb-10 print:rounded-none print:mb-0'
+          style={{ background: 'linear-gradient(135deg, #51c879 0%, #50bfe6 100%)', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+        >
+          <div className='catalog-cover-inner p-10 sm:p-14 text-white flex flex-col' style={{ minHeight: '70vh' }}>
+            {/* Top label */}
+            <p className='text-xs font-bold uppercase tracking-widest text-white/60'>Catálogo de productos</p>
+
+            {/* Center brand */}
+            <div className='flex-1 flex flex-col items-center justify-center text-center py-10'>
+              <h2 className='text-7xl sm:text-8xl font-bold leading-none'>MagicArte</h2>
+              <p className='text-xl text-white/75 mt-3 font-medium'>Nicaragua</p>
+              <p className='mt-6 text-base text-white/90 max-w-sm leading-relaxed'>
+                Regalos personalizados en madera,<br />hechos a mano con amor y creatividad.
+              </p>
+            </div>
+
+            {/* Bottom info pills */}
+            <div className='flex flex-wrap gap-3 text-sm justify-center'>
+              <div className='bg-white/15 rounded-xl px-4 py-2.5'>
                 <p className='text-white/70 text-xs mb-0.5'>WhatsApp</p>
                 <p className='font-semibold'>{CONTACT_PHONE}</p>
               </div>
-              <div className='bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5'>
+              <div className='bg-white/15 rounded-xl px-4 py-2.5'>
                 <p className='text-white/70 text-xs mb-0.5'>Tiempo de entrega</p>
                 <p className='font-semibold'>{DELIVERY_TIME}</p>
               </div>
-              <div className='bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5'>
+              <div className='bg-white/15 rounded-xl px-4 py-2.5'>
                 <p className='text-white/70 text-xs mb-0.5'>Actualizado</p>
                 <p className='font-semibold'>{generatedDate}</p>
               </div>
-              <div className='bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5'>
+              <div className='bg-white/15 rounded-xl px-4 py-2.5'>
                 <p className='text-white/70 text-xs mb-0.5'>Web</p>
                 <p className='font-semibold'>magicarte.net</p>
               </div>
@@ -185,6 +199,20 @@ export default function Catalog() {
         {/* Products */}
         {isLoading ? (
           <div className='py-20 text-center text-gray-400'>Cargando catálogo...</div>
+        ) : loadError ? (
+          <div className='py-20 text-center'>
+            <p className='text-base font-semibold text-gray-700'>No se pudo cargar el catálogo.</p>
+            <p className='mt-2 text-sm text-gray-500'>Reintentá la carga antes de generar el PDF.</p>
+            <button
+              onClick={() => {
+                refetchCategories()
+                refetchProducts()
+              }}
+              className='mt-4 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
+            >
+              Reintentar
+            </button>
+          </div>
         ) : groupedProducts.length === 0 ? (
           <div className='py-20 text-center text-gray-400'>No hay productos visibles.</div>
         ) : (
@@ -192,7 +220,7 @@ export default function Catalog() {
             {groupedProducts.map((category) => (
               <section key={category.id} className='catalog-category'>
                 {/* Category Header */}
-                <div className='flex items-center gap-3 mb-5'>
+                <div className='catalog-category-header flex items-center gap-3 mb-5'>
                   <h3 className='text-xl font-bold text-gray-900'>{category.name}</h3>
                   <div className='flex-1 h-px bg-gray-200'></div>
                   <span className='text-xs font-semibold text-gray-400 shrink-0'>

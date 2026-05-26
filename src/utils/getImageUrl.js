@@ -1,6 +1,9 @@
-export function getImageUrl(productImage) {
+export function getImageUrl(productImage, { width, quality } = {}) {
   if (productImage) {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    if (width) {
+      return `${supabaseUrl}/storage/v1/render/image/public/images/${productImage}?width=${width}&quality=${quality ?? 75}`
+    }
     return `${supabaseUrl}/storage/v1/object/public/images/${productImage}`
   }
 

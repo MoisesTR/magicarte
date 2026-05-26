@@ -1533,22 +1533,22 @@ ${dateLine}`.trim()
                         />
                       </div>
                       <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Teléfono</label>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>
+                          Teléfono
+                          {formData.customer_phone && formData.customer_phone.length !== 8 && (
+                            <span className='ml-1.5 text-orange-400 font-normal'>{formData.customer_phone.length}/8</span>
+                          )}
+                        </label>
                         <input
                           type='text'
                           value={formData.customer_phone}
-                          onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '')
+                            const phone = digits.startsWith('505') && digits.length > 8 ? digits.slice(3) : digits
+                            setFormData({ ...formData, customer_phone: phone.slice(0, 8) })
+                          }}
                           className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                        />
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
-                        <input
-                          type='text'
-                          value={formData.customer_social_media}
-                          onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
-                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                          placeholder='Facebook, Instagram...'
+                          placeholder='88881234'
                         />
                       </div>
                       <div>
@@ -1564,38 +1564,58 @@ ${dateLine}`.trim()
                   </div>
 
                   {/* Estado del Pedido */}
-                  <div className='border-t border-gray-100 pt-5'>
-                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Estado del Pedido</p>
-                    <div className='grid grid-cols-2 md:grid-cols-5 gap-3'>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Estado</label>
-                        <select
-                          value={formData.status}
-                          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getStatusColor(formData.status)}`}
-                        >
-                          {Object.entries(statusLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                        {formData.status === 'backlog' && (
-                          <p className='text-xs text-gray-400 mt-1'>Los productos son opcionales.</p>
-                        )}
+                  <div className='border-t border-gray-100 pt-5 space-y-4'>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide'>Estado del Pedido</p>
+
+                    {/* Estado pills */}
+                    <div>
+                      <label className='block text-xs font-medium text-gray-600 mb-2'>Estado</label>
+                      <div className='flex flex-wrap gap-2'>
+                        {Object.entries(statusLabels).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type='button'
+                            onClick={() => setFormData({ ...formData, status: key })}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border-2 ${
+                              formData.status === key
+                                ? `${getStatusColor(key)} border-transparent shadow-sm`
+                                : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Prioridad</label>
-                        <select
-                          value={formData.priority}
-                          onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPriorityColor(formData.priority)}`}
-                        >
-                          {Object.entries(priorityLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
+                      {formData.status === 'backlog' && (
+                        <p className='text-xs text-gray-400 mt-1.5'>Los productos son opcionales.</p>
+                      )}
+                    </div>
+
+                    {/* Prioridad pills */}
+                    <div>
+                      <label className='block text-xs font-medium text-gray-600 mb-2'>Prioridad</label>
+                      <div className='flex gap-2'>
+                        {Object.entries(priorityLabels).map(([key, label]) => (
+                          <button
+                            key={key}
+                            type='button'
+                            onClick={() => setFormData({ ...formData, priority: key })}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border-2 ${
+                              formData.priority === key
+                                ? `${getPriorityColor(key)} border-transparent shadow-sm`
+                                : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
+                    </div>
+
+                    {/* Pago + Método + Fecha */}
+                    <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
                       <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Pago</label>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Estado de Pago</label>
                         <select
                           value={formData.payment_status}
                           onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
@@ -1607,7 +1627,7 @@ ${dateLine}`.trim()
                         </select>
                       </div>
                       <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Método</label>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Método de Pago</label>
                         <select
                           value={formData.payment_method}
                           onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
@@ -1619,7 +1639,26 @@ ${dateLine}`.trim()
                         </select>
                       </div>
                       <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Fecha de Entrega</label>
+                        <div className='flex items-center justify-between mb-1.5'>
+                          <label className='block text-xs font-medium text-gray-600'>Fecha de Entrega</label>
+                          <div className='flex gap-1'>
+                            {[7, 15].map((days) => (
+                              <button
+                                key={days}
+                                type='button'
+                                onClick={() => {
+                                  const base = formData.order_date ? new Date(formData.order_date + 'T00:00:00') : new Date()
+                                  base.setDate(base.getDate() + days)
+                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  setFormData({ ...formData, estimated_delivery_date: dateStr })
+                                }}
+                                className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-[#51c879] hover:text-white transition-colors'
+                              >
+                                +{days}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <input
                           type='date'
                           value={formData.estimated_delivery_date}
@@ -1682,11 +1721,20 @@ ${dateLine}`.trim()
                           />
                         </div>
                         <div>
-                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Teléfono de quien Recibe</label>
+                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>
+                            Teléfono de quien Recibe
+                            {formData.recipient_phone && formData.recipient_phone.length !== 8 && (
+                              <span className='ml-1.5 text-orange-400 font-normal'>{formData.recipient_phone.length}/8</span>
+                            )}
+                          </label>
                           <input
                             type='text'
                             value={formData.recipient_phone}
-                            onChange={(e) => setFormData({ ...formData, recipient_phone: e.target.value })}
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, '')
+                              const phone = digits.startsWith('505') && digits.length > 8 ? digits.slice(3) : digits
+                              setFormData({ ...formData, recipient_phone: phone.slice(0, 8) })
+                            }}
                             className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                             placeholder='Si es diferente al cliente'
                           />
@@ -1886,18 +1934,8 @@ ${dateLine}`.trim()
                                 step='0.01'
                                 min='0'
                                 value={item.unit_price}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                              />
-                            </div>
-
-                            <div>
-                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Horas Necesarias</label>
-                              <input
-                                type='number'
-                                min='0'
-                                value={item.hours_needed}
-                                onChange={(e) => updateItem(index, 'hours_needed', parseInt(e.target.value) || 0)}
                                 className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                               />
                             </div>
@@ -1909,6 +1947,7 @@ ${dateLine}`.trim()
                                 step='0.01'
                                 min='0'
                                 value={item.rush_fee}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateItem(index, 'rush_fee', parseFloat(e.target.value) || 0)}
                                 className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                               />
