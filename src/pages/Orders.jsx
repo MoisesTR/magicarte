@@ -874,6 +874,12 @@ ${dateLine}`.trim()
                 ← Productos
               </button>
               <button
+                onClick={() => navigate('/admin/catalog')}
+                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
+              >
+                Catálogo
+              </button>
+              <button
                 onClick={handleLogout}
                 className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
               >
