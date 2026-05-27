@@ -442,14 +442,14 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
               >
                 📦 Pedidos
               </button>
-              <button
-                onClick={() => navigate('/admin/catalog')}
-                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
-              >
-                📄 Catálogo
-              </button>
-              <button
-                onClick={() => setShowCategoryManager(true)}
+	              <button
+	                onClick={() => navigate('/admin/clients')}
+	                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
+	              >
+	                👥 Clientes
+	              </button>
+	              <button
+	                onClick={() => setShowCategoryManager(true)}
                 className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
               >
                 📁 Categorías

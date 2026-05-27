@@ -27,8 +27,13 @@ export default function Orders() {
   const [selectedDay, setSelectedDay] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [clientMatches, setClientMatches] = useState([])
+  const [clientSearchOpen, setClientSearchOpen] = useState(false)
+  const [clientSearchLoading, setClientSearchLoading] = useState(false)
+  const [openWhatsAppMenuId, setOpenWhatsAppMenuId] = useState(null)
   const ITEMS_PER_PAGE = 10
   const [formData, setFormData] = useState({
+    client_id: null,
     customer_name: '',
     customer_phone: '',
     customer_social_media: '',
@@ -39,6 +44,8 @@ export default function Orders() {
     priority: 'normal',
     payment_status: 'unpaid',
     payment_method: 'not_specified',
+    follow_up_reason: '',
+    follow_up_date: '',
     notes: '',
     estimated_delivery_date: '',
     delivery_fee: 0,
@@ -66,6 +73,33 @@ export default function Orders() {
   useEffect(() => {
     setCurrentPage(1)
   }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery, filterGift, selectedDay])
+
+  useEffect(() => {
+    const query = formData.customer_name.trim()
+
+    if (!showForm || query.length < 2) {
+      setClientMatches([])
+      setClientSearchLoading(false)
+      return
+    }
+
+    setClientSearchLoading(true)
+    const timeoutId = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from(TABLE.CLIENTS)
+        .select('id, name, phone, social_media, delivery_address, notes')
+        .ilike('name', `%${query}%`)
+        .order('name', { ascending: true })
+        .limit(6)
+
+      if (!error) {
+        setClientMatches(data || [])
+      }
+      setClientSearchLoading(false)
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [formData.customer_name, showForm])
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -123,6 +157,14 @@ export default function Orders() {
       items: formData.items.filter((_, i) => i !== index)
     })
   }
+
+  const toNumber = (value, fallback = 0) => {
+    if (value === '' || value === null || value === undefined) return fallback
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
+  const toQuantity = (value) => Math.max(1, toNumber(value, 1))
 
   const updateItem = (index, field, value) => {
     const newItems = [...formData.items]
@@ -214,8 +256,92 @@ export default function Orders() {
 
   const calculateTotal = () => {
     return formData.items.reduce((sum, item) => {
-      return sum + (item.quantity * item.unit_price) + (item.rush_fee || 0)
+      return sum + (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
     }, 0)
+  }
+
+  const selectClient = (client) => {
+    setFormData(prev => ({
+      ...prev,
+      client_id: client.id,
+      customer_name: client.name || '',
+      customer_phone: client.phone || '',
+      customer_social_media: client.social_media || '',
+      delivery_address: client.delivery_address || '',
+    }))
+    setClientMatches([])
+    setClientSearchOpen(false)
+  }
+
+  const syncLinkedClient = async () => {
+    if (!formData.client_id) return
+
+    const { data, error } = await supabase
+      .from(TABLE.CLIENTS)
+      .select('id, name, phone, social_media, delivery_address')
+      .eq('id', formData.client_id)
+      .single()
+
+    if (error || !data) {
+      toast.error('No se pudo sincronizar el cliente')
+      return
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      customer_name: data.name || '',
+      customer_phone: data.phone || '',
+      customer_social_media: data.social_media || '',
+      delivery_address: data.delivery_address || '',
+    }))
+    toast.success('Datos del cliente sincronizados')
+  }
+
+  const saveOrderCustomerAsClient = async () => {
+    const name = formData.customer_name.trim()
+    if (!name) {
+      toast.error('Agrega el nombre del cliente primero')
+      return
+    }
+
+    const phone = formData.customer_phone || null
+
+    try {
+      if (phone) {
+        const { data: existingClient, error: findError } = await supabase
+          .from(TABLE.CLIENTS)
+          .select('id, name, phone, social_media, delivery_address')
+          .eq('phone', phone)
+          .maybeSingle()
+
+        if (findError) throw findError
+
+        if (existingClient) {
+          selectClient(existingClient)
+          toast.success('Cliente existente vinculado')
+          return
+        }
+      }
+
+      const { data, error } = await supabase
+        .from(TABLE.CLIENTS)
+        .insert([{
+          name,
+          phone,
+          social_media: formData.customer_social_media || null,
+          delivery_address: formData.delivery_address || null,
+          notes: 'Creado desde un pedido',
+        }])
+        .select('id, name, phone, social_media, delivery_address')
+        .single()
+
+      if (error) throw error
+
+      selectClient(data)
+      toast.success('Cliente creado y vinculado')
+    } catch (error) {
+      toast.error('Error al guardar cliente: ' + error.message)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -224,6 +350,7 @@ export default function Orders() {
 
     try {
       const orderData = {
+        client_id: formData.client_id || null,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone || null,
         customer_social_media: formData.customer_social_media || null,
@@ -234,9 +361,11 @@ export default function Orders() {
         priority: formData.priority,
         payment_status: formData.payment_status,
         payment_method: formData.payment_method,
+        follow_up_reason: formData.follow_up_reason || null,
+        follow_up_date: formData.follow_up_date || null,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
-        delivery_fee: formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0,
+        delivery_fee: formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0,
         recipient_name: formData.delivery_method === 'delivery' ? (formData.recipient_name || null) : null,
         recipient_phone: formData.delivery_method === 'delivery' ? (formData.recipient_phone || null) : null,
         is_gift: formData.is_gift,
@@ -272,11 +401,11 @@ export default function Orders() {
         product_id: item.is_custom ? null : item.product_id,
         product_name: item.product_name,
         product_description: item.product_description || null,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        hours_needed: item.hours_needed || null,
-        rush_fee: item.rush_fee || 0,
-        subtotal: (item.quantity * item.unit_price) + (item.rush_fee || 0)
+        quantity: toQuantity(item.quantity),
+        unit_price: toNumber(item.unit_price),
+        hours_needed: item.hours_needed === '' ? null : toNumber(item.hours_needed, 0) || null,
+        rush_fee: toNumber(item.rush_fee),
+        subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
       }))
 
       const { error: itemsError } = await supabase
@@ -297,6 +426,7 @@ export default function Orders() {
 
   const resetForm = () => {
     setFormData({
+      client_id: null,
       customer_name: '',
       customer_phone: '',
       customer_social_media: '',
@@ -307,6 +437,8 @@ export default function Orders() {
       priority: 'normal',
       payment_status: 'unpaid',
       payment_method: 'not_specified',
+      follow_up_reason: '',
+      follow_up_date: '',
       notes: '',
       estimated_delivery_date: '',
       delivery_fee: 0,
@@ -316,11 +448,14 @@ export default function Orders() {
       items: []
     })
     setEditingOrder(null)
+    setClientMatches([])
+    setClientSearchOpen(false)
     setShowForm(false)
   }
 
   const editOrder = (order) => {
     setFormData({
+      client_id: order.client_id || null,
       customer_name: order.customer_name,
       customer_phone: order.customer_phone || '',
       customer_social_media: order.customer_social_media || '',
@@ -331,6 +466,8 @@ export default function Orders() {
       priority: order.priority,
       payment_status: order.payment_status || 'unpaid',
       payment_method: order.payment_method || 'not_specified',
+      follow_up_reason: order.follow_up_reason || '',
+      follow_up_date: order.follow_up_date || '',
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
       delivery_fee: order.delivery_fee || 0,
@@ -431,49 +568,52 @@ export default function Orders() {
     navigate('/admin')
   }
 
-  const openWhatsApp = (order) => {
+  const openFollowUpWhatsApp = (order, reasonOverride = null) => {
     let phone = order.customer_phone
     if (!phone) {
       toast.error('Este pedido no tiene número de teléfono registrado')
       return
     }
 
-    phone = phone.replace(/\D/g, '')
+    const reason = reasonOverride || order.follow_up_reason
 
-    const statusOpening = {
-      backlog: 'Hemos recibido tu solicitud y la tenemos en lista de espera.',
-      pending: 'Hemos recibido tu pedido y estamos revisando los detalles.',
-      confirmed: 'Tu pedido ha sido confirmado y pronto comenzaremos a trabajar en el.',
-      in_progress: 'Tu pedido esta en proceso, pronto estara listo.',
-      ready: order.delivery_method === 'delivery'
-        ? 'Tu pedido esta listo y en camino!'
-        : 'Tu pedido esta listo para recoger!',
-      completed: 'Gracias por tu compra! Esperamos que hayas quedado satisfecho.',
+    if (!reason) {
+      toast.error('Selecciona un tipo de mensaje para WhatsApp')
+      return
     }
 
-    const opening = statusOpening[order.status] || 'Te escribo sobre tu pedido.'
+    phone = phone.replace(/\D/g, '')
 
-    const itemsList = order.order_items.map(item => `- ${item.product_name}, cantidad: ${item.quantity}`).join('\n')
-    const totalLine = `Total productos: C$ ${parseFloat(order.total_amount).toFixed(2)}`
-    const deliveryLine = order.delivery_fee > 0
-      ? `Delivery: C$ ${parseFloat(order.delivery_fee).toFixed(2)}\nTotal: C$ ${(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}`
+    const customerName = order.customer_name || 'cliente'
+    const itemsList = order.order_items?.length
+      ? order.order_items.map(item => {
+        const quantity = Number(item.quantity) > 1 ? ` x${item.quantity}` : ''
+        const details = item.product_description ? ` (${item.product_description})` : ''
+        return `- ${item.product_name}${quantity}${details}`
+      }).join('\n')
       : ''
-    const dateLine = order.estimated_delivery_date
-      ? `Fecha estimada de entrega: ${new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}`
-      : ''
 
-    const message = `Hola ${order.customer_name}!
+    const deliveryLines = [
+      `- Dirección: ${order.delivery_address || 'pendiente de confirmar'}`,
+      `- Recibe: ${order.recipient_name || order.customer_name || 'pendiente de confirmar'}`,
+      `- Teléfono de contacto: ${order.recipient_phone || order.customer_phone || 'pendiente de confirmar'}`
+    ].join('\n')
 
-${opening}
+    const followUpMessages = {
+      deposit_request: `Hola ${customerName}! Te escribe MagicArte. Para avanzar con tu pedido, necesitamos confirmar el anticipo del 50%. Cuando tengas oportunidad, nos puedes enviar el comprobante por este medio.`,
+      confirm_delivery_details: `Hola ${customerName}! Te escribe MagicArte. Queremos confirmar los datos de entrega de tu pedido:\n\n${deliveryLines}\n\nMe confirmas por favor si todo está correcto o si debemos ajustar algún dato.`,
+      notify_ready: `Hola ${customerName}! Te escribe MagicArte. Tu pedido ya está listo. Cuando puedas, nos confirmas si prefieres coordinar entrega o retiro.`,
+      waiting_customer_response: `Hola ${customerName}! Te escribe MagicArte. Quedamos pendientes de tu confirmación para poder continuar con tu pedido. Cuando tengas oportunidad, nos respondes por este medio.`,
+      delivery_received_check: `Hola ${customerName}! Te escribe MagicArte. Solo queríamos confirmar si tu pedido llegó bien y si todo quedó como esperabas. Nos ayudaría mucho saber si todo está correcto.`
+    }
 
-Detalles del pedido:
-${itemsList}
+    const messageParts = [
+      followUpMessages[reason] || `Hola ${customerName}! Te escribo de MagicArte para dar seguimiento a tu pedido.`,
+      reason !== 'delivery_received_check' && itemsList ? `Detalle del pedido:\n${itemsList}` : null,
+      reason === 'delivery_received_check' ? 'Muchas gracias!' : 'Gracias!'
+    ].filter(Boolean)
 
-${totalLine}
-${deliveryLine}
-${dateLine}`.trim()
-
-    const encodedMessage = encodeURIComponent(message)
+    const encodedMessage = encodeURIComponent(messageParts.join('\n\n'))
     window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank')
   }
 
@@ -517,6 +657,13 @@ ${dateLine}`.trim()
     return colors[paymentMethod] || 'bg-gray-100 text-gray-600'
   }
 
+  const getFollowUpColor = (followUpDate) => {
+    if (!followUpDate) return 'bg-gray-100 text-gray-600'
+    if (followUpDate < today) return 'bg-red-600 text-white'
+    if (followUpDate === today) return 'bg-amber-500 text-white'
+    return 'bg-sky-100 text-sky-800 border border-sky-300'
+  }
+
   const statusLabels = {
     backlog: 'Backlog',
     pending: 'Pendiente',
@@ -543,6 +690,14 @@ ${dateLine}`.trim()
     not_specified: 'Sin método',
     cash_transfer: 'Efectivo / Transferencia',
     credit_card: 'Tarjeta'
+  }
+
+  const followUpReasonLabels = {
+    deposit_request: 'Pedir anticipo 50%',
+    confirm_delivery_details: 'Confirmar datos de entrega',
+    notify_ready: 'Avisar que está listo',
+    waiting_customer_response: 'Cliente quedó en responder',
+    delivery_received_check: 'Confirmar si llegó bien'
   }
 
   const deliveryMethodLabels = {
@@ -820,9 +975,7 @@ ${dateLine}`.trim()
     .filter(o => o.payment_status === 'paid')
     .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
 
-  const backlogCount = orders.filter(o => o.status === 'backlog').length
-
-  const stats = {
+	  const stats = {
     total: filteredOrders.length,
     pending: filteredOrders.filter(o => o.status === 'pending').length,
     in_progress: filteredOrders.filter(o => o.status === 'in_progress').length,
@@ -873,14 +1026,14 @@ ${dateLine}`.trim()
               >
                 ← Productos
               </button>
-              <button
-                onClick={() => navigate('/admin/catalog')}
-                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-              >
-                Catálogo
-              </button>
-              <button
-                onClick={handleLogout}
+	              <button
+	                onClick={() => navigate('/admin/clients')}
+	                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
+	              >
+	                Clientes
+	              </button>
+	              <button
+	                onClick={handleLogout}
                 className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
               >
                 Cerrar Sesión
@@ -889,7 +1042,7 @@ ${dateLine}`.trim()
           </div>
 
           {/* Stats */}
-          <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3'>
+	          <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3'>
             <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl'>
               <p className='text-xs text-blue-600 font-medium'>Total</p>
               <p className='text-2xl font-bold text-blue-900'>{stats.total}</p>
@@ -906,14 +1059,7 @@ ${dateLine}`.trim()
               <p className='text-xs text-green-600 font-medium'>Completados</p>
               <p className='text-2xl font-bold text-green-900'>{stats.completed}</p>
             </div>
-            <button
-              onClick={() => { setFilterStatus('backlog'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
-              className={`p-3 rounded-xl text-left transition-all ${filterStatus === 'backlog' ? 'bg-gray-300 ring-2 ring-gray-400' : 'bg-gradient-to-br from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300'}`}
-            >
-              <p className='text-xs text-gray-500 font-medium'>Backlog</p>
-              <p className='text-2xl font-bold text-gray-700'>{backlogCount}</p>
-            </button>
-            <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-3 rounded-xl'>
+	            <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-3 rounded-xl'>
               <p className='text-xs text-[#51c879] font-medium'>Ingresos</p>
               <p className='text-lg font-bold text-gray-900'>C$ {stats.revenue.toFixed(0)}</p>
             </div>
@@ -1104,9 +1250,9 @@ ${dateLine}`.trim()
                   <option value='delivery_date'>↕ Fecha de entrega</option>
                 </select>
 
-                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || filterGift !== 'no_gifts' || selectedDay || searchQuery) && (
-                  <button
-                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
+	                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || filterGift !== 'no_gifts' || selectedDay || searchQuery) && (
+	                  <button
+	                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
                     className='px-3 py-2 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
                   >
                     ✕ Limpiar filtros
@@ -1228,20 +1374,37 @@ ${dateLine}`.trim()
                                     {paymentMethodLabels[order.payment_method]}
                                   </span>
                                 )}
+                                {order.follow_up_reason && order.follow_up_date && (
+                                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
+                                    {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
+                                  </span>
+                                )}
                                 {countdown && (
                                   <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${countdown.color}`}>
                                     {countdown.text}
                                   </span>
                                 )}
                               </div>
-                              {order.estimated_delivery_date && (
-                                <div className='text-xs text-gray-400 mt-1.5'>
-                                  {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
-                                </div>
+	                              {order.estimated_delivery_date && (
+	                                <div className='text-xs text-gray-400 mt-1.5'>
+	                                  {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
+	                                </div>
+	                              )}
+                              {order.customer_phone && order.follow_up_reason && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openFollowUpWhatsApp(order)
+                                  }}
+                                  className='mt-2 w-full px-2 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors'
+                                  title='Enviar mensaje guardado por WhatsApp'
+                                >
+                                  WhatsApp: {followUpReasonLabels[order.follow_up_reason] || 'Mensaje'}
+                                </button>
                               )}
-                            </div>
-                          )
-                        })}
+	                            </div>
+	                          )
+	                        })}
                       </div>
                     </div>
                   )
@@ -1276,6 +1439,11 @@ ${dateLine}`.trim()
                                 {paymentMethodLabels[order.payment_method]}
                               </span>
                             )}
+                            {order.follow_up_reason && order.follow_up_date && (
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
+                                {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
+                              </span>
+                            )}
                             {order.is_gift && (
                               <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
                                 Regalo
@@ -1294,6 +1462,9 @@ ${dateLine}`.trim()
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
                           <p><strong>Método de pago:</strong> {paymentMethodLabels[order.payment_method] || 'Sin método'}</p>
+                          {order.follow_up_reason && order.follow_up_date && (
+                            <p><strong>Recordatorio WhatsApp:</strong> {followUpReasonLabels[order.follow_up_reason]} · {new Date(order.follow_up_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>
+                          )}
                           {order.order_date && <p><strong>Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
                       </div>
@@ -1388,19 +1559,37 @@ ${dateLine}`.trim()
                       </select>
                       <div className='flex items-center gap-1 ml-auto'>
                         {order.customer_phone && (
-                          <button
-                            onClick={() => openWhatsApp(order)}
-                            className='p-2 text-[#25D366] hover:bg-green-50 rounded-lg transition-colors'
-                            title='Enviar WhatsApp'
-                          >
-                            <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 24 24'>
-                              <path d='M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.787'/>
-                            </svg>
-                          </button>
+                          <div className='relative'>
+                            <button
+                              type='button'
+                              onClick={() => setOpenWhatsAppMenuId(openWhatsAppMenuId === order.id ? null : order.id)}
+                              className='px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:border-[#25D366] hover:bg-green-50 focus:ring-2 focus:ring-[#25D366]/30 focus:border-transparent transition-colors'
+                              title='Enviar mensaje rápido por WhatsApp'
+                            >
+                              WhatsApp rápido
+                            </button>
+                            {openWhatsAppMenuId === order.id && (
+                              <div className='absolute right-0 bottom-full mb-2 w-64 bg-white border border-gray-100 rounded-xl shadow-lg p-1.5 z-30'>
+                                {Object.entries(followUpReasonLabels).map(([key, label]) => (
+                                  <button
+                                    key={key}
+                                    type='button'
+                                    onClick={() => {
+                                      setOpenWhatsAppMenuId(null)
+                                      openFollowUpWhatsApp(order, key)
+                                    }}
+                                    className='w-full text-left px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-green-50 hover:text-green-700 transition-colors'
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
-                        <button
-                          onClick={() => editOrder(order)}
-                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
+		                        <button
+	                          onClick={() => editOrder(order)}
+	                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
                           title='Editar pedido'
                         >
                           <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -1524,13 +1713,95 @@ ${dateLine}`.trim()
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Nombre *</label>
-                        <input
-                          type='text'
-                          required
-                          value={formData.customer_name}
-                          onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                        />
+                        <div className='relative'>
+                          <input
+                            type='text'
+                            required
+                            value={formData.customer_name}
+                            onChange={(e) => {
+                              setFormData({ ...formData, client_id: null, customer_name: e.target.value })
+                              setClientSearchOpen(true)
+                            }}
+                            onFocus={() => {
+                              if (clientMatches.length > 0) setClientSearchOpen(true)
+                            }}
+                            onBlur={() => setTimeout(() => setClientSearchOpen(false), 140)}
+                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                            placeholder='Busca o escribe un cliente...'
+                            autoComplete='off'
+                          />
+
+                          {clientSearchOpen && (clientMatches.length > 0 || clientSearchLoading) && (
+                            <div
+                              className='absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl'
+                              onMouseDown={(e) => e.preventDefault()}
+                            >
+                              {clientSearchLoading ? (
+                                <div className='px-4 py-3 text-sm text-gray-400'>Buscando clientes...</div>
+                              ) : (
+                                clientMatches.map((client) => (
+                                  <button
+                                    key={client.id}
+                                    type='button'
+                                    onClick={() => selectClient(client)}
+                                    className='w-full text-left px-4 py-3 hover:bg-[#51c879]/10 transition-colors'
+                                  >
+                                    <div className='flex items-start justify-between gap-3'>
+                                      <div>
+                                        <p className='text-sm font-semibold text-gray-800'>{client.name}</p>
+                                        <p className='text-xs text-gray-400'>
+                                          {[client.phone, client.social_media].filter(Boolean).join(' · ') || 'Sin teléfono'}
+                                        </p>
+                                      </div>
+                                      <span className='text-xs font-semibold text-[#51c879]'>Usar</span>
+                                    </div>
+                                    {client.delivery_address && (
+                                      <p className='text-xs text-gray-500 mt-1 line-clamp-1'>{client.delivery_address}</p>
+                                    )}
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {formData.client_id ? (
+                          <div className='mt-1.5 flex flex-wrap items-center justify-between gap-2'>
+                            <p className='text-xs font-medium text-[#51c879]'>
+                              {editingOrder
+                                ? 'Cliente seleccionado. Guarda para aplicar el vínculo.'
+                                : 'Cliente seleccionado. Se vinculará al crear el pedido.'}
+                            </p>
+                            <div className='flex items-center gap-2'>
+                              <button
+                                type='button'
+                                onClick={syncLinkedClient}
+                                className='text-xs font-semibold text-sky-600 hover:text-sky-700'
+                              >
+                                Sincronizar datos
+                              </button>
+                              <button
+                                type='button'
+                                onClick={() => setFormData({ ...formData, client_id: null })}
+                                className='text-xs font-medium text-gray-400 hover:text-red-500'
+                              >
+                                Desvincular
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className='mt-1.5 flex flex-wrap items-center justify-between gap-2'>
+                            <p className='text-xs text-gray-400'>Sin cliente vinculado.</p>
+                            {formData.customer_name.trim() && (
+                              <button
+                                type='button'
+                                onClick={saveOrderCustomerAsClient}
+                                className='text-xs font-semibold text-[#51c879] hover:text-[#45b86b]'
+                              >
+                                Guardar como cliente
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>
@@ -1549,6 +1820,16 @@ ${dateLine}`.trim()
                           }}
                           className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                           placeholder='88881234'
+                        />
+                      </div>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
+                        <input
+                          type='text'
+                          value={formData.customer_social_media}
+                          onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                          placeholder='Facebook, Instagram...'
                         />
                       </div>
                       <div>
@@ -1705,7 +1986,7 @@ ${dateLine}`.trim()
                             step='0.01'
                             min='0'
                             value={formData.delivery_fee}
-                            onChange={(e) => setFormData({ ...formData, delivery_fee: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => setFormData({ ...formData, delivery_fee: e.target.value })}
                             className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                             placeholder='0.00'
                           />
@@ -1741,6 +2022,83 @@ ${dateLine}`.trim()
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Recordatorio de WhatsApp */}
+                  <div className='border-t border-gray-100 pt-5'>
+                    <div className='flex items-center justify-between gap-3 mb-3'>
+                      <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide'>Recordatorio WhatsApp</p>
+                      {(formData.follow_up_reason || formData.follow_up_date) && (
+                        <button
+                          type='button'
+                          onClick={() => setFormData({ ...formData, follow_up_reason: '', follow_up_date: '' })}
+                          className='text-xs font-medium text-gray-400 hover:text-red-500'
+                        >
+                          Limpiar recordatorio
+                        </button>
+                      )}
+                    </div>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                      <div>
+                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Mensaje sugerido</label>
+                        <select
+                          value={formData.follow_up_reason}
+                          onChange={(e) => setFormData({ ...formData, follow_up_reason: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        >
+                          <option value=''>Sin recordatorio</option>
+                          {Object.entries(followUpReasonLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <div className='flex items-center justify-between mb-1.5'>
+                          <label className='block text-xs font-medium text-gray-600'>Recordar el</label>
+                          <div className='flex gap-1'>
+                            {formData.estimated_delivery_date && (
+                              <button
+                                type='button'
+                                onClick={() => {
+                                  const base = new Date(formData.estimated_delivery_date + 'T00:00:00')
+                                  base.setDate(base.getDate() - 1)
+                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  setFormData({
+                                    ...formData,
+                                    follow_up_reason: formData.follow_up_reason || 'confirm_delivery_details',
+                                    follow_up_date: dateStr
+                                  })
+                                }}
+                                className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition-colors'
+                              >
+                                1d antes entrega
+                              </button>
+                            )}
+                            {[1, 2, 3].map((days) => (
+                              <button
+                                key={days}
+                                type='button'
+                                onClick={() => {
+                                  const base = new Date()
+                                  base.setDate(base.getDate() + days)
+                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  setFormData({ ...formData, follow_up_date: dateStr })
+                                }}
+                                className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-amber-500 hover:text-white transition-colors'
+                              >
+                                +{days}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <input
+                          type='date'
+                          value={formData.follow_up_date}
+                          onChange={(e) => setFormData({ ...formData, follow_up_date: e.target.value })}
+                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Notas y regalo */}
@@ -1852,7 +2210,7 @@ ${dateLine}`.trim()
 
                                         {item.product_id && (
                                           <div className='mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'>
-                                            {item.product_name} · C$ {parseFloat(item.unit_price).toFixed(2)}
+                                            {item.product_name} · C$ {toNumber(item.unit_price).toFixed(2)}
                                           </div>
                                         )}
 
@@ -1918,13 +2276,13 @@ ${dateLine}`.trim()
 
                             <div>
                               <label className='block text-xs font-medium text-gray-600 mb-1.5'>Cantidad</label>
-                              <input
-                                type='number'
-                                min='1'
-                                value={item.quantity}
-                                onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                              />
+	                              <input
+	                                type='number'
+	                                min='1'
+	                                value={item.quantity}
+	                                onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+	                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+	                              />
                             </div>
 
                             <div>
@@ -1932,12 +2290,12 @@ ${dateLine}`.trim()
                               <input
                                 type='number'
                                 step='0.01'
-                                min='0'
-                                value={item.unit_price}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                              />
+	                                min='0'
+	                                value={item.unit_price}
+	                                onFocus={(e) => e.target.select()}
+	                                onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+	                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+	                              />
                             </div>
 
                             <div>
@@ -1945,20 +2303,20 @@ ${dateLine}`.trim()
                               <input
                                 type='number'
                                 step='0.01'
-                                min='0'
-                                value={item.rush_fee}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => updateItem(index, 'rush_fee', parseFloat(e.target.value) || 0)}
-                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                              />
+	                                min='0'
+	                                value={item.rush_fee}
+	                                onFocus={(e) => e.target.select()}
+	                                onChange={(e) => updateItem(index, 'rush_fee', e.target.value)}
+	                                className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+	                              />
                             </div>
                           </div>
 
-                          <div className='mt-2 text-right'>
-                            <span className='text-xs font-semibold text-gray-600'>
-                              Subtotal: C$ {((item.quantity * item.unit_price) + (item.rush_fee || 0)).toFixed(2)}
-                            </span>
-                          </div>
+	                          <div className='mt-2 text-right'>
+	                            <span className='text-xs font-semibold text-gray-600'>
+	                              Subtotal: C$ {((toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)).toFixed(2)}
+	                            </span>
+	                          </div>
                         </div>
                       ))}
 
@@ -1975,12 +2333,12 @@ ${dateLine}`.trim()
                       <div className='mt-4 flex items-center justify-between bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 px-4 py-3 rounded-xl'>
                         <div className='text-sm text-gray-600 space-y-0.5'>
                           <p>Productos: <span className='font-semibold'>C$ {calculateTotal().toFixed(2)}</span></p>
-                          {formData.delivery_method === 'delivery' && formData.delivery_fee > 0 && (
-                            <p>Delivery: <span className='font-semibold'>C$ {parseFloat(formData.delivery_fee).toFixed(2)}</span></p>
+                          {formData.delivery_method === 'delivery' && toNumber(formData.delivery_fee) > 0 && (
+                            <p>Delivery: <span className='font-semibold'>C$ {toNumber(formData.delivery_fee).toFixed(2)}</span></p>
                           )}
                         </div>
                         <p className='text-xl font-bold text-gray-900'>
-                          C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? (parseFloat(formData.delivery_fee) || 0) : 0)).toFixed(2)}
+                          C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0)).toFixed(2)}
                         </p>
                       </div>
                     )}

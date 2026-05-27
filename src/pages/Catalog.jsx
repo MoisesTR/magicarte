@@ -22,41 +22,31 @@ function formatDimensions(product) {
 function ProductCard({ product }) {
   const dimensions = formatDimensions(product)
   const isOutOfStock = product.stock_quantity === 0
+  const imgSrc = getImageUrl(product.image_url, { width: 400, quality: 75 })
 
   return (
     <article className='catalog-product border border-gray-200 rounded-2xl overflow-hidden bg-white flex flex-col'>
-      {/* Image */}
-      <div className='catalog-product-image relative aspect-square bg-gray-50 overflow-hidden'>
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 4', background: '#ffffff' }}>
         <img
-          src={getImageUrl(product.image_url, { width: 400, quality: 75 })}
+          src={imgSrc}
           alt={product.name}
-          className='w-full h-full object-contain p-2'
           loading='eager'
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }}
         />
         {isOutOfStock && (
-          <div className='absolute top-2 right-2 bg-gray-800/80 text-white text-[11px] font-semibold px-2 py-0.5 rounded-full'>
-            Agotado
-          </div>
+          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(30,30,30,0.75)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>Agotado</div>
         )}
       </div>
-
-      {/* Content */}
-      <div className='catalog-product-body p-4 flex flex-col flex-1 gap-2'>
+      <div className='p-4 flex flex-col gap-2 flex-1'>
         <div className='flex items-start justify-between gap-2'>
           <h4 className='text-sm font-bold text-gray-900 leading-snug line-clamp-2 flex-1'>{product.name}</h4>
           <p className='text-base font-bold text-[#51c879] whitespace-nowrap shrink-0'>{formatPrice(product.price)}</p>
         </div>
-
-        <p className='text-xs text-gray-500 leading-relaxed catalog-description line-clamp-3'>
+        <p className='text-xs text-gray-500 leading-relaxed line-clamp-3'>
           {product.description || 'Producto personalizado hecho a mano en madera.'}
         </p>
-
         {dimensions && (
-          <div className='mt-auto pt-1'>
-            <span className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600'>
-              📐 {dimensions}
-            </span>
-          </div>
+          <span className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 self-start mt-auto'>📐 {dimensions}</span>
         )}
       </div>
     </article>
@@ -161,21 +151,22 @@ export default function Catalog() {
           className='catalog-cover rounded-2xl overflow-hidden mb-10 print:rounded-none print:mb-0'
           style={{ background: 'linear-gradient(135deg, #51c879 0%, #50bfe6 100%)', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
         >
-          <div className='catalog-cover-inner p-10 sm:p-14 text-white flex flex-col' style={{ minHeight: '70vh' }}>
-            {/* Top label */}
-            <p className='text-xs font-bold uppercase tracking-widest text-white/60'>Catálogo de productos</p>
-
-            {/* Center brand */}
-            <div className='flex-1 flex flex-col items-center justify-center text-center py-10'>
-              <h2 className='text-7xl sm:text-8xl font-bold leading-none'>MagicArte</h2>
-              <p className='text-xl text-white/75 mt-3 font-medium'>Nicaragua</p>
-              <p className='mt-6 text-base text-white/90 max-w-sm leading-relaxed'>
-                Regalos personalizados en madera,<br />hechos a mano con amor y creatividad.
+          <div className='catalog-cover-inner p-10 sm:p-14 text-white flex flex-col'>
+            {/* Brand — top */}
+            <div className='text-center py-6'>
+              <p className='text-xs font-bold uppercase tracking-widest text-white/60 mb-4'>Catálogo de productos</p>
+              <h2 className='text-6xl sm:text-7xl font-bold leading-none'>MagicArte</h2>
+              <p className='text-lg text-white/75 mt-2 font-medium'>Nicaragua</p>
+              <p className='mt-4 text-base text-white/90 max-w-sm mx-auto leading-relaxed'>
+                Regalos personalizados en madera, hechos a mano con amor y creatividad.
               </p>
             </div>
 
-            {/* Bottom info pills */}
-            <div className='flex flex-wrap gap-3 text-sm justify-center'>
+            {/* Spacer — pushes pills to bottom in print */}
+            <div className='flex-1' />
+
+            {/* Info pills — bottom */}
+            <div className='flex flex-wrap gap-3 text-sm justify-center pb-2'>
               <div className='bg-white/15 rounded-xl px-4 py-2.5'>
                 <p className='text-white/70 text-xs mb-0.5'>WhatsApp</p>
                 <p className='font-semibold'>{CONTACT_PHONE}</p>

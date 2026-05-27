@@ -12,6 +12,7 @@ const ProductDetail = lazy(() => import('./pages/ProductDetail'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Orders = lazy(() => import('./pages/Orders'))
 const Catalog = lazy(() => import('./pages/Catalog'))
+const Clients = lazy(() => import('./pages/Clients'))
 const ShippingPolicy = lazy(() => import('./pages/ShippingPolicy'))
 const FAQ = lazy(() => import('./pages/FAQ'))
 
@@ -54,6 +55,7 @@ export default function App() {
                 <Route path='/admin/products' element={<Admin />} />
                 <Route path='/admin/orders' element={<Orders />} />
                 <Route path='/admin/catalog' element={<Catalog />} />
+                <Route path='/admin/clients' element={<Clients />} />
                 <Route path='/politica-de-envio' element={<ShippingPolicy />} />
                 <Route path='/faq' element={<FAQ />} />
               </Routes>
