@@ -6,6 +6,7 @@ export const TABLE = {
   CATEGORIES: 'categories',
   ORDERS: 'orders',
   ORDER_ITEMS: 'order_items',
+  ORDER_PAYMENTS: 'order_payments',
   CLIENTS: 'clients',
 }
 export const COLUMNS = {
@@ -14,5 +15,6 @@ export const COLUMNS = {
   [TABLE.CATEGORIES]: 'id, name, order',
   [TABLE.ORDERS]: 'id, client_id, order_number, customer_name, customer_phone, customer_social_media, delivery_address, delivery_method, order_date, total_amount, status, priority, notes, created_at, estimated_delivery_date, completed_at, updated_at, payment_status, payment_method, follow_up_reason, follow_up_date, calculator_data, delivery_fee, recipient_name, recipient_phone, is_gift',
   [TABLE.ORDER_ITEMS]: 'id, order_id, product_id, product_name, product_description, quantity, unit_price, hours_needed, rush_fee, subtotal',
+  [TABLE.ORDER_PAYMENTS]: 'id, order_id, amount, method, paid_at, note, created_at',
   [TABLE.CLIENTS]: 'id, name, phone, social_media, delivery_address, notes, created_at, updated_at',
 }

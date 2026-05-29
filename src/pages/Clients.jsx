@@ -94,10 +94,12 @@ export default function Clients() {
     )
   }, [clients, searchQuery])
 
-	  const topClients = useMemo(() => {
-	    const ordersForRanking = linkedOrders.filter((order) =>
-	      !order.is_gift && (rankingFilter === 'completed' ? order.status === 'completed' : order.status !== 'backlog')
-	    )
+  const topClients = useMemo(() => {
+    const ordersForRanking = linkedOrders.filter((order) =>
+      !order.is_gift && (rankingFilter === 'completed'
+        ? order.status === 'completed'
+        : !['backlog', 'canceled'].includes(order.status))
+    )
     const statsByClient = new Map()
 
     ordersForRanking.forEach((order) => {
@@ -435,9 +437,17 @@ export default function Clients() {
                   {client.notes && <p className='text-gray-500 whitespace-pre-wrap'><strong>Notas:</strong> {client.notes}</p>}
                 </div>
 
-                <p className='mt-4 text-xs text-gray-400'>
-                  Actualizado: {new Date(client.updated_at || client.created_at).toLocaleDateString('es-NI')}
-                </p>
+                <div className='mt-4 flex items-center justify-between'>
+                  <p className='text-xs text-gray-400'>
+                    Actualizado: {new Date(client.updated_at || client.created_at).toLocaleDateString('es-NI')}
+                  </p>
+                  <button
+                    onClick={() => navigate('/admin/orders', { state: { clientId: client.id, clientName: client.name } })}
+                    className='text-xs font-semibold text-[#51c879] hover:text-[#45b56a] px-2 py-1 rounded-lg hover:bg-green-50 transition-colors'
+                  >
+                    Ver pedidos →
+                  </button>
+                </div>
 	              </article>
             ))}
           </div>

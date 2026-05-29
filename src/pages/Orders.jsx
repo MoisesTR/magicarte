@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../config/supabaseClient'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { TABLE } from '../utils/constants'
 import toast from 'react-hot-toast'
 
 export default function Orders() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Current month (YYYY-MM) in Nicaragua time, regardless of where the app runs.
+  const currentMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Managua' }).slice(0, 7)
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState([])
@@ -19,11 +22,14 @@ export default function Orders() {
   const [sortBy, setSortBy] = useState('created_at')
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('ordersViewMode') || 'list')
-  const [filterMonth, setFilterMonth] = useState('all')
+  const [filterMonth, setFilterMonth] = useState(currentMonth)
   const [filterDelivery, setFilterDelivery] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [draggedOrderId, setDraggedOrderId] = useState(null)
   const [filterGift, setFilterGift] = useState('no_gifts')
+  const [filterPayment, setFilterPayment] = useState('all')
+  const [filterClientId, setFilterClientId] = useState(null)
+  const [filterClientName, setFilterClientName] = useState('')
   const [selectedDay, setSelectedDay] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
@@ -31,7 +37,18 @@ export default function Orders() {
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [clientSearchLoading, setClientSearchLoading] = useState(false)
   const [openWhatsAppMenuId, setOpenWhatsAppMenuId] = useState(null)
+  const [editPayments, setEditPayments] = useState([])
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    method: 'transferencia',
+    paid_at: new Date().toISOString().split('T')[0],
+    note: ''
+  })
   const ITEMS_PER_PAGE = 10
+  const COMMISSION_RATE = 0.0675
+  // Temporary UI toggles. Flip to true to bring these back.
+  const SHOW_SOCIAL_MEDIA = false
+  const SHOW_WHATSAPP_REMINDER = false
   const [formData, setFormData] = useState({
     client_id: null,
     customer_name: '',
@@ -71,15 +88,35 @@ export default function Orders() {
   }, [])
 
   useEffect(() => {
+    if (location.state?.clientId) {
+      setFilterClientId(location.state.clientId)
+      setFilterClientName(location.state.clientName || '')
+      setFilterStatus('all')
+      setFilterMonth('all')
+      setFilterGift('all')
+      setFilterPayment('all')
+      setSearchQuery('')
+      window.history.replaceState({}, '')
+    } else if (location.state?.search) {
+      setSearchQuery(location.state.search)
+      setFilterStatus('all')
+      setFilterMonth('all')
+      window.history.replaceState({}, '')
+    }
+  }, [location.state])
+
+  useEffect(() => {
     setCurrentPage(1)
-  }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery, filterGift, selectedDay])
+  }, [filterStatus, filterPriority, filterMonth, filterDelivery, sortBy, searchQuery, filterGift, filterPayment, filterClientId, selectedDay])
 
   useEffect(() => {
     const query = formData.customer_name.trim()
+    let ignore = false
 
     if (!showForm || query.length < 2) {
       setClientMatches([])
       setClientSearchLoading(false)
+      setClientSearchOpen(false)
       return
     }
 
@@ -92,13 +129,18 @@ export default function Orders() {
         .order('name', { ascending: true })
         .limit(6)
 
-      if (!error) {
+      if (!ignore && !error) {
         setClientMatches(data || [])
       }
-      setClientSearchLoading(false)
+      if (!ignore) {
+        setClientSearchLoading(false)
+      }
     }, 300)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      ignore = true
+      clearTimeout(timeoutId)
+    }
   }, [formData.customer_name, showForm])
 
   const fetchOrders = async () => {
@@ -111,7 +153,9 @@ export default function Orders() {
           order_items (
             *,
             products (name, image_url, width, length)
-          )
+          ),
+          order_payments (id, order_id, amount, method, paid_at, note, created_at),
+          clients (id, name)
         `)
         .order('created_at', { ascending: false })
 
@@ -136,6 +180,7 @@ export default function Orders() {
     setFormData({
       ...formData,
       items: [...formData.items, {
+        _key: crypto.randomUUID(),
         product_id: null,
         product_query: '',
         product_open: false,
@@ -258,6 +303,25 @@ export default function Orders() {
     return formData.items.reduce((sum, item) => {
       return sum + (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
     }, 0)
+  }
+
+  const displayName = (order) => order.clients?.name || order.customer_name
+
+  const getPaymentSummary = (payments, total) => {
+    const list = payments || []
+    const paid = list.reduce((s, p) => s + toNumber(p.amount), 0)
+    const paidCard = list
+      .filter(p => p.method === 'tarjeta')
+      .reduce((s, p) => s + toNumber(p.amount), 0)
+    const commission = paidCard * COMMISSION_RATE
+    const net = paid - commission
+    const balance = Math.max(0, toNumber(total) - paid)
+
+    let status = 'unpaid'
+    if (paid > 0.009 && paid + 0.009 >= toNumber(total)) status = 'paid'
+    else if (paid > 0.009) status = 'partial'
+
+    return { payments: list, paid, paidCard, commission, net, balance, status }
   }
 
   const selectClient = (client) => {
@@ -448,6 +512,7 @@ export default function Orders() {
       items: []
     })
     setEditingOrder(null)
+    setEditPayments([])
     setClientMatches([])
     setClientSearchOpen(false)
     setShowForm(false)
@@ -475,6 +540,7 @@ export default function Orders() {
       recipient_phone: order.recipient_phone || '',
       is_gift: order.is_gift || false,
       items: order.order_items.map(item => ({
+        _key: item.id || crypto.randomUUID(),
         product_id: item.product_id,
         product_query: item.product_id ? item.product_name : '',
         product_open: false,
@@ -487,6 +553,13 @@ export default function Orders() {
         rush_fee: item.rush_fee || 0,
         is_custom: !item.product_id
       }))
+    })
+    setEditPayments(order.order_payments || [])
+    setPaymentForm({
+      amount: '',
+      method: 'transferencia',
+      paid_at: new Date().toISOString().split('T')[0],
+      note: ''
     })
     setEditingOrder(order)
     setShowForm(true)
@@ -536,30 +609,55 @@ export default function Orders() {
     setDraggedOrderId(null)
   }
 
-  const updatePaymentStatus = async (id, payment_status) => {
-    const { error } = await supabase
-      .from(TABLE.ORDERS)
-      .update({ payment_status })
-      .eq('id', id)
+  const addPayment = async () => {
+    if (!editingOrder) return
+    const amount = toNumber(paymentForm.amount)
+    if (amount <= 0) {
+      toast.error('Ingresa un monto válido')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from(TABLE.ORDER_PAYMENTS)
+      .insert([{
+        order_id: editingOrder.id,
+        amount,
+        method: paymentForm.method,
+        paid_at: paymentForm.paid_at || new Date().toISOString().split('T')[0],
+        note: paymentForm.note.trim() || null
+      }])
+      .select()
 
     if (error) {
-      toast.error('Error al actualizar estado de pago')
-    } else {
-      fetchOrders()
+      toast.error('Error al registrar pago: ' + error.message)
+      return
     }
+
+    setEditPayments(prev => [...prev, data[0]])
+    setPaymentForm({
+      amount: '',
+      method: paymentForm.method,
+      paid_at: new Date().toISOString().split('T')[0],
+      note: ''
+    })
+    toast.success('Pago registrado')
+    fetchOrders()
   }
 
-  const updatePaymentMethod = async (id, payment_method) => {
+  const deletePayment = async (paymentId) => {
     const { error } = await supabase
-      .from(TABLE.ORDERS)
-      .update({ payment_method })
-      .eq('id', id)
+      .from(TABLE.ORDER_PAYMENTS)
+      .delete()
+      .eq('id', paymentId)
 
     if (error) {
-      toast.error('Error al actualizar método de pago')
-    } else {
-      fetchOrders()
+      toast.error('Error al eliminar pago')
+      return
     }
+
+    setEditPayments(prev => prev.filter(p => p.id !== paymentId))
+    toast.success('Pago eliminado')
+    fetchOrders()
   }
 
   const handleLogout = async () => {
@@ -584,7 +682,7 @@ export default function Orders() {
 
     phone = phone.replace(/\D/g, '')
 
-    const customerName = order.customer_name || 'cliente'
+    const customerName = displayName(order) || 'cliente'
     const itemsList = order.order_items?.length
       ? order.order_items.map(item => {
         const quantity = Number(item.quantity) > 1 ? ` x${item.quantity}` : ''
@@ -595,7 +693,7 @@ export default function Orders() {
 
     const deliveryLines = [
       `- Dirección: ${order.delivery_address || 'pendiente de confirmar'}`,
-      `- Recibe: ${order.recipient_name || order.customer_name || 'pendiente de confirmar'}`,
+      `- Recibe: ${order.recipient_name || displayName(order) || 'pendiente de confirmar'}`,
       `- Teléfono de contacto: ${order.recipient_phone || order.customer_phone || 'pendiente de confirmar'}`
     ].join('\n')
 
@@ -648,15 +746,6 @@ export default function Orders() {
     return colors[paymentStatus] || 'bg-gray-100 text-gray-800'
   }
 
-  const getPaymentMethodColor = (paymentMethod) => {
-    const colors = {
-      not_specified: 'bg-gray-100 text-gray-600',
-      cash_transfer: 'bg-sky-100 text-sky-800',
-      credit_card: 'bg-violet-100 text-violet-800'
-    }
-    return colors[paymentMethod] || 'bg-gray-100 text-gray-600'
-  }
-
   const getFollowUpColor = (followUpDate) => {
     if (!followUpDate) return 'bg-gray-100 text-gray-600'
     if (followUpDate < today) return 'bg-red-600 text-white'
@@ -686,10 +775,16 @@ export default function Orders() {
     paid: 'Pagado'
   }
 
-  const paymentMethodLabels = {
-    not_specified: 'Sin método',
-    cash_transfer: 'Efectivo / Transferencia',
-    credit_card: 'Tarjeta'
+  const payMethodLabels = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transferencia',
+    tarjeta: 'Tarjeta'
+  }
+
+  const payMethodColor = {
+    efectivo: 'bg-emerald-100 text-emerald-800',
+    transferencia: 'bg-sky-100 text-sky-800',
+    tarjeta: 'bg-violet-100 text-violet-800'
   }
 
   const followUpReasonLabels = {
@@ -734,7 +829,7 @@ export default function Orders() {
         : ''
       const method = order.delivery_method === 'pickup' ? 'Recoger en Tienda' : 'Entrega a Domicilio'
 
-      const labelName = order.recipient_name || order.customer_name
+      const labelName = order.recipient_name || displayName(order)
       const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
 
       return `<div class="label">
@@ -805,7 +900,7 @@ export default function Orders() {
       const items = order.order_items.map(i =>
         `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
       ).join('')
-      const labelName = order.recipient_name || order.customer_name
+      const labelName = order.recipient_name || displayName(order)
       const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
 
       return `<div class="label">
@@ -912,28 +1007,41 @@ export default function Orders() {
     if (filterStatus === 'active' && !ACTIVE_STATUSES.includes(order.status)) return false
     if (filterStatus !== 'all' && filterStatus !== 'active' && order.status !== filterStatus) return false
     if (filterPriority !== 'all' && order.priority !== filterPriority) return false
-    if (filterMonth !== 'all') {
-      const orderDate = order.order_date || order.created_at
-      if (!orderDate || !orderDate.startsWith(filterMonth)) return false
+    if (filterMonth !== 'all' && !searchQuery.trim() && !filterClientId) {
+      // Month filter only restricts settled history. Anything still active or
+      // with money to collect always shows, even from other months.
+      // When a search is active we skip the month filter entirely so you see
+      // all of a client's orders regardless of when they were placed.
+      const isActive = ACTIVE_STATUSES.includes(order.status)
+      const hasPendingBalance = getPaymentSummary(order.order_payments, order.total_amount).balance > 0.009
+      if (!isActive && !hasPendingBalance) {
+        const orderDate = order.order_date || order.created_at
+        if (!orderDate || !orderDate.startsWith(filterMonth)) return false
+      }
     }
     if (filterDelivery === 'today' && order.estimated_delivery_date !== today) return false
     if (filterDelivery === 'week' && (!order.estimated_delivery_date || order.estimated_delivery_date < weekStart || order.estimated_delivery_date > weekEnd)) return false
     if (filterDelivery === 'overdue' && (!order.estimated_delivery_date || order.estimated_delivery_date >= today || ['completed', 'canceled'].includes(order.status))) return false
     if (filterGift === 'no_gifts' && order.is_gift) return false
     if (filterGift === 'only_gifts' && !order.is_gift) return false
+    if (filterPayment !== 'all' && getPaymentSummary(order.order_payments, order.total_amount).status !== filterPayment) return false
     if (selectedDay && order.estimated_delivery_date !== selectedDay) return false
+    if (filterClientId && order.client_id !== filterClientId) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       const matchesName = order.customer_name?.toLowerCase().includes(q)
+      const matchesClientName = order.clients?.name?.toLowerCase().includes(q)
       const matchesPhone = order.customer_phone?.toLowerCase().includes(q)
       const matchesNumber = String(order.order_number).includes(q)
-      if (!matchesName && !matchesPhone && !matchesNumber) return false
+      if (!matchesName && !matchesClientName && !matchesPhone && !matchesNumber) return false
     }
     return true
   }).sort((a, b) => {
     // Primary: payment status (paid first, then partial, then unpaid)
     const paymentOrder = { paid: 0, partial: 1, unpaid: 2 }
-    const payDiff = (paymentOrder[a.payment_status] ?? 2) - (paymentOrder[b.payment_status] ?? 2)
+    const aStatus = getPaymentSummary(a.order_payments, a.total_amount).status
+    const bStatus = getPaymentSummary(b.order_payments, b.total_amount).status
+    const payDiff = (paymentOrder[aStatus] ?? 2) - (paymentOrder[bStatus] ?? 2)
     if (payDiff !== 0) return payDiff
 
     // Secondary: selected sort criteria
@@ -971,25 +1079,18 @@ export default function Orders() {
     return counts
   })()
 
-  const totalRevenue = filteredOrders
-    .filter(o => o.payment_status === 'paid')
-    .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0)
-
 	  const stats = {
     total: filteredOrders.length,
     pending: filteredOrders.filter(o => o.status === 'pending').length,
     in_progress: filteredOrders.filter(o => o.status === 'in_progress').length,
     completed: filteredOrders.filter(o => o.status === 'completed').length,
-    revenue: totalRevenue,
-    expectedRevenue: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0),
-    pending_payment: filteredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0) - totalRevenue
   }
 
   // Build available months from orders for the dropdown
-  const availableMonths = [...new Set(orders.map(o => {
+  const availableMonths = [...new Set([currentMonth, ...orders.map(o => {
     const d = o.order_date || o.created_at
     return d ? d.slice(0, 7) : null
-  }).filter(Boolean))].sort().reverse()
+  }).filter(Boolean)])].sort().reverse()
 
   const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE)
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
@@ -1032,6 +1133,12 @@ export default function Orders() {
 	              >
 	                Clientes
 	              </button>
+                <button
+                  onClick={() => navigate('/admin/finances')}
+                  className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
+                >
+                  Finanzas
+                </button>
 	              <button
 	                onClick={handleLogout}
                 className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
@@ -1042,7 +1149,7 @@ export default function Orders() {
           </div>
 
           {/* Stats */}
-	          <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3'>
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
             <div className='bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl'>
               <p className='text-xs text-blue-600 font-medium'>Total</p>
               <p className='text-2xl font-bold text-blue-900'>{stats.total}</p>
@@ -1058,18 +1165,6 @@ export default function Orders() {
             <div className='bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl'>
               <p className='text-xs text-green-600 font-medium'>Completados</p>
               <p className='text-2xl font-bold text-green-900'>{stats.completed}</p>
-            </div>
-	            <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-3 rounded-xl'>
-              <p className='text-xs text-[#51c879] font-medium'>Ingresos</p>
-              <p className='text-lg font-bold text-gray-900'>C$ {stats.revenue.toFixed(0)}</p>
-            </div>
-            <div className='bg-gradient-to-br from-amber-50 to-amber-100 p-3 rounded-xl'>
-              <p className='text-xs text-amber-600 font-medium'>Esperado</p>
-              <p className='text-lg font-bold text-amber-900'>C$ {stats.expectedRevenue.toFixed(0)}</p>
-            </div>
-            <div className='bg-gradient-to-br from-red-50 to-red-100 p-3 rounded-xl'>
-              <p className='text-xs text-red-600 font-medium'>Por Cobrar</p>
-              <p className='text-lg font-bold text-red-900'>C$ {stats.pending_payment.toFixed(0)}</p>
             </div>
           </div>
         </div>
@@ -1237,6 +1332,17 @@ export default function Orders() {
                   <option value='only_gifts'>🎁 Solo regalos</option>
                 </select>
 
+                <select
+                  value={filterPayment}
+                  onChange={(e) => setFilterPayment(e.target.value)}
+                  className={`px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] transition-colors ${filterPayment !== 'all' ? 'bg-amber-50 border-amber-300 text-amber-700' : 'border-gray-300 text-gray-700'}`}
+                >
+                  <option value='all'>Todos los pagos</option>
+                  <option value='unpaid'>No pagado</option>
+                  <option value='partial'>Pago parcial</option>
+                  <option value='paid'>Pagado</option>
+                </select>
+
                 <div className='h-6 w-px bg-gray-200 mx-1 hidden sm:block' />
 
                 <select
@@ -1250,9 +1356,19 @@ export default function Orders() {
                   <option value='delivery_date'>↕ Fecha de entrega</option>
                 </select>
 
-	                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== 'all' || filterDelivery !== 'all' || filterGift !== 'no_gifts' || selectedDay || searchQuery) && (
+                {filterClientId && (
+                  <div className='flex items-center gap-1.5 px-3 py-1.5 bg-[#51c879]/10 border border-[#51c879]/30 rounded-lg text-sm'>
+                    <span className='text-[#51c879] font-semibold'>{filterClientName || 'Cliente'}</span>
+                    <button
+                      onClick={() => { setFilterClientId(null); setFilterClientName(''); setFilterStatus('active'); setFilterMonth(currentMonth) }}
+                      className='text-[#51c879] hover:text-red-500 font-bold leading-none'
+                      title='Quitar filtro de cliente'
+                    >✕</button>
+                  </div>
+                )}
+	                {(filterStatus !== 'active' || filterPriority !== 'all' || filterMonth !== currentMonth || filterDelivery !== 'all' || filterGift !== 'no_gifts' || filterPayment !== 'all' || filterClientId || selectedDay || searchQuery) && (
 	                  <button
-	                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth('all'); setFilterDelivery('all'); setFilterGift('no_gifts'); setSelectedDay(null); setSearchQuery('') }}
+	                    onClick={() => { setFilterStatus('active'); setFilterPriority('all'); setFilterMonth(currentMonth); setFilterDelivery('all'); setFilterGift('no_gifts'); setFilterPayment('all'); setFilterClientId(null); setFilterClientName(''); setSelectedDay(null); setSearchQuery('') }}
                     className='px-3 py-2 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors'
                   >
                     ✕ Limpiar filtros
@@ -1345,6 +1461,8 @@ export default function Orders() {
                         )}
                         {colOrders.map(order => {
                           const countdown = getDeliveryCountdown(order.estimated_delivery_date, order.status)
+                          const paySummary = getPaymentSummary(order.order_payments, order.total_amount)
+                          const payMethodsUsed = [...new Set((order.order_payments || []).map(p => p.method))]
                           return (
                             <div
                               key={order.id}
@@ -1355,7 +1473,7 @@ export default function Orders() {
                               onClick={() => editOrder(order)}
                             >
                               <div className='flex items-start justify-between gap-1 mb-1.5'>
-                                <span className='font-semibold text-sm text-gray-800 leading-tight'>{order.customer_name}</span>
+                                <span className='font-semibold text-sm text-gray-800 leading-tight'>{displayName(order)}</span>
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${getPriorityColor(order.priority)}`}>
                                   {priorityLabels[order.priority]}
                                 </span>
@@ -1365,16 +1483,16 @@ export default function Orders() {
                                 <span className='mx-1'>·</span>
                                 <span className='font-medium text-gray-600'>C$ {parseFloat(order.total_amount).toFixed(0)}</span>
                               </div>
-                              <div className='flex items-center justify-between gap-1'>
-                                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
-                                  {paymentStatusLabels[order.payment_status] || 'No Pagado'}
+                              <div className='flex items-center justify-between gap-1 flex-wrap'>
+                                <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(paySummary.status)}`}>
+                                  {paymentStatusLabels[paySummary.status]}
                                 </span>
-                                {order.payment_method && order.payment_method !== 'not_specified' && (
-                                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentMethodColor(order.payment_method)}`}>
-                                    {paymentMethodLabels[order.payment_method]}
+                                {payMethodsUsed.map(m => (
+                                  <span key={m} className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${payMethodColor[m]}`}>
+                                    {payMethodLabels[m]}
                                   </span>
-                                )}
-                                {order.follow_up_reason && order.follow_up_date && (
+                                ))}
+                                {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
                                   <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
                                     {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
                                   </span>
@@ -1390,7 +1508,7 @@ export default function Orders() {
 	                                  {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
 	                                </div>
 	                              )}
-                              {order.customer_phone && order.follow_up_reason && (
+                              {SHOW_WHATSAPP_REMINDER && order.customer_phone && order.follow_up_reason && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
@@ -1412,7 +1530,10 @@ export default function Orders() {
               </div>
             ) : (
               <div className='space-y-4'>
-                {paginatedOrders.map((order) => (
+                {paginatedOrders.map((order) => {
+                  const paySummary = getPaymentSummary(order.order_payments, order.total_amount)
+                  const payMethodsUsed = [...new Set((order.order_payments || []).map(p => p.method))]
+                  return (
                   <div key={order.id} className={`bg-white rounded-2xl shadow-soft p-4 sm:p-5 hover:shadow-md transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
                     <div className='flex justify-between items-start mb-4'>
                       <div className='flex-1'>
@@ -1431,15 +1552,15 @@ export default function Orders() {
                             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
                               {priorityLabels[order.priority]}
                             </span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(order.payment_status)}`}>
-                              {paymentStatusLabels[order.payment_status] || 'No Pagado'}
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(paySummary.status)}`}>
+                              {paymentStatusLabels[paySummary.status]}
                             </span>
-                            {order.payment_method && order.payment_method !== 'not_specified' && (
-                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentMethodColor(order.payment_method)}`}>
-                                {paymentMethodLabels[order.payment_method]}
+                            {payMethodsUsed.map(m => (
+                              <span key={m} className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${payMethodColor[m]}`}>
+                                {payMethodLabels[m]}
                               </span>
-                            )}
-                            {order.follow_up_reason && order.follow_up_date && (
+                            ))}
+                            {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
                               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
                                 {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
                               </span>
@@ -1453,16 +1574,19 @@ export default function Orders() {
                         </div>
                         
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-1.5 text-sm text-gray-600'>
-                          <p><strong>Cliente:</strong> {order.customer_name}</p>
+                          <p><strong>Cliente:</strong> {displayName(order)}</p>
                           {order.customer_phone && <p><strong>Teléfono:</strong> {order.customer_phone}</p>}
-                          {order.customer_social_media && <p><strong>Red Social:</strong> {order.customer_social_media}</p>}
+                          {SHOW_SOCIAL_MEDIA && order.customer_social_media && <p><strong>Red Social:</strong> {order.customer_social_media}</p>}
                           {order.delivery_address && <p><strong>Dirección:</strong> {order.delivery_address}</p>}
                           {order.recipient_name && (
                             <p><strong>Recibe:</strong> {order.recipient_name}{order.recipient_phone ? ` — ${order.recipient_phone}` : ''}</p>
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
-                          <p><strong>Método de pago:</strong> {paymentMethodLabels[order.payment_method] || 'Sin método'}</p>
-                          {order.follow_up_reason && order.follow_up_date && (
+                          <p>
+                            <strong>Pagado:</strong> C$ {paySummary.paid.toFixed(2)} / C$ {parseFloat(order.total_amount).toFixed(2)}
+                            {paySummary.balance > 0.009 && <span className='text-red-600'> · saldo C$ {paySummary.balance.toFixed(2)}</span>}
+                          </p>
+                          {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
                             <p><strong>Recordatorio WhatsApp:</strong> {followUpReasonLabels[order.follow_up_reason]} · {new Date(order.follow_up_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>
                           )}
                           {order.order_date && <p><strong>Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
@@ -1476,6 +1600,11 @@ export default function Orders() {
                         )}
                         {order.delivery_fee > 0 && (
                           <p className='text-sm font-semibold text-gray-700'>Total cliente: C$ {(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}</p>
+                        )}
+                        {paySummary.commission > 0.009 && (
+                          <p className='text-xs text-gray-500'>
+                            Comisión: − C$ {paySummary.commission.toFixed(2)} · Neto: <span className='font-semibold text-[#51c879]'>C$ {paySummary.net.toFixed(2)}</span>
+                          </p>
                         )}
                         <p className='text-sm text-gray-500 mt-1'>{new Date(order.created_at).toLocaleDateString('es-NI')}</p>
                         {order.estimated_delivery_date && (
@@ -1539,26 +1668,16 @@ export default function Orders() {
                           <option key={key} value={key}>{label}</option>
                         ))}
                       </select>
-                      <select
-                        value={order.payment_status || 'unpaid'}
-                        onChange={(e) => updatePaymentStatus(order.id, e.target.value)}
-                        className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] ${getPaymentColor(order.payment_status)}`}
+                      <button
+                        type='button'
+                        onClick={() => editOrder(order)}
+                        className={`px-3 py-1.5 text-sm font-semibold border rounded-lg hover:opacity-80 transition-opacity ${getPaymentColor(paySummary.status)}`}
+                        title='Registrar o ver pagos'
                       >
-                        {Object.entries(paymentStatusLabels).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={order.payment_method || 'not_specified'}
-                        onChange={(e) => updatePaymentMethod(order.id, e.target.value)}
-                        className={`px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#51c879] ${getPaymentMethodColor(order.payment_method)}`}
-                      >
-                        {Object.entries(paymentMethodLabels).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
-                        ))}
-                      </select>
+                        {paymentStatusLabels[paySummary.status]} · Pagos
+                      </button>
                       <div className='flex items-center gap-1 ml-auto'>
-                        {order.customer_phone && (
+                        {SHOW_WHATSAPP_REMINDER && order.customer_phone && (
                           <div className='relative'>
                             <button
                               type='button'
@@ -1644,7 +1763,8 @@ export default function Orders() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
 
                 {totalPages > 1 && (
                   <div className='flex items-center justify-between bg-white rounded-2xl shadow-soft px-5 py-3 mt-2'>
@@ -1822,16 +1942,18 @@ export default function Orders() {
                           placeholder='88881234'
                         />
                       </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
-                        <input
-                          type='text'
-                          value={formData.customer_social_media}
-                          onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
-                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                          placeholder='Facebook, Instagram...'
-                        />
-                      </div>
+                      {SHOW_SOCIAL_MEDIA && (
+                        <div>
+                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
+                          <input
+                            type='text'
+                            value={formData.customer_social_media}
+                            onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
+                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                            placeholder='Facebook, Instagram...'
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Dirección de Entrega</label>
                         <input
@@ -1893,32 +2015,8 @@ export default function Orders() {
                       </div>
                     </div>
 
-                    {/* Pago + Método + Fecha */}
-                    <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Estado de Pago</label>
-                        <select
-                          value={formData.payment_status}
-                          onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
-                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPaymentColor(formData.payment_status)}`}
-                        >
-                          {Object.entries(paymentStatusLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Método de Pago</label>
-                        <select
-                          value={formData.payment_method}
-                          onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                          className={`w-full px-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm font-medium ${getPaymentMethodColor(formData.payment_method)}`}
-                        >
-                          {Object.entries(paymentMethodLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Fecha de entrega */}
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
                       <div>
                         <div className='flex items-center justify-between mb-1.5'>
                           <label className='block text-xs font-medium text-gray-600'>Fecha de Entrega</label>
@@ -1948,6 +2046,148 @@ export default function Orders() {
                         />
                       </div>
                     </div>
+
+                    {/* Pagos */}
+                    {(() => {
+                      const summary = getPaymentSummary(editPayments, calculateTotal())
+                      return (
+                        <div className='border border-gray-200 rounded-xl p-4'>
+                          <div className='flex items-center justify-between mb-3'>
+                            <p className='text-sm font-semibold text-gray-700'>Pagos</p>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${calculateTotal() < 0.009 ? 'bg-gray-100 text-gray-500' : getPaymentColor(summary.status)}`}>
+                              {calculateTotal() < 0.009 ? 'Sin costo' : paymentStatusLabels[summary.status]}
+                            </span>
+                          </div>
+
+                          {!editingOrder ? (
+                            <p className='text-sm text-gray-400'>Guarda el pedido para registrar pagos.</p>
+                          ) : (
+                            <>
+                              {editPayments.length === 0 ? (
+                                <p className='text-sm text-gray-400 mb-3'>Sin pagos registrados.</p>
+                              ) : (
+                                <div className='space-y-2 mb-3'>
+                                  {editPayments.map((p) => (
+                                    <div key={p.id} className='flex items-center gap-2 text-sm'>
+                                      <span className='text-gray-400 w-14 flex-shrink-0'>
+                                        {new Date(p.paid_at + 'T00:00:00').toLocaleDateString('es-NI', { day: '2-digit', month: 'short' })}
+                                      </span>
+                                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${payMethodColor[p.method]}`}>
+                                        {payMethodLabels[p.method]}
+                                      </span>
+                                      <span className='font-semibold text-gray-800 flex-shrink-0'>C$ {toNumber(p.amount).toFixed(2)}</span>
+                                      {p.note && <span className='text-gray-400 truncate'>{p.note}</span>}
+                                      <button
+                                        type='button'
+                                        onClick={() => deletePayment(p.id)}
+                                        className='ml-auto px-2 py-1 flex items-center gap-1 text-xs font-medium text-red-500 hover:text-white hover:bg-red-500 border border-red-200 rounded-lg transition-colors flex-shrink-0'
+                                        title='Eliminar este pago'
+                                      >
+                                        Borrar
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className='text-sm border-t border-gray-100 pt-3 mb-3 space-y-0.5'>
+                                <div className='flex justify-between'>
+                                  <span className='text-gray-500'>Pagado</span>
+                                  <span className='font-semibold text-gray-800'>C$ {summary.paid.toFixed(2)} / C$ {calculateTotal().toFixed(2)}</span>
+                                </div>
+                                {summary.balance > 0.009 && (
+                                  <div className='flex justify-between'>
+                                    <span className='text-gray-500'>Saldo pendiente</span>
+                                    <span className='font-semibold text-red-600'>C$ {summary.balance.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {summary.commission > 0.009 && (
+                                  <>
+                                    <div className='flex justify-between'>
+                                      <span className='text-gray-500'>Comisión tarjeta (6.75%)</span>
+                                      <span className='text-gray-500'>− C$ {summary.commission.toFixed(2)}</span>
+                                    </div>
+                                    <div className='flex justify-between'>
+                                      <span className='text-gray-600 font-medium'>Neto recibido</span>
+                                      <span className='font-bold text-[#51c879]'>C$ {summary.net.toFixed(2)}</span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+
+                              {summary.balance > 0.009 ? (
+                              <div className='flex flex-wrap items-end gap-2'>
+                                <div className='flex-1 min-w-[100px]'>
+                                  <div className='flex items-center justify-between mb-1'>
+                                    <label className='block text-xs text-gray-500'>Monto</label>
+                                    <button
+                                      type='button'
+                                      onClick={() => setPaymentForm({ ...paymentForm, amount: summary.balance.toFixed(2) })}
+                                      className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-[#51c879] hover:text-white transition-colors'
+                                      title='Usar el saldo pendiente'
+                                    >
+                                      Saldo C$ {summary.balance.toFixed(0)}
+                                    </button>
+                                  </div>
+                                  <input
+                                    type='number'
+                                    min='0'
+                                    step='0.01'
+                                    value={paymentForm.amount}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                    className='w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                    placeholder='0.00'
+                                  />
+                                </div>
+                                <div className='min-w-[130px]'>
+                                  <label className='block text-xs text-gray-500 mb-1'>Método</label>
+                                  <select
+                                    value={paymentForm.method}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                                    className='w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                  >
+                                    {Object.entries(payMethodLabels).map(([key, label]) => (
+                                      <option key={key} value={key}>{label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className='min-w-[140px]'>
+                                  <label className='block text-xs text-gray-500 mb-1'>Fecha</label>
+                                  <input
+                                    type='date'
+                                    value={paymentForm.paid_at}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, paid_at: e.target.value })}
+                                    className='w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                  />
+                                </div>
+                                <div className='flex-1 min-w-[120px]'>
+                                  <label className='block text-xs text-gray-500 mb-1'>Nota (opcional)</label>
+                                  <input
+                                    type='text'
+                                    value={paymentForm.note}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })}
+                                    className='w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                                    placeholder='anticipo, saldo...'
+                                  />
+                                </div>
+                                <button
+                                  type='button'
+                                  onClick={addPayment}
+                                  className='px-4 py-2 bg-[#51c879] text-white rounded-lg text-sm font-semibold hover:bg-[#45b56a] transition-colors'
+                                >
+                                  + Pago
+                                </button>
+                              </div>
+                              ) : (
+                                calculateTotal() < 0.009
+                                  ? <p className='text-sm text-gray-400'>Pedido sin costo (C$0) — no se requiere pago.</p>
+                                  : <p className='text-sm text-gray-400'>Pedido pagado por completo. Para ajustar, usa el botón Borrar de un pago en la lista de arriba.</p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Entrega */}
@@ -2025,6 +2265,7 @@ export default function Orders() {
                   </div>
 
                   {/* Recordatorio de WhatsApp */}
+                  {SHOW_WHATSAPP_REMINDER && (
                   <div className='border-t border-gray-100 pt-5'>
                     <div className='flex items-center justify-between gap-3 mb-3'>
                       <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide'>Recordatorio WhatsApp</p>
@@ -2100,6 +2341,7 @@ export default function Orders() {
                       </div>
                     </div>
                   </div>
+                  )}
 
                   {/* Notas y regalo */}
                   <div className='border-t border-gray-100 pt-5 space-y-3'>
@@ -2147,7 +2389,7 @@ export default function Orders() {
 
                     <div className='space-y-3'>
                       {formData.items.map((item, index) => (
-                        <div key={index} className='bg-gray-50 p-3 rounded-xl border border-gray-200'>
+                        <div key={item._key || index} className='bg-gray-50 p-3 rounded-xl border border-gray-200'>
                           <div className='flex items-center justify-between mb-3'>
                             <label className='flex items-center gap-2 cursor-pointer'>
                               <input
