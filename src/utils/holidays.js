@@ -6,5 +6,5 @@ export function getMothersDay() {
   const year = now.getFullYear()
   const mothersDay = new Date(year, MOTHERS_DAY_MONTH, MOTHERS_DAY_DATE)
   const daysLeft = Math.ceil((mothersDay - now) / (1000 * 60 * 60 * 24))
-  return { isActive: daysLeft >= -2 && daysLeft <= 20, daysLeft }
+  return { isActive: daysLeft >= 0 && daysLeft <= 20, daysLeft }
 }
