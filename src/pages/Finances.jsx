@@ -74,12 +74,12 @@ export default function Finances() {
       const [{ data: pays, error: e1 }, { data: ords, error: e2 }] = await Promise.all([
         supabase
           .from(TABLE.ORDER_PAYMENTS)
-          .select('id, order_id, amount, method, paid_at, note, created_at, orders(order_number, customer_name, total_amount, client_id, clients(name))')
+          .select('id, order_id, amount, method, paid_at, note, created_at, orders(order_number, customer_name, total_amount, delivery_fee, client_id, clients(name))')
           .order('paid_at', { ascending: false })
           .order('created_at', { ascending: false }),
         supabase
           .from(TABLE.ORDERS)
-          .select('id, order_number, customer_name, total_amount, order_date, status, is_gift, order_payments(amount, method, paid_at)')
+          .select('id, order_number, customer_name, total_amount, delivery_fee, order_date, status, is_gift, client_id, order_payments(amount, method, paid_at)')
           .not('status', 'in', '("canceled")')
       ])
       if (e1) throw e1
@@ -111,7 +111,7 @@ export default function Finances() {
   // outstanding balance — exclude gifts (nothing to collect from them)
   const pendingOrders = orders.map(o => {
     const paid = (o.order_payments || []).reduce((s, p) => s + Number(p.amount), 0)
-    const balance = Math.max(0, Number(o.total_amount || 0) - paid)
+    const balance = Math.max(0, Number(o.total_amount || 0) + Number(o.delivery_fee || 0) - paid)
     return { ...o, paid, balance }
   }).filter(o => o.balance > 0.009 && !o.is_gift)
   const totalPending = pendingOrders.reduce((s, o) => s + o.balance, 0)
@@ -144,7 +144,7 @@ export default function Finances() {
         order_id: p.order_id,
         order_number: p.orders?.order_number,
         name: orderDisplayName(p),
-        total_amount: Number(p.orders?.total_amount || 0),
+        total_amount: Number(p.orders?.total_amount || 0) + Number(p.orders?.delivery_fee || 0),
         payments: []
       }
       acc[key].payments.push(p)
@@ -361,7 +361,7 @@ export default function Finances() {
                         </div>
                         <div className='text-right flex-shrink-0'>
                           <p className='text-sm font-bold text-red-600'>C$ {o.balance.toFixed(0)}</p>
-                          <p className='text-xs text-gray-400'>de C$ {Number(o.total_amount).toFixed(0)}</p>
+                          <p className='text-xs text-gray-400'>de C$ {(Number(o.total_amount || 0) + Number(o.delivery_fee || 0)).toFixed(0)}</p>
                         </div>
                         <button
                           onClick={() => navigate('/admin/orders', o.client_id ? { state: { clientId: o.client_id, clientName: o.customer_name } } : { state: { search: o.customer_name } })}

@@ -307,6 +307,8 @@ export default function Orders() {
 
   const displayName = (order) => order.clients?.name || order.customer_name
 
+  const getOrderChargeTotal = (order) => toNumber(order.total_amount) + toNumber(order.delivery_fee)
+
   const getPaymentSummary = (payments, total) => {
     const list = payments || []
     const paid = list.reduce((s, p) => s + toNumber(p.amount), 0)
@@ -1013,7 +1015,7 @@ export default function Orders() {
       // When a search is active we skip the month filter entirely so you see
       // all of a client's orders regardless of when they were placed.
       const isActive = ACTIVE_STATUSES.includes(order.status)
-      const hasPendingBalance = getPaymentSummary(order.order_payments, order.total_amount).balance > 0.009
+      const hasPendingBalance = getPaymentSummary(order.order_payments, getOrderChargeTotal(order)).balance > 0.009
       if (!isActive && !hasPendingBalance) {
         const orderDate = order.order_date || order.created_at
         if (!orderDate || !orderDate.startsWith(filterMonth)) return false
@@ -1024,7 +1026,7 @@ export default function Orders() {
     if (filterDelivery === 'overdue' && (!order.estimated_delivery_date || order.estimated_delivery_date >= today || ['completed', 'canceled'].includes(order.status))) return false
     if (filterGift === 'no_gifts' && order.is_gift) return false
     if (filterGift === 'only_gifts' && !order.is_gift) return false
-    if (filterPayment !== 'all' && getPaymentSummary(order.order_payments, order.total_amount).status !== filterPayment) return false
+    if (filterPayment !== 'all' && getPaymentSummary(order.order_payments, getOrderChargeTotal(order)).status !== filterPayment) return false
     if (selectedDay && order.estimated_delivery_date !== selectedDay) return false
     if (filterClientId && order.client_id !== filterClientId) return false
     if (searchQuery) {
@@ -1039,8 +1041,8 @@ export default function Orders() {
   }).sort((a, b) => {
     // Primary: payment status (paid first, then partial, then unpaid)
     const paymentOrder = { paid: 0, partial: 1, unpaid: 2 }
-    const aStatus = getPaymentSummary(a.order_payments, a.total_amount).status
-    const bStatus = getPaymentSummary(b.order_payments, b.total_amount).status
+    const aStatus = getPaymentSummary(a.order_payments, getOrderChargeTotal(a)).status
+    const bStatus = getPaymentSummary(b.order_payments, getOrderChargeTotal(b)).status
     const payDiff = (paymentOrder[aStatus] ?? 2) - (paymentOrder[bStatus] ?? 2)
     if (payDiff !== 0) return payDiff
 
@@ -1461,7 +1463,7 @@ export default function Orders() {
                         )}
                         {colOrders.map(order => {
                           const countdown = getDeliveryCountdown(order.estimated_delivery_date, order.status)
-                          const paySummary = getPaymentSummary(order.order_payments, order.total_amount)
+                          const paySummary = getPaymentSummary(order.order_payments, getOrderChargeTotal(order))
                           const payMethodsUsed = [...new Set((order.order_payments || []).map(p => p.method))]
                           return (
                             <div
@@ -1531,7 +1533,7 @@ export default function Orders() {
             ) : (
               <div className='space-y-4'>
                 {paginatedOrders.map((order) => {
-                  const paySummary = getPaymentSummary(order.order_payments, order.total_amount)
+                  const paySummary = getPaymentSummary(order.order_payments, getOrderChargeTotal(order))
                   const payMethodsUsed = [...new Set((order.order_payments || []).map(p => p.method))]
                   return (
                   <div key={order.id} className={`bg-white rounded-2xl shadow-soft p-4 sm:p-5 hover:shadow-md transition-shadow ${selectedOrders.has(order.id) ? 'ring-2 ring-amber-400' : ''}`}>
@@ -2049,13 +2051,14 @@ export default function Orders() {
 
                     {/* Pagos */}
                     {(() => {
-                      const summary = getPaymentSummary(editPayments, calculateTotal())
+                      const draftTotal = calculateTotal() + (formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0)
+                      const summary = getPaymentSummary(editPayments, draftTotal)
                       return (
                         <div className='border border-gray-200 rounded-xl p-4'>
                           <div className='flex items-center justify-between mb-3'>
                             <p className='text-sm font-semibold text-gray-700'>Pagos</p>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${calculateTotal() < 0.009 ? 'bg-gray-100 text-gray-500' : getPaymentColor(summary.status)}`}>
-                              {calculateTotal() < 0.009 ? 'Sin costo' : paymentStatusLabels[summary.status]}
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${draftTotal < 0.009 ? 'bg-gray-100 text-gray-500' : getPaymentColor(summary.status)}`}>
+                              {draftTotal < 0.009 ? 'Sin costo' : paymentStatusLabels[summary.status]}
                             </span>
                           </div>
 
@@ -2093,7 +2096,7 @@ export default function Orders() {
                               <div className='text-sm border-t border-gray-100 pt-3 mb-3 space-y-0.5'>
                                 <div className='flex justify-between'>
                                   <span className='text-gray-500'>Pagado</span>
-                                  <span className='font-semibold text-gray-800'>C$ {summary.paid.toFixed(2)} / C$ {calculateTotal().toFixed(2)}</span>
+                                  <span className='font-semibold text-gray-800'>C$ {summary.paid.toFixed(2)} / C$ {draftTotal.toFixed(2)}</span>
                                 </div>
                                 {summary.balance > 0.009 && (
                                   <div className='flex justify-between'>
