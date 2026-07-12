@@ -1,15 +1,20 @@
 import Products from './Products'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
 import MothersDayHero from '../components/MothersDayHero'
 import { TABLE } from '../utils/constants'
 import { getMothersDay } from '../utils/holidays'
+import { useBusiness } from '../context/BusinessContext'
+import { businessFilter } from '../data/scope'
 
 export default function Home() {
+  const { publicBusinessId, rootRedirectPending, rootRedirectTo } = useBusiness()
   const order = { column: 'order' }
   const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
+    filters: businessFilter(publicBusinessId),
     order,
   })
   const [showBackToTop, setShowBackToTop] = useState(false)
@@ -19,15 +24,13 @@ export default function Home() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
-  const modifiedCategories =
-    categories.length > 0 && categories[0].name !== 'Todos'
-      ? [{ id: 0, name: 'Todos' }, ...categories]
-      : categories
+  const modifiedCategories = useMemo(
+    () => (categories.length > 0 && categories[0].name !== 'Todos' ? [{ id: 0, name: 'Todos' }, ...categories] : categories),
+    [categories],
+  )
 
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  const dropdownRef = useRef(null)
   const productsRef = useRef(null)
 
   const mothersDayBannerActive = getMothersDay().isActive
@@ -38,19 +41,12 @@ export default function Home() {
     }
   }, [modifiedCategories, selectedCategory])
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setSidebarOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
+  // A signed-in user with no Magic Arte access (e.g. a Hikari-only login) has
+  // no reason to land on this storefront — send them to their own dashboard.
+  // `rootRedirectPending` covers the brief auth-check window so we don't flash
+  // the storefront at them right before bouncing them elsewhere.
+  if (rootRedirectPending) return null
+  if (rootRedirectTo) return <Navigate to={rootRedirectTo} replace />
 
   return (
     <>

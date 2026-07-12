@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
 import { uploadCompressedImage } from '../utils/uploadImage'
 import { generateFacebookMarketplaceListing, generateProductDescription } from '../utils/gemini'
+import { useBusiness } from '../context/BusinessContext'
+import { businessFilter } from '../data/scope'
+import {
+  fetchProductsForBusiness,
+  createProduct,
+  updateProduct,
+  setProductVisibility,
+  deleteProduct as deleteProductRow,
+} from '../data/products'
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 import toast from 'react-hot-toast'
 import heic2any from 'heic2any'
 
 export default function Admin() {
-  const navigate = useNavigate()
+  const { currentBusinessId } = useBusiness()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [products, setProducts] = useState([])
@@ -76,6 +84,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
 
   // Fetch data
   const { data: categoriesData = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
+    filters: businessFilter(currentBusinessId),
     order: { column: 'order' }
   })
 
@@ -168,7 +177,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     try {
       await navigator.clipboard.writeText(text)
       toast.success('Listing copiado al portapapeles')
-    } catch (error) {
+    } catch {
       const textarea = document.createElement('textarea')
       textarea.value = text
       textarea.style.position = 'fixed'
@@ -178,7 +187,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       try {
         document.execCommand('copy')
         toast.success('Listing copiado al portapapeles')
-      } catch (copyError) {
+      } catch {
         toast.error('No se pudo copiar el listing')
       } finally {
         document.body.removeChild(textarea)
@@ -189,52 +198,17 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   const fetchProducts = async () => {
     setLoadingProducts(true)
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const { data, error } = await fetchProductsForBusiness(currentBusinessId)
 
       if (error) {
         toast.error(`Error al cargar productos: ${error.message}`)
       } else {
         setProducts(data || [])
       }
-    } catch (error) {
+    } catch {
       toast.error('Error inesperado al cargar productos')
     } finally {
       setLoadingProducts(false)
-    }
-  }
-
-  const uploadImage = async (file, folder = 'products') => {
-    if (!file) return null
-
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `${folder}/${fileName}`
-
-      const { data, error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      if (uploadError) {
-
-        // Si es error de permisos, mostrar mensaje específico
-        if (uploadError.message?.includes('row-level security') || uploadError.statusCode === '403') {
-          toast.error('Error de Storage: Verifica las políticas del bucket "images" en Supabase')
-          return null
-        }
-
-        throw uploadError
-      }
-
-      return filePath
-    } catch (error) {
-      return null
     }
   }
 
@@ -269,14 +243,9 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
 
       let result
       if (editingProduct) {
-        result = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id)
+        result = await updateProduct(editingProduct.id, productData)
       } else {
-        result = await supabase
-          .from('products')
-          .insert([productData])
+        result = await createProduct(productData, currentBusinessId)
       }
 
       if (result.error) {
@@ -292,7 +261,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
         resetForm()
         fetchProducts()
       }
-    } catch (error) {
+    } catch {
       toast.error('Error al procesar la solicitud')
     } finally {
       setLoading(false)
@@ -300,10 +269,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const toggleVisibility = async (product) => {
-    const { error } = await supabase
-      .from('products')
-      .update({ is_visible: !product.is_visible })
-      .eq('id', product.id)
+    const { error } = await setProductVisibility(product.id, !product.is_visible)
     if (error) {
       toast.error('Error al actualizar visibilidad')
     } else {
@@ -355,10 +321,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const deleteProduct = async (id) => {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id)
+    const { error } = await deleteProductRow(id)
 
     if (error) {
       toast.error('Error al eliminar el producto')
@@ -377,14 +340,16 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       setUser(user)
       setCheckingAuth(false)
 
-      if (user) {
-        // User authenticated
-        fetchProducts()
-      }
     }
 
     checkUser()
   }, [])
+
+  // Fetch only once we know the user AND the real business id; refetch on switch.
+  useEffect(() => {
+    if (user && currentBusinessId) fetchProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusinessId, user])
 
   const handleLogin = (userData) => {
     setUser(userData)
@@ -436,18 +401,6 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
               >
                 + Nuevo Producto
               </button>
-              <button
-                onClick={() => navigate('/admin/orders')}
-                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
-              >
-                📦 Pedidos
-              </button>
-	              <button
-	                onClick={() => navigate('/admin/clients')}
-	                className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
-	              >
-	                👥 Clientes
-	              </button>
 	              <button
 	                onClick={() => setShowCategoryManager(true)}
                 className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'

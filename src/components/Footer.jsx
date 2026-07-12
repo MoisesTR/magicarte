@@ -35,7 +35,10 @@ export default function Footer() {
             </a>
           </div>
         </div>
-        <div className='mb-3 flex justify-center gap-6'>
+        <div className='mb-3 flex flex-wrap justify-center gap-6'>
+          <Link to='/acerca-de-nosotros' className='text-gray-400 hover:text-[#51c879] text-sm transition-colors'>
+            Acerca de Nosotros
+          </Link>
           <Link to='/politica-de-envio' className='text-gray-400 hover:text-[#51c879] text-sm transition-colors'>
             Políticas
           </Link>

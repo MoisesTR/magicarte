@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import { businessFilter, withBusiness } from '../data/scope'
 import { getImageUrl } from '../utils/getImageUrl'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
 import { trackGenerateLead, trackViewItem } from '../utils/analytics'
@@ -18,14 +20,17 @@ export default function ProductDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
-  // Fetch only this product by ID
+  const { publicBusinessId } = useBusiness()
+
+  // Fetch only this product by ID (scoped to the public business)
   const { data: productArr = [], isLoading, error } = useSupabaseQuery(TABLE.PRODUCT, {
-    filters: [{ column: 'id', value: id }]
+    filters: withBusiness([{ column: 'id', value: id }], publicBusinessId)
   })
   const product = productArr[0] ?? null
 
   // Fetch categories for category name
   const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
+    filters: businessFilter(publicBusinessId),
     order: { column: 'order' }
   })
 
@@ -33,10 +38,10 @@ export default function ProductDetail() {
 
   // Fetch related products separately (same category, visible only, exclude current)
   const { data: relatedProducts = [] } = useSupabaseQuery(TABLE.PRODUCT, {
-    filters: [
+    filters: withBusiness([
       { column: 'category_id', value: product?.category_id ?? '' },
       { column: 'is_visible', value: true }
-    ],
+    ], publicBusinessId),
     order: { column: 'created_at', ascending: false }
   })
 
@@ -99,7 +104,7 @@ export default function ProductDetail() {
   if (isLoading) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-        <Header onCartClick={() => setShowCartModal(true)} />
+        <Header />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
             <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-[#51c879] mx-auto mb-4'></div>
@@ -113,7 +118,7 @@ export default function ProductDetail() {
   if (error || !product) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-        <Header onCartClick={() => setShowCartModal(true)} />
+        <Header />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
             <svg className='w-16 h-16 text-gray-400 mx-auto mb-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -140,7 +145,7 @@ export default function ProductDetail() {
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-      <Header onCartClick={() => setShowCartModal(true)} />
+      <Header />
 
       <main className={`max-w-7xl mx-auto px-6 pb-24 lg:pb-8 lg:px-8 ${isBannerActive ? 'pt-40' : 'pt-28'}`}>
         {/* Back Button */}

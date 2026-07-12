@@ -1,9 +1,13 @@
 import ProductCard from '../components/ProductCard'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import { businessFilter } from '../data/scope'
 
 export default function Products({ selectedCategory, categories = [] }) {
+  const { publicBusinessId } = useBusiness()
   const { data: products = [], isLoading } = useSupabaseQuery(TABLE.PRODUCT, {
+    filters: businessFilter(publicBusinessId),
     order: { column: 'created_at', ascending: false }
   })
 

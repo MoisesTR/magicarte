@@ -1,36 +1,15 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
-import { trackGenerateLead, trackSelectItem } from '../utils/analytics'
-import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
+import { trackSelectItem } from '../utils/analytics'
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate()
-  const [selectedImage, setSelectedImage] = useState(product.image_url)
-  const [isQuoteRequested, setIsQuoteRequested] = useState(false)
-
-  const onQuoteClick = (e) => {
-    e.stopPropagation()
-    const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
-    window.open(whatsappUrl, '_blank')
-    setIsQuoteRequested(true)
-    trackGenerateLead(product)
-    setTimeout(() => setIsQuoteRequested(false), 3000)
-  }
-
   const handleCardClick = () => {
     trackSelectItem(product)
     navigate(`/product/${product.id}`)
     window.scrollTo(0, 0);
   }
-
-  const handleImageClick = (e, image) => {
-    e.stopPropagation() // Prevent card click when clicking thumbnail
-    setSelectedImage(image)
-  }
-
-
 
   const isOutOfStock = product.stock_quantity === 0
   const isNew = product.created_at && (Date.now() - new Date(product.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000
@@ -43,7 +22,7 @@ export default function ProductCard({ product }) {
       {/* Image */}
       <div className='relative aspect-square overflow-hidden bg-gray-50'>
         <LazyImage
-          src={getImageUrl(selectedImage)}
+          src={getImageUrl(product.image_url)}
           alt={product.name}
           className='w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-500'
         />
