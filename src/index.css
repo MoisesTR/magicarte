@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 
 /* Define color variables */
@@ -8,6 +8,83 @@
   --color-accent: #50bfe6; /* Blue */
   --color-danger: #e53e3e; /* Red for cart counter and price */
   --color-background: #f8f9fa; /* Light background */
+  --color-text: #1f2937; /* Base text color (overridden per-business in admin) */
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Per-business dark theme (admin only).
+   The BusinessContext sets data-theme="dark" + --color-background/--color-text
+   on <html> for dark brands (Hikari, Joyería Trigueros). These rules remap the
+   standard Tailwind surface/text utilities the admin pages use to brand tokens,
+   so the page bodies go dark WITHOUT editing every page. Public site and light
+   brands have no data-theme="dark", so they are completely unaffected.
+   ────────────────────────────────────────────────────────────────────────── */
+[data-theme='dark'] {
+  /* derived tokens (color-mix is well supported in modern browsers) */
+  --color-surface: color-mix(in srgb, var(--color-background) 92%, white);
+  --color-surface-2: color-mix(in srgb, var(--color-background) 82%, white);
+  --color-border: color-mix(in srgb, var(--color-text) 16%, transparent);
+  --color-muted: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
+
+/* surfaces */
+[data-theme='dark'] .bg-gray-50 { background-color: var(--color-background) !important; }
+[data-theme='dark'] .bg-white { background-color: var(--color-surface) !important; }
+[data-theme='dark'] .bg-gray-100 { background-color: var(--color-surface-2) !important; }
+[data-theme='dark'] .hover\:bg-gray-50:hover,
+[data-theme='dark'] .hover\:bg-gray-100:hover { background-color: var(--color-surface-2) !important; }
+
+/* text */
+[data-theme='dark'] .text-gray-900,
+[data-theme='dark'] .text-gray-800,
+[data-theme='dark'] .text-gray-700 { color: var(--color-text) !important; }
+[data-theme='dark'] .text-gray-600,
+[data-theme='dark'] .text-gray-500,
+[data-theme='dark'] .text-gray-400 { color: var(--color-muted) !important; }
+
+/* borders */
+[data-theme='dark'] .border-gray-100,
+[data-theme='dark'] .border-gray-200,
+[data-theme='dark'] .border-gray-300 { border-color: var(--color-border) !important; }
+
+/* form fields */
+[data-theme='dark'] input,
+[data-theme='dark'] select,
+[data-theme='dark'] textarea {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+}
+[data-theme='dark'] input::placeholder,
+[data-theme='dark'] textarea::placeholder { color: var(--color-muted) !important; }
+
+/* Light pastel surfaces (stat cards, kanban headers, info boxes, chips) → dark.
+   Targets the NAMED palette only, so arbitrary-value gradients like the
+   green→blue action buttons (from-[#51c879]) are untouched. */
+[data-theme='dark'] .from-blue-50,
+[data-theme='dark'] .from-yellow-50,
+[data-theme='dark'] .from-purple-50,
+[data-theme='dark'] .from-green-50,
+[data-theme='dark'] .from-red-50 {
+  background-image: none !important;
+  background-color: var(--color-surface) !important;
+}
+[data-theme='dark'] .bg-blue-50,  [data-theme='dark'] .bg-blue-100,
+[data-theme='dark'] .bg-indigo-50,
+[data-theme='dark'] .bg-yellow-50, [data-theme='dark'] .bg-yellow-100,
+[data-theme='dark'] .bg-amber-50,
+[data-theme='dark'] .bg-purple-50, [data-theme='dark'] .bg-purple-100,
+[data-theme='dark'] .bg-green-50,  [data-theme='dark'] .bg-green-100,
+[data-theme='dark'] .bg-red-50,    [data-theme='dark'] .bg-red-100 {
+  background-color: var(--color-surface-2) !important;
+}
+/* dark colored text (card numbers, kanban headers) → readable light */
+[data-theme='dark'] .text-blue-900,   [data-theme='dark'] .text-blue-800,
+[data-theme='dark'] .text-yellow-900, [data-theme='dark'] .text-yellow-800,
+[data-theme='dark'] .text-purple-900, [data-theme='dark'] .text-purple-800,
+[data-theme='dark'] .text-green-900,  [data-theme='dark'] .text-green-800,
+[data-theme='dark'] .text-red-900,    [data-theme='dark'] .text-red-800 {
+  color: var(--color-text) !important;
 }
 
 /* Background colors */
@@ -140,6 +217,20 @@ body {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
+/* Shared native fields for the compact product forms in the new businesses. */
+.field {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+}
+.field:focus {
+  border-color: transparent;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 0;
+}
+
 
 /* Hide scrollbar utility */
 .scrollbar-hide {
@@ -148,67 +239,4 @@ body {
 }
 .scrollbar-hide::-webkit-scrollbar { 
   display: none;  /* Safari and Chrome */
-}
-
-@media print {
-  @page {
-    size: A4;
-    margin: 12mm;
-  }
-
-  html,
-  body {
-    background: #ffffff !important;
-  }
-
-  .catalog-document {
-    width: 100% !important;
-    max-width: none !important;
-    min-height: auto !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
-  }
-
-  .catalog-cover {
-    height: 100vh;
-    break-after: page;
-    page-break-after: always;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .catalog-cover-inner {
-    flex: 1;
-  }
-
-  .catalog-category-header {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .catalog-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px !important;
-  }
-
-  .catalog-product {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-
-  .catalog-footer {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Hide dev tools and UI chrome */
-  [data-testid="react-query-devtools"],
-  [class*="tsqd"],
-  button[aria-label*="React Query"] {
-    display: none !important;
-  }
 }

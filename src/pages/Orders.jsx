@@ -1,13 +1,31 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../config/supabaseClient'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
-import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import {
+  fetchOrdersForBusiness,
+  fetchOrderProducts,
+  createOrder,
+  updateOrder,
+  deleteOrder as deleteOrderRow,
+  deleteOrderItems,
+  insertOrderItems,
+} from '../data/orders'
+import {
+  searchClientsByName,
+  fetchClientById,
+  findClientByPhone,
+  createClientReturning,
+} from '../data/clients'
+import { addPayment as addPaymentRow, deletePayment as deletePaymentRow } from '../data/payments'
 import toast from 'react-hot-toast'
 
 export default function Orders() {
-  const navigate = useNavigate()
   const location = useLocation()
+  const { currentBusinessId, currentBusiness } = useBusiness()
+  // In-person business (engraving): no delivery / recipient / gift fields.
+  const isInPerson = currentBusiness?.slug === 'joyeria-trigueros'
   // Current month (YYYY-MM) in Nicaragua time, regardless of where the app runs.
   const currentMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Managua' }).slice(0, 7)
   const [user, setUser] = useState(null)
@@ -77,15 +95,26 @@ export default function Orders() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
       setCheckingAuth(false)
-
-      if (user) {
-        fetchOrders()
-        fetchProducts()
-      }
     }
 
     checkUser()
   }, [])
+
+  // Fetch ONLY once we know the user AND the real business id, and refetch when
+  // the business changes. Guarding on currentBusinessId avoids the race where a
+  // null id (before businesses load) would pull every business's orders.
+  useEffect(() => {
+    if (user && currentBusinessId) {
+      fetchOrders()
+      fetchProducts()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusinessId, user])
+
+  // Engraving is a log of completed jobs → show all by default; otherwise active.
+  useEffect(() => {
+    setFilterStatus(isInPerson ? 'all' : 'active')
+  }, [isInPerson])
 
   useEffect(() => {
     if (location.state?.clientId) {
@@ -122,12 +151,7 @@ export default function Orders() {
 
     setClientSearchLoading(true)
     const timeoutId = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from(TABLE.CLIENTS)
-        .select('id, name, phone, social_media, delivery_address, notes')
-        .ilike('name', `%${query}%`)
-        .order('name', { ascending: true })
-        .limit(6)
+      const { data, error } = await searchClientsByName(query, currentBusinessId)
 
       if (!ignore && !error) {
         setClientMatches(data || [])
@@ -141,23 +165,12 @@ export default function Orders() {
       ignore = true
       clearTimeout(timeoutId)
     }
-  }, [formData.customer_name, showForm])
+  }, [formData.customer_name, showForm, currentBusinessId])
 
   const fetchOrders = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from(TABLE.ORDERS)
-        .select(`
-          *,
-          order_items (
-            *,
-            products (name, image_url, width, length)
-          ),
-          order_payments (id, order_id, amount, method, paid_at, note, created_at),
-          clients (id, name)
-        `)
-        .order('created_at', { ascending: false })
+      const { data, error } = await fetchOrdersForBusiness(currentBusinessId)
 
       if (error) throw error
       setOrders(data || [])
@@ -169,10 +182,7 @@ export default function Orders() {
   }
 
   const fetchProducts = async () => {
-    const { data } = await supabase
-      .from(TABLE.PRODUCT)
-      .select('id, name, price')
-      .order('name')
+    const { data } = await fetchOrderProducts(currentBusinessId)
     setProducts(data || [])
   }
 
@@ -191,7 +201,9 @@ export default function Orders() {
         unit_price: 0,
         hours_needed: 0,
         rush_fee: 0,
-        is_custom: false
+        is_custom: false,
+        material: '',
+        engraving_minutes: ''
       }]
     })
   }
@@ -342,11 +354,7 @@ export default function Orders() {
   const syncLinkedClient = async () => {
     if (!formData.client_id) return
 
-    const { data, error } = await supabase
-      .from(TABLE.CLIENTS)
-      .select('id, name, phone, social_media, delivery_address')
-      .eq('id', formData.client_id)
-      .single()
+    const { data, error } = await fetchClientById(formData.client_id)
 
     if (error || !data) {
       toast.error('No se pudo sincronizar el cliente')
@@ -374,11 +382,7 @@ export default function Orders() {
 
     try {
       if (phone) {
-        const { data: existingClient, error: findError } = await supabase
-          .from(TABLE.CLIENTS)
-          .select('id, name, phone, social_media, delivery_address')
-          .eq('phone', phone)
-          .maybeSingle()
+        const { data: existingClient, error: findError } = await findClientByPhone(phone, currentBusinessId)
 
         if (findError) throw findError
 
@@ -389,17 +393,16 @@ export default function Orders() {
         }
       }
 
-      const { data, error } = await supabase
-        .from(TABLE.CLIENTS)
-        .insert([{
+      const { data, error } = await createClientReturning(
+        {
           name,
           phone,
           social_media: formData.customer_social_media || null,
           delivery_address: formData.delivery_address || null,
           notes: 'Creado desde un pedido',
-        }])
-        .select('id, name, phone, social_media, delivery_address')
-        .single()
+        },
+        currentBusinessId,
+      )
 
       if (error) throw error
 
@@ -418,10 +421,10 @@ export default function Orders() {
       const orderData = {
         client_id: formData.client_id || null,
         customer_name: formData.customer_name,
-        customer_phone: formData.customer_phone || null,
+        customer_phone: isInPerson ? null : (formData.customer_phone || null),
         customer_social_media: formData.customer_social_media || null,
-        delivery_address: formData.delivery_address || null,
-        delivery_method: formData.delivery_method,
+        delivery_address: isInPerson ? null : (formData.delivery_address || null),
+        delivery_method: isInPerson ? 'pickup' : formData.delivery_method,
         order_date: formData.order_date,
         status: formData.status,
         priority: formData.priority,
@@ -431,52 +434,52 @@ export default function Orders() {
         follow_up_date: formData.follow_up_date || null,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
-        delivery_fee: formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0,
-        recipient_name: formData.delivery_method === 'delivery' ? (formData.recipient_name || null) : null,
-        recipient_phone: formData.delivery_method === 'delivery' ? (formData.recipient_phone || null) : null,
-        is_gift: formData.is_gift,
+        delivery_fee: (!isInPerson && formData.delivery_method === 'delivery') ? toNumber(formData.delivery_fee) : 0,
+        recipient_name: (!isInPerson && formData.delivery_method === 'delivery') ? (formData.recipient_name || null) : null,
+        recipient_phone: (!isInPerson && formData.delivery_method === 'delivery') ? (formData.recipient_phone || null) : null,
+        is_gift: isInPerson ? false : formData.is_gift,
         total_amount: calculateTotal()
       }
 
       let orderId
       if (editingOrder) {
-        const { error } = await supabase
-          .from(TABLE.ORDERS)
-          .update(orderData)
-          .eq('id', editingOrder.id)
-        
+        const { error } = await updateOrder(editingOrder.id, orderData)
+
         if (error) throw error
         orderId = editingOrder.id
 
-        await supabase
-          .from(TABLE.ORDER_ITEMS)
-          .delete()
-          .eq('order_id', orderId)
+        await deleteOrderItems(orderId)
       } else {
-        const { data, error } = await supabase
-          .from(TABLE.ORDERS)
-          .insert([orderData])
-          .select()
-        
+        const { data, error } = await createOrder(orderData, currentBusinessId)
+
         if (error) throw error
         orderId = data[0].id
       }
 
-      const items = formData.items.map(item => ({
-        order_id: orderId,
-        product_id: item.is_custom ? null : item.product_id,
-        product_name: item.product_name,
-        product_description: item.product_description || null,
-        quantity: toQuantity(item.quantity),
-        unit_price: toNumber(item.unit_price),
-        hours_needed: item.hours_needed === '' ? null : toNumber(item.hours_needed, 0) || null,
-        rush_fee: toNumber(item.rush_fee),
-        subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
-      }))
+      const items = formData.items.map(item => {
+        const row = {
+          order_id: orderId,
+          product_id: (isInPerson || item.is_custom) ? null : item.product_id,
+          product_name: item.product_name,
+          product_description: item.product_description || null,
+          quantity: toQuantity(item.quantity),
+          unit_price: toNumber(item.unit_price),
+          hours_needed: item.hours_needed === '' ? null : toNumber(item.hours_needed, 0) || null,
+          rush_fee: toNumber(item.rush_fee),
+          subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
+        }
+        // Only engraving (Joyería) writes these columns, so other businesses
+        // don't depend on the engraving_item_fields migration.
+        if (isInPerson) {
+          row.material = item.material || null
+          row.engraving_minutes = item.engraving_minutes !== '' && item.engraving_minutes != null
+            ? parseInt(item.engraving_minutes, 10)
+            : null
+        }
+        return row
+      })
 
-      const { error: itemsError } = await supabase
-        .from(TABLE.ORDER_ITEMS)
-        .insert(items)
+      const { error: itemsError } = await insertOrderItems(items)
 
       if (itemsError) throw itemsError
 
@@ -553,7 +556,9 @@ export default function Orders() {
         unit_price: item.unit_price,
         hours_needed: item.hours_needed || 0,
         rush_fee: item.rush_fee || 0,
-        is_custom: !item.product_id
+        is_custom: !item.product_id,
+        material: item.material || '',
+        engraving_minutes: item.engraving_minutes ?? ''
       }))
     })
     setEditPayments(order.order_payments || [])
@@ -568,10 +573,7 @@ export default function Orders() {
   }
 
   const deleteOrder = async (id) => {
-    const { error } = await supabase
-      .from(TABLE.ORDERS)
-      .delete()
-      .eq('id', id)
+    const { error } = await deleteOrderRow(id)
 
     if (error) {
       toast.error('Error al eliminar')
@@ -588,10 +590,7 @@ export default function Orders() {
       updateData.completed_at = new Date().toISOString()
     }
 
-    const { error } = await supabase
-      .from(TABLE.ORDERS)
-      .update(updateData)
-      .eq('id', id)
+    const { error } = await updateOrder(id, updateData)
 
     if (error) {
       toast.error('Error al actualizar estado')
@@ -619,16 +618,16 @@ export default function Orders() {
       return
     }
 
-    const { data, error } = await supabase
-      .from(TABLE.ORDER_PAYMENTS)
-      .insert([{
+    const { data, error } = await addPaymentRow(
+      {
         order_id: editingOrder.id,
         amount,
         method: paymentForm.method,
         paid_at: paymentForm.paid_at || new Date().toISOString().split('T')[0],
         note: paymentForm.note.trim() || null
-      }])
-      .select()
+      },
+      currentBusinessId,
+    )
 
     if (error) {
       toast.error('Error al registrar pago: ' + error.message)
@@ -647,10 +646,7 @@ export default function Orders() {
   }
 
   const deletePayment = async (paymentId) => {
-    const { error } = await supabase
-      .from(TABLE.ORDER_PAYMENTS)
-      .delete()
-      .eq('id', paymentId)
+    const { error } = await deletePaymentRow(paymentId)
 
     if (error) {
       toast.error('Error al eliminar pago')
@@ -660,12 +656,6 @@ export default function Orders() {
     setEditPayments(prev => prev.filter(p => p.id !== paymentId))
     toast.success('Pago eliminado')
     fetchOrders()
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    navigate('/admin')
   }
 
   const openFollowUpWhatsApp = (order, reasonOverride = null) => {
@@ -824,13 +814,6 @@ export default function Orders() {
       const items = order.order_items.map(i =>
         `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
       ).join('')
-      const payLabel = { paid: 'PAGADO', partial: 'PARCIAL', unpaid: 'NO PAGADO' }[order.payment_status] || 'NO PAGADO'
-      const payClass = { paid: 'paid', partial: 'partial', unpaid: 'unpaid' }[order.payment_status] || 'unpaid'
-      const delivery = order.estimated_delivery_date
-        ? new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')
-        : ''
-      const method = order.delivery_method === 'pickup' ? 'Recoger en Tienda' : 'Entrega a Domicilio'
-
       const labelName = order.recipient_name || displayName(order)
       const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
 
@@ -1121,32 +1104,6 @@ export default function Orders() {
             <div>
               <h1 className='text-xl font-bold text-gray-800'>Gestión de Pedidos</h1>
               <p className='text-xs text-gray-400 mt-0.5'>{user.email}</p>
-            </div>
-            <div className='flex gap-2'>
-              <button
-                onClick={() => navigate('/admin/products')}
-                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-              >
-                ← Productos
-              </button>
-	              <button
-	                onClick={() => navigate('/admin/clients')}
-	                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-	              >
-	                Clientes
-	              </button>
-                <button
-                  onClick={() => navigate('/admin/finances')}
-                  className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-                >
-                  Finanzas
-                </button>
-	              <button
-	                onClick={handleLogout}
-                className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
-              >
-                Cerrar Sesión
-              </button>
             </div>
           </div>
 
@@ -1585,7 +1542,7 @@ export default function Orders() {
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
                           <p>
-                            <strong>Pagado:</strong> C$ {paySummary.paid.toFixed(2)} / C$ {parseFloat(order.total_amount).toFixed(2)}
+                            <strong>Pagado:</strong> C$ {paySummary.paid.toFixed(2)} / C$ {getOrderChargeTotal(order).toFixed(2)}
                             {paySummary.balance > 0.009 && <span className='text-red-600'> · saldo C$ {paySummary.balance.toFixed(2)}</span>}
                           </p>
                           {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
@@ -1925,6 +1882,7 @@ export default function Orders() {
                           </div>
                         )}
                       </div>
+                      {!isInPerson && (
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>
                           Teléfono
@@ -1944,6 +1902,7 @@ export default function Orders() {
                           placeholder='88881234'
                         />
                       </div>
+                      )}
                       {SHOW_SOCIAL_MEDIA && (
                         <div>
                           <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
@@ -1956,6 +1915,7 @@ export default function Orders() {
                           />
                         </div>
                       )}
+                      {!isInPerson && (
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Dirección de Entrega</label>
                         <input
@@ -1965,6 +1925,7 @@ export default function Orders() {
                           className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                         />
                       </div>
+                      )}
                     </div>
                   </div>
 
@@ -2182,7 +2143,7 @@ export default function Orders() {
                                 </button>
                               </div>
                               ) : (
-                                calculateTotal() < 0.009
+                                draftTotal < 0.009
                                   ? <p className='text-sm text-gray-400'>Pedido sin costo (C$0) — no se requiere pago.</p>
                                   : <p className='text-sm text-gray-400'>Pedido pagado por completo. Para ajustar, usa el botón Borrar de un pago en la lista de arriba.</p>
                               )}
@@ -2195,8 +2156,9 @@ export default function Orders() {
 
                   {/* Entrega */}
                   <div className='border-t border-gray-100 pt-5'>
-                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Entrega</p>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>{isInPerson ? 'Fecha' : 'Entrega'}</p>
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                      {!isInPerson && (
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Modalidad *</label>
                         <select
@@ -2209,6 +2171,7 @@ export default function Orders() {
                           ))}
                         </select>
                       </div>
+                      )}
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Fecha del Encargo *</label>
                         <input
@@ -2220,7 +2183,7 @@ export default function Orders() {
                         />
                       </div>
                     </div>
-                    {formData.delivery_method === 'delivery' && (
+                    {!isInPerson && formData.delivery_method === 'delivery' && (
                       <div className='grid grid-cols-1 md:grid-cols-3 gap-3 mt-3'>
                         <div>
                           <label className='block text-xs font-medium text-gray-600 mb-1.5'>Costo Delivery (C$)</label>
@@ -2358,6 +2321,7 @@ export default function Orders() {
                         placeholder='Instrucciones especiales, detalles del diseño...'
                       />
                     </div>
+                    {!isInPerson && (
                     <button
                       type='button'
                       onClick={() => setFormData({ ...formData, is_gift: !formData.is_gift })}
@@ -2372,6 +2336,7 @@ export default function Orders() {
                       </svg>
                       {formData.is_gift ? 'Es un regalo' : 'Marcar como regalo'}
                     </button>
+                    )}
                   </div>
 
                   {/* Productos */}
@@ -2394,15 +2359,19 @@ export default function Orders() {
                       {formData.items.map((item, index) => (
                         <div key={item._key || index} className='bg-gray-50 p-3 rounded-xl border border-gray-200'>
                           <div className='flex items-center justify-between mb-3'>
-                            <label className='flex items-center gap-2 cursor-pointer'>
-                              <input
-                                type='checkbox'
-                                checked={item.is_custom}
-                                onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
-                                className='w-3.5 h-3.5 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
-                              />
-                              <span className='text-xs font-medium text-gray-600'>Producto personalizado</span>
-                            </label>
+                            {isInPerson ? (
+                              <span className='text-xs font-semibold text-gray-600'>Trabajo de grabado</span>
+                            ) : (
+                              <label className='flex items-center gap-2 cursor-pointer'>
+                                <input
+                                  type='checkbox'
+                                  checked={item.is_custom}
+                                  onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
+                                  className='w-3.5 h-3.5 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
+                                />
+                                <span className='text-xs font-medium text-gray-600'>Producto personalizado</span>
+                              </label>
+                            )}
                             <button
                               type='button'
                               onClick={() => removeItem(index)}
@@ -2416,7 +2385,7 @@ export default function Orders() {
                           </div>
 
                           <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                            {!item.is_custom ? (
+                            {!(isInPerson || item.is_custom) ? (
                               <div className='md:col-span-2'>
                                 <label className='block text-xs font-medium text-gray-600 mb-1.5'>Producto del Catálogo</label>
                                 <div className='relative'>
@@ -2568,7 +2537,7 @@ export default function Orders() {
                       {formData.items.length === 0 && (
                         <div className='text-center py-6 border-2 border-dashed border-gray-200 rounded-xl'>
                           <p className='text-sm text-gray-400'>
-                            {formData.status === 'backlog' ? 'Puedes guardar sin productos por ahora.' : 'Agrega al menos un producto para crear el pedido.'}
+                            {formData.status === 'backlog' ? 'Puedes guardar sin productos por ahora.' : 'Agrega al menos un ítem para crear el pedido. Puede ser un “Producto personalizado” (ej. un grabado).'}
                           </p>
                         </div>
                       )}

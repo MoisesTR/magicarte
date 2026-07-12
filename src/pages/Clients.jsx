@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { supabase } from '../config/supabaseClient'
-import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import {
+  fetchClientsForBusiness,
+  fetchLinkedOrdersForBusiness,
+  createClient,
+  updateClient,
+  deleteClient as deleteClientRow,
+} from '../data/clients'
 import toast from 'react-hot-toast'
 
 const initialFormData = {
@@ -30,6 +37,7 @@ function formatCurrency(value, maximumFractionDigits = 0) {
 
 export default function Clients() {
   const navigate = useNavigate()
+  const { currentBusinessId, currentBusiness } = useBusiness()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [clients, setClients] = useState([])
@@ -47,28 +55,23 @@ export default function Clients() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       setUser(authUser)
       setCheckingAuth(false)
-
-      if (authUser) {
-        fetchClients()
-      }
     }
 
     checkUser()
   }, [])
 
+  // Fetch only once we know the user AND the real business id; refetch on switch.
+  useEffect(() => {
+    if (user && currentBusinessId) fetchClients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusinessId, user])
+
   const fetchClients = async () => {
     setLoading(true)
     try {
       const [clientsResult, ordersResult] = await Promise.all([
-        supabase
-          .from(TABLE.CLIENTS)
-          .select('*')
-          .order('updated_at', { ascending: false }),
-	        supabase
-	          .from(TABLE.ORDERS)
-	          .select('id, client_id, order_number, status, total_amount, delivery_fee, order_date, created_at, is_gift')
-	          .not('client_id', 'is', null)
-	          .order('created_at', { ascending: false }),
+        fetchClientsForBusiness(currentBusinessId),
+        fetchLinkedOrdersForBusiness(currentBusinessId),
       ])
 
       if (clientsResult.error) throw clientsResult.error
@@ -170,17 +173,10 @@ export default function Clients() {
 
     try {
       if (editingClient) {
-        const { error } = await supabase
-          .from(TABLE.CLIENTS)
-          .update(clientData)
-          .eq('id', editingClient.id)
-
+        const { error } = await updateClient(editingClient.id, clientData)
         if (error) throw error
       } else {
-        const { error } = await supabase
-          .from(TABLE.CLIENTS)
-          .insert([clientData])
-
+        const { error } = await createClient(clientData, currentBusinessId)
         if (error) throw error
       }
 
@@ -195,10 +191,7 @@ export default function Clients() {
   }
 
   const deleteClient = async (id) => {
-    const { error } = await supabase
-      .from(TABLE.CLIENTS)
-      .delete()
-      .eq('id', id)
+    const { error } = await deleteClientRow(id)
 
     if (error) {
       toast.error('Error al eliminar cliente')
@@ -241,18 +234,6 @@ export default function Clients() {
               <p className='text-xs text-gray-400 mt-0.5'>{clients.length} cliente{clients.length !== 1 ? 's' : ''} guardado{clients.length !== 1 ? 's' : ''}</p>
             </div>
             <div className='flex flex-wrap gap-2'>
-              <button
-                onClick={() => navigate('/admin/orders')}
-                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-              >
-                Pedidos
-              </button>
-	              <button
-	                onClick={() => navigate('/admin/products')}
-	                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-	              >
-	                Productos
-	              </button>
 	              <button
 	                onClick={() => {
                   setEditingClient(null)
@@ -442,7 +423,7 @@ export default function Clients() {
                     Actualizado: {new Date(client.updated_at || client.created_at).toLocaleDateString('es-NI')}
                   </p>
                   <button
-                    onClick={() => navigate('/admin/orders', { state: { clientId: client.id, clientName: client.name } })}
+                    onClick={() => navigate(`/admin/${currentBusiness.slug}/orders`, { state: { clientId: client.id, clientName: client.name } })}
                     className='text-xs font-semibold text-[#51c879] hover:text-[#45b56a] px-2 py-1 rounded-lg hover:bg-green-50 transition-colors'
                   >
                     Ver pedidos →

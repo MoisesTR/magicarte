@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { supabase } from '../config/supabaseClient'
-import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import { fetchPaymentsForBusiness } from '../data/payments'
+import { fetchFinanceOrders } from '../data/orders'
+import { fetchBusinessEarnings, fetchPartnerSettlements } from '../data/businesses'
 
 const COMMISSION_RATE = 0.0675
 const TZ = 'America/Managua'
@@ -11,6 +14,85 @@ function nicaraguaMonth(dateStr) {
   // Returns 'YYYY-MM' for a date string or ISO timestamp, in Nicaragua time.
   const d = new Date(dateStr)
   return d.toLocaleDateString('en-CA', { timeZone: TZ }).slice(0, 7)
+}
+
+function CombinedFinances({ loading, earnings, settlements }) {
+  const totals = earnings.reduce(
+    (acc, row) => ({
+      collected: acc.collected + Number(row.collected || 0),
+      partner: acc.partner + Number(row.partner_share_paid || 0),
+      mine: acc.mine + Number(row.net_to_us_paid || 0),
+      orders: acc.orders + Number(row.orders_count || 0),
+    }),
+    { collected: 0, partner: 0, mine: 0, orders: 0 },
+  )
+
+  return (
+    <div className='min-h-screen bg-gray-50 py-6'>
+      <div className='mx-auto max-w-5xl space-y-5 px-4'>
+        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
+          <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Studio HQ</p>
+          <h1 className='mt-1 text-xl font-bold text-gray-800'>Finanzas consolidadas</h1>
+          <p className='mt-1 text-sm text-gray-500'>Totales acumulados de los negocios a los que tienes acceso.</p>
+        </div>
+
+        {loading ? (
+          <div className='flex justify-center py-20'><div className='h-10 w-10 animate-spin rounded-full border-b-2 border-slate-700' /></div>
+        ) : (
+          <>
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-4'>
+              <FinanceCard label='Cobrado' value={money(totals.collected)} tone='bg-sky-50 text-sky-900' hint={`${totals.orders} pedido${totals.orders !== 1 ? 's' : ''}`} />
+              <FinanceCard label='Parte de socios' value={money(totals.partner)} tone='bg-amber-50 text-amber-900' hint='De pedidos totalmente pagados' />
+              <FinanceCard label='Neto para ti' value={money(totals.mine)} tone='bg-emerald-50 text-emerald-900' hint='Después de repartos y reembolsos' />
+              <FinanceCard label='Por liquidar' value={money(settlements.reduce((sum, row) => sum + Number(row.partner_owed || 0), 0))} tone='bg-violet-50 text-violet-900' hint='Socios configurados' />
+            </div>
+
+            <div className='overflow-hidden rounded-2xl bg-white shadow-soft'>
+              <div className='border-b border-gray-100 px-5 py-4'>
+                <h2 className='font-bold text-gray-800'>Por negocio</h2>
+              </div>
+              {earnings.length === 0 ? (
+                <p className='px-5 py-10 text-center text-sm text-gray-400'>No hay negocios disponibles para este usuario.</p>
+              ) : (
+                <div className='divide-y divide-gray-100'>
+                  {earnings.map((row) => (
+                    <div key={row.business_id} className='grid gap-3 px-5 py-4 text-sm sm:grid-cols-[1.3fr_repeat(3,1fr)] sm:items-center'>
+                      <div><p className='font-semibold text-gray-800'>{row.name}</p><p className='text-xs text-gray-400'>{row.orders_count} pedido{Number(row.orders_count) !== 1 ? 's' : ''}</p></div>
+                      <Metric label='Cobrado' value={money(row.collected)} />
+                      <Metric label='Socio' value={money(row.partner_share_paid)} />
+                      <Metric label='Neto para ti' value={money(row.net_to_us_paid)} strong />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {settlements.length > 0 && (
+              <div className='rounded-2xl border border-amber-200 bg-amber-50 p-5'>
+                <h2 className='font-bold text-amber-950'>Liquidaciones pendientes</h2>
+                <div className='mt-3 space-y-3'>
+                  {settlements.map((row) => (
+                    <div key={row.business_id} className='flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/70 pt-3 text-sm first:border-t-0 first:pt-0'>
+                      <div><p className='font-semibold text-amber-950'>{row.name}</p><p className='text-amber-800'>{row.partner_name || 'Socio'} · {row.settled_orders} pagado{Number(row.settled_orders) !== 1 ? 's' : ''}</p></div>
+                      <div className='text-right'><p className='text-xs text-amber-700'>Debes liquidar</p><p className='font-bold text-amber-950'>{money(row.partner_owed)}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FinanceCard({ label, value, hint, tone }) {
+  return <div className={`rounded-2xl p-4 ${tone}`}><p className='text-xs font-medium opacity-70'>{label}</p><p className='mt-1 text-xl font-bold'>{value}</p><p className='mt-1 text-[11px] opacity-65'>{hint}</p></div>
+}
+
+function Metric({ label, value, strong = false }) {
+  return <div><p className='text-[11px] text-gray-400 sm:hidden'>{label}</p><p className={strong ? 'font-bold text-emerald-700' : 'font-semibold text-gray-700'}>{value}</p><p className='hidden text-[11px] text-gray-400 sm:block'>{label}</p></div>
 }
 
 function currentNicaraguaMonth() {
@@ -51,12 +133,23 @@ const methodColor = {
 }
 const methodLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
+const money = (value) =>
+  new Intl.NumberFormat('es-NI', {
+    style: 'currency',
+    currency: 'NIO',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0))
+
 export default function Finances() {
   const navigate = useNavigate()
+  const { currentBusinessId, currentBusiness, isAllBusinesses } = useBusiness()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [payments, setPayments] = useState([])
   const [orders, setOrders] = useState([])
+  const [earnings, setEarnings] = useState([])
+  const [partnerSettlements, setPartnerSettlements] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(currentNicaraguaMonth)
 
@@ -64,28 +157,51 @@ export default function Finances() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user)
       setCheckingAuth(false)
-      if (user) fetchData()
     })
   }, [])
+
+  // Individual-business dashboards use the detailed order/payment queries. The
+  // all-business dashboard uses the accounting views, which are RLS-scoped in
+  // the final migration so a limited user never sees another business's totals.
+  useEffect(() => {
+    if (!user) return
+    if (isAllBusinesses) fetchCombinedData()
+    else if (currentBusinessId) fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBusinessId, isAllBusinesses, user])
 
   const fetchData = async () => {
     setLoading(true)
     try {
       const [{ data: pays, error: e1 }, { data: ords, error: e2 }] = await Promise.all([
-        supabase
-          .from(TABLE.ORDER_PAYMENTS)
-          .select('id, order_id, amount, method, paid_at, note, created_at, orders(order_number, customer_name, total_amount, delivery_fee, client_id, clients(name))')
-          .order('paid_at', { ascending: false })
-          .order('created_at', { ascending: false }),
-        supabase
-          .from(TABLE.ORDERS)
-          .select('id, order_number, customer_name, total_amount, delivery_fee, order_date, status, is_gift, client_id, order_payments(amount, method, paid_at)')
-          .not('status', 'in', '("canceled")')
+        fetchPaymentsForBusiness(currentBusinessId),
+        fetchFinanceOrders(currentBusinessId),
       ])
       if (e1) throw e1
       if (e2) throw e2
       setPayments(pays || [])
       setOrders(ords || [])
+      const { data: settlements, error: settlementError } = await fetchPartnerSettlements()
+      if (settlementError) throw settlementError
+      setPartnerSettlements(settlements || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchCombinedData = async () => {
+    setLoading(true)
+    try {
+      const [{ data: earningRows, error: earningsError }, { data: settlementRows, error: settlementsError }] = await Promise.all([
+        fetchBusinessEarnings(),
+        fetchPartnerSettlements(),
+      ])
+      if (earningsError) throw earningsError
+      if (settlementsError) throw settlementsError
+      setEarnings(earningRows || [])
+      setPartnerSettlements(settlementRows || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -103,6 +219,10 @@ export default function Finances() {
 
   if (!user) return <AdminLogin onLogin={setUser} />
 
+  if (isAllBusinesses) {
+    return <CombinedFinances loading={loading} earnings={earnings} settlements={partnerSettlements} />
+  }
+
   // ── derived data ──────────────────────────────────────────────
 
   const monthPayments = payments.filter(p => nicaraguaMonth(p.paid_at) === selectedMonth)
@@ -115,6 +235,7 @@ export default function Finances() {
     return { ...o, paid, balance }
   }).filter(o => o.balance > 0.009 && !o.is_gift)
   const totalPending = pendingOrders.reduce((s, o) => s + o.balance, 0)
+  const currentSettlement = partnerSettlements.find((settlement) => settlement.business_id === currentBusinessId)
 
   // method breakdown for selected month
   const byMethod = ['efectivo', 'transferencia', 'tarjeta'].map(m => {
@@ -170,14 +291,6 @@ export default function Finances() {
               <h1 className='text-xl font-bold text-gray-800'>Finanzas</h1>
               <p className='text-xs text-gray-400 mt-0.5'>{user.email}</p>
             </div>
-            <div className='flex gap-2'>
-              <button
-                onClick={() => navigate('/admin/orders')}
-                className='px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors'
-              >
-                ← Pedidos
-              </button>
-            </div>
           </div>
         </div>
 
@@ -227,6 +340,25 @@ export default function Finances() {
                 </div>
               </div>
             </div>
+
+            {currentSettlement && (
+              <div className='rounded-2xl border border-amber-200 bg-amber-50 p-5'>
+                <div className='flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between'>
+                  <div>
+                    <p className='text-xs font-semibold uppercase tracking-wide text-amber-700'>Liquidación con socio · acumulado</p>
+                    <p className='mt-1 text-sm text-amber-900'>
+                      {currentSettlement.settled_orders} trabajo{Number(currentSettlement.settled_orders) !== 1 ? 's' : ''} totalmente pagado{Number(currentSettlement.settled_orders) !== 1 ? 's' : ''}.
+                    </p>
+                  </div>
+                  <p className='text-xl font-bold text-amber-900'>{money(currentSettlement.partner_owed)}</p>
+                </div>
+                <div className='mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3'>
+                  <div><p className='text-amber-700/75'>Facturado</p><p className='font-semibold text-amber-950'>{money(currentSettlement.gross)}</p></div>
+                  <div><p className='text-amber-700/75'>Materiales</p><p className='font-semibold text-amber-950'>{money(currentSettlement.material_total)}</p></div>
+                  <div><p className='text-amber-700/75'>Tu parte</p><p className='font-semibold text-amber-950'>{money(currentSettlement.your_take)}</p></div>
+                </div>
+              </div>
+            )}
 
             {/* ── Tendencia 6 meses + Desglose método (side by side on md+) ── */}
             <div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
@@ -327,7 +459,7 @@ export default function Finances() {
                       <button
                         onClick={() => {
                           const clientId = o.payments[0]?.orders?.client_id
-                          navigate('/admin/orders', clientId
+                          navigate(`/admin/${currentBusiness.slug}/orders`, clientId
                             ? { state: { clientId, clientName: o.name } }
                             : { state: { search: o.name } }
                           )
@@ -364,7 +496,7 @@ export default function Finances() {
                           <p className='text-xs text-gray-400'>de C$ {(Number(o.total_amount || 0) + Number(o.delivery_fee || 0)).toFixed(0)}</p>
                         </div>
                         <button
-                          onClick={() => navigate('/admin/orders', o.client_id ? { state: { clientId: o.client_id, clientName: o.customer_name } } : { state: { search: o.customer_name } })}
+                          onClick={() => navigate(`/admin/${currentBusiness.slug}/orders`, o.client_id ? { state: { clientId: o.client_id, clientName: o.customer_name } } : { state: { search: o.customer_name } })}
                           className='text-xs text-gray-400 hover:text-[#51c879] px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0'
                         >
                           Ver →

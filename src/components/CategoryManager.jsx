@@ -1,10 +1,18 @@
 import { useState, useRef } from 'react'
-import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
+import { useBusiness } from '../context/BusinessContext'
+import { businessFilter } from '../data/scope'
+import {
+  createCategory,
+  updateCategory,
+  deleteCategory as deleteCategoryRow,
+  reorderCategories,
+} from '../data/categories'
 import toast from 'react-hot-toast'
 
 export default function CategoryManager({ isOpen, onClose }) {
+  const { currentBusinessId } = useBusiness()
   const [loading, setLoading] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -17,6 +25,7 @@ export default function CategoryManager({ isOpen, onClose }) {
   const [dropTarget, setDropTarget] = useState(null)
 
   const { data: categories = [], refetch } = useSupabaseQuery(TABLE.CATEGORIES, {
+    filters: businessFilter(currentBusinessId),
     order: { column: 'order' }
   })
 
@@ -26,14 +35,12 @@ export default function CategoryManager({ isOpen, onClose }) {
     try {
       let result
       if (editingCategory) {
-        result = await supabase
-          .from('categories')
-          .update({ name: formData.name })
-          .eq('id', editingCategory.id)
+        result = await updateCategory(editingCategory.id, { name: formData.name })
       } else {
-        result = await supabase
-          .from('categories')
-          .insert([{ name: formData.name, order: categories.length + 1 }])
+        result = await createCategory(
+          { name: formData.name, order: categories.length + 1 },
+          currentBusinessId,
+        )
       }
       if (result.error) {
         toast.error(`Error: ${result.error.message}`)
@@ -62,7 +69,7 @@ export default function CategoryManager({ isOpen, onClose }) {
   }
 
   const deleteCategory = async (id) => {
-    const { error } = await supabase.from('categories').delete().eq('id', id)
+    const { error } = await deleteCategoryRow(id)
     if (error) {
       toast.error('Error al eliminar la categoría')
     } else {
@@ -115,8 +122,13 @@ export default function CategoryManager({ isOpen, onClose }) {
 
     setReordering(true)
     try {
-      const updates = reordered.map((cat, i) => ({ id: cat.id, name: cat.name, order: i + 1 }))
-      const { error } = await supabase.from('categories').upsert(updates)
+      const updates = reordered.map((cat, i) => ({
+        id: cat.id,
+        name: cat.name,
+        order: i + 1,
+        business_id: cat.business_id,
+      }))
+      const { error } = await reorderCategories(updates, currentBusinessId)
       if (error) toast.error('Error al reordenar: ' + error.message)
       else refetch()
     } catch {

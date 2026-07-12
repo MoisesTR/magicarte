@@ -4,7 +4,6 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 
 const normalizeText = (text) => text?.trim().replace(/\n{3,}/g, '\n\n') || ''
-const endsCompleteSentence = (text) => /[.!?…][)"'”’\]]*$/.test(normalizeText(text))
 
 const getRetrySeconds = (message) => {
   const match = message?.match(/retry in ([\d.]+)s/i)
