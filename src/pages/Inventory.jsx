@@ -45,6 +45,8 @@ const movementFormInitial = {
   adjustment_direction: 'in',
   quantity: '',
   unit_cost: '',
+  purchase_cost: '',
+  delivery_cost: '',
   note: '',
 }
 
@@ -217,6 +219,17 @@ export default function Inventory() {
       toast.error('La cantidad debe ser mayor que cero')
       return
     }
+    const isPurchase = movementForm.movement_type === 'purchase'
+    const packageCost = Number(movementForm.purchase_cost)
+    const deliveryCost = Number(movementForm.delivery_cost) || 0
+    if (isPurchase && movementForm.purchase_cost === '') {
+      toast.error('Escribe el costo del paquete')
+      return
+    }
+    if (isPurchase && packageCost < 0) {
+      toast.error('El costo del paquete no puede ser negativo')
+      return
+    }
 
     const direction =
       movementForm.movement_type === 'adjustment'
@@ -229,7 +242,9 @@ export default function Inventory() {
         inventory_item_id: item.id,
         movement_type: movementForm.movement_type,
         quantity_delta: enteredQuantity * direction,
-        unit_cost: movementForm.unit_cost === '' ? null : Number(movementForm.unit_cost),
+        unit_cost: isPurchase || movementForm.unit_cost === '' ? null : Number(movementForm.unit_cost),
+        purchase_cost: isPurchase ? packageCost : null,
+        delivery_cost: isPurchase ? deliveryCost : 0,
         note: movementForm.note.trim() || null,
       }, currentBusinessId)
       if (error) throw error
@@ -304,7 +319,7 @@ export default function Inventory() {
                     <th className='px-4 py-3 font-semibold'>Artículo</th>
                     <th className='px-4 py-3 font-semibold'>Tipo</th>
                     <th className='px-4 py-3 font-semibold'>Stock</th>
-                    <th className='px-4 py-3 font-semibold'>Costo unit.</th>
+                    <th className='px-4 py-3 font-semibold'>Costo promedio</th>
                     <th className='px-4 py-3 font-semibold'>Estado</th>
                     <th className='px-4 py-3 font-semibold' aria-label='Acciones' />
                   </tr>
@@ -365,7 +380,11 @@ export default function Inventory() {
                     <span className={`font-bold ${entering ? 'text-emerald-600' : 'text-red-600'}`}>
                       {entering ? '+' : ''}{amount(movement.quantity_delta)} {item?.unit || ''}
                     </span>
-                    <span className='max-w-56 truncate text-xs text-gray-400'>{movement.note || '—'}</span>
+                    <span className='max-w-56 truncate text-xs text-gray-400'>
+                      {movement.purchase_cost != null
+                        ? `${money(movement.purchase_cost)} + envío ${money(movement.delivery_cost)}`
+                        : movement.note || '—'}
+                    </span>
                   </div>
                 )
               })}
@@ -410,7 +429,16 @@ export default function Inventory() {
               <Field label='Movimiento'><select value={movementForm.movement_type} onChange={(event) => setMovementForm({ ...movementForm, movement_type: event.target.value })} className='field'>{['purchase', 'sale', 'consumption', 'adjustment', 'return'].map((value) => <option key={value} value={value}>{MOVEMENT_TYPES[value]}</option>)}</select></Field>
               {movementForm.movement_type === 'adjustment' ? <Field label='Dirección'><select value={movementForm.adjustment_direction} onChange={(event) => setMovementForm({ ...movementForm, adjustment_direction: event.target.value })} className='field'><option value='in'>Aumentar stock</option><option value='out'>Reducir stock</option></select></Field> : <Field label='Cantidad'><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
               {movementForm.movement_type === 'adjustment' && <Field label='Cantidad'><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
-              <Field label='Costo unitario (opcional)'><input type='number' min='0' step='0.01' value={movementForm.unit_cost} onChange={(event) => setMovementForm({ ...movementForm, unit_cost: event.target.value })} className='field' /></Field>
+              {movementForm.movement_type === 'purchase' ? (
+                <>
+                  <Field label='Costo del paquete (C$)'><input required type='number' min='0' step='0.01' value={movementForm.purchase_cost} onChange={(event) => setMovementForm({ ...movementForm, purchase_cost: event.target.value })} placeholder='Ej. 1500' className='field' /></Field>
+                  <Field label='Envío hasta Nicaragua (C$)'><input type='number' min='0' step='0.01' value={movementForm.delivery_cost} onChange={(event) => setMovementForm({ ...movementForm, delivery_cost: event.target.value })} placeholder='Ej. 300' className='field' /></Field>
+                  <div className='col-span-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900'>
+                    <p className='font-semibold'>Costo puesto en Nicaragua: {money((Number(movementForm.purchase_cost) || 0) + (Number(movementForm.delivery_cost) || 0))}</p>
+                    <p className='mt-0.5 text-xs text-amber-800'>Costo por {itemById.get(movementForm.inventory_item_id)?.unit || 'unidad'}: {money((Number(movementForm.purchase_cost) + (Number(movementForm.delivery_cost) || 0)) / (Number(movementForm.quantity) || 1))}</p>
+                  </div>
+                </>
+              ) : <Field label='Costo unitario (opcional)'><input type='number' min='0' step='0.01' value={movementForm.unit_cost} onChange={(event) => setMovementForm({ ...movementForm, unit_cost: event.target.value })} className='field' /></Field>}
               <Field className='col-span-2' label='Nota'><textarea rows={2} value={movementForm.note} onChange={(event) => setMovementForm({ ...movementForm, note: event.target.value })} placeholder='Factura, motivo del ajuste, pedido...' className='field' /></Field>
             </div>
             <FormActions onCancel={resetMovementForm} saving={saving} label='Registrar movimiento' color={currentBusiness?.primary_color} />
