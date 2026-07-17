@@ -32,6 +32,8 @@ const itemFormInitial = {
   item_type: 'material',
   unit: 'unidad',
   opening_quantity: '',
+  purchase_cost: '',
+  delivery_cost: '',
   low_stock_threshold: '',
   unit_cost: '',
   supplier_name: '',
@@ -146,6 +148,8 @@ export default function Inventory() {
       item_type: item.item_type,
       unit: item.unit || 'unidad',
       opening_quantity: '',
+      purchase_cost: '',
+      delivery_cost: '',
       low_stock_threshold: item.low_stock_threshold ?? '',
       unit_cost: item.unit_cost ?? '',
       supplier_name: item.supplier_name || '',
@@ -170,8 +174,24 @@ export default function Inventory() {
       toast.error('Escribe el nombre del artículo')
       return
     }
-    if (Number(itemForm.opening_quantity) < 0) {
-      toast.error('El saldo inicial no puede ser negativo')
+    const receivedQuantity = Number(itemForm.opening_quantity)
+    const packageCost = Number(itemForm.purchase_cost)
+    const deliveryCost = Number(itemForm.delivery_cost) || 0
+    const hasPackageCost = itemForm.purchase_cost !== ''
+    if (receivedQuantity < 0) {
+      toast.error('La cantidad recibida no puede ser negativa')
+      return
+    }
+    if (hasPackageCost && !(receivedQuantity > 0)) {
+      toast.error('Escribe cuántas unidades recibiste')
+      return
+    }
+    if (hasPackageCost && packageCost < 0) {
+      toast.error('El costo del paquete no puede ser negativo')
+      return
+    }
+    if (hasPackageCost && deliveryCost < 0) {
+      toast.error('El envío no puede ser negativo')
       return
     }
 
@@ -185,14 +205,15 @@ export default function Inventory() {
       } else {
         const { data, error } = await createInventoryItem(item, currentBusinessId)
         if (error) throw error
-        const openingQuantity = Number(itemForm.opening_quantity)
-        if (openingQuantity > 0) {
+        if (receivedQuantity > 0) {
           const { error: movementError } = await addInventoryMovement({
             inventory_item_id: data.id,
-            movement_type: 'opening',
-            quantity_delta: openingQuantity,
-            unit_cost: item.unit_cost,
-            note: 'Saldo inicial',
+            movement_type: hasPackageCost ? 'purchase' : 'opening',
+            quantity_delta: receivedQuantity,
+            unit_cost: hasPackageCost ? null : item.unit_cost,
+            purchase_cost: hasPackageCost ? packageCost : null,
+            delivery_cost: hasPackageCost ? deliveryCost : 0,
+            note: hasPackageCost ? 'Compra inicial' : 'Saldo inicial',
           }, currentBusinessId)
           if (movementError) throw movementError
         }
@@ -401,9 +422,14 @@ export default function Inventory() {
               <Field label='Código / SKU'><input value={itemForm.sku} onChange={(event) => setItemForm({ ...itemForm, sku: event.target.value })} className='field' /></Field>
               <Field label='Tipo'><select value={itemForm.item_type} onChange={(event) => setItemForm({ ...itemForm, item_type: event.target.value })} className='field'>{Object.entries(ITEM_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label='Unidad'><input required value={itemForm.unit} onChange={(event) => setItemForm({ ...itemForm, unit: event.target.value })} placeholder='unidad, gramo, caja...' className='field' /></Field>
-              {!editingItem && <Field label='Saldo inicial'><input type='number' min='0' step='0.001' value={itemForm.opening_quantity} onChange={(event) => setItemForm({ ...itemForm, opening_quantity: event.target.value })} placeholder='0' className='field' /></Field>}
+              {!editingItem && <>
+                <Field label='Cantidad que recibiste'><input type='number' min='0' step='0.001' value={itemForm.opening_quantity} onChange={(event) => setItemForm({ ...itemForm, opening_quantity: event.target.value })} placeholder='Ej. 100' className='field' /></Field>
+                <Field label='Costo del paquete (C$)'><input type='number' min='0' step='0.01' value={itemForm.purchase_cost} onChange={(event) => setItemForm({ ...itemForm, purchase_cost: event.target.value })} placeholder='Ej. 1500' className='field' /></Field>
+                <Field label='Envío hasta Nicaragua (C$)'><input type='number' min='0' step='0.01' value={itemForm.delivery_cost} onChange={(event) => setItemForm({ ...itemForm, delivery_cost: event.target.value })} placeholder='Ej. 300' className='field' /></Field>
+                {itemForm.purchase_cost !== '' && <div className='col-span-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900'><p className='font-semibold'>Costo puesto en Nicaragua: {money((Number(itemForm.purchase_cost) || 0) + (Number(itemForm.delivery_cost) || 0))}</p><p className='mt-0.5 text-xs text-amber-800'>Costo por {itemForm.unit || 'unidad'}: {money(((Number(itemForm.purchase_cost) || 0) + (Number(itemForm.delivery_cost) || 0)) / (Number(itemForm.opening_quantity) || 1))}</p><p className='mt-1 text-xs text-amber-800'>Se registrará como tu primera compra, no necesitas agregar un movimiento aparte.</p></div>}
+              </>}
               <Field label='Alerta bajo stock'><input type='number' min='0' step='0.001' value={itemForm.low_stock_threshold} onChange={(event) => setItemForm({ ...itemForm, low_stock_threshold: event.target.value })} placeholder='0' className='field' /></Field>
-              <Field label='Costo por unidad (C$)'><input type='number' min='0' step='0.01' value={itemForm.unit_cost} onChange={(event) => setItemForm({ ...itemForm, unit_cost: event.target.value })} placeholder='0' className='field' /></Field>
+              <Field label={editingItem ? 'Costo promedio actual (C$)' : 'Costo por unidad manual (opcional)'}><input type='number' min='0' step='0.01' value={itemForm.unit_cost} onChange={(event) => setItemForm({ ...itemForm, unit_cost: event.target.value })} placeholder='0' className='field' /></Field>
               <Field className='col-span-2' label='Proveedor'><input value={itemForm.supplier_name} onChange={(event) => setItemForm({ ...itemForm, supplier_name: event.target.value })} className='field' /></Field>
               <Field className='col-span-2' label='Notas'><textarea rows={2} value={itemForm.notes} onChange={(event) => setItemForm({ ...itemForm, notes: event.target.value })} className='field' /></Field>
               {editingItem && <label className='col-span-2 flex items-center gap-2 text-sm text-gray-600'><input type='checkbox' checked={itemForm.is_active} onChange={(event) => setItemForm({ ...itemForm, is_active: event.target.checked })} />Activo en inventario</label>}
