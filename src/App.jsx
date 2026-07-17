@@ -25,6 +25,7 @@ const HikariOrders = lazy(() => import('./pages/hikari/Orders'))
 const HikariProducts = lazy(() => import('./pages/hikari/Products'))
 const JoyeriaOrders = lazy(() => import('./pages/joyeria/Orders'))
 const JoyeriaProducts = lazy(() => import('./pages/joyeria/Products'))
+const Inventory = lazy(() => import('./pages/Inventory'))
 
 // Tab → per-business component. Falls back to the Magic Arte screen for any
 // business without its own variant yet.
@@ -101,11 +102,13 @@ export default function App() {
                 <Route path='/admin' element={<AdminIndexRedirect />} />
                 <Route path='/admin/:business/orders' element={<BusinessOrders />} />
                 <Route path='/admin/:business/products' element={<BusinessProducts />} />
+                <Route path='/admin/:business/inventory' element={<Inventory />} />
                 <Route path='/admin/:business/clients' element={<Clients />} />
                 <Route path='/admin/:business/finances' element={<Finances />} />
                 {/* Legacy un-scoped admin URLs → Magic Arte. */}
                 <Route path='/admin/orders' element={<Navigate to='/admin/magicarte/orders' replace />} />
                 <Route path='/admin/products' element={<Navigate to='/admin/magicarte/products' replace />} />
+                <Route path='/admin/inventory' element={<Navigate to='/admin/magicarte/inventory' replace />} />
                 <Route path='/admin/clients' element={<Navigate to='/admin/magicarte/clients' replace />} />
                 <Route path='/admin/finances' element={<Navigate to='/admin/magicarte/finances' replace />} />
                 <Route path='/politica-de-envio' element={<ShippingPolicy />} />
