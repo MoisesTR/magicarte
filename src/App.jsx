@@ -32,10 +32,12 @@ const Inventory = lazy(() => import('./pages/Inventory'))
 const ORDERS_BY_BUSINESS = {
   hikari: HikariOrders,
   'joyeria-trigueros': JoyeriaOrders,
+  'ema-accesorios': JoyeriaOrders,
 }
 const PRODUCTS_BY_BUSINESS = {
   hikari: HikariProducts,
   'joyeria-trigueros': JoyeriaProducts,
+  'ema-accesorios': JoyeriaProducts,
 }
 
 function BusinessOrders() {
