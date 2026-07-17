@@ -7,6 +7,7 @@ import BusinessSwitcher from './BusinessSwitcher'
 const TABS = [
   { tab: 'orders', label: 'Pedidos' },
   { tab: 'products', label: 'Productos' },
+  { tab: 'inventory', label: 'Inventario' },
   { tab: 'clients', label: 'Clientes' },
   { tab: 'finances', label: 'Finanzas' },
 ]
@@ -40,8 +41,6 @@ export default function AdminChrome() {
   const fg = currentBusiness?.text_color || '#1f2937'
   const accent = currentBusiness?.primary_color || '#51c879'
   const borderCls = dark ? 'border-white/15' : 'border-black/10'
-  const tabBusinessSlug = isAllBusinesses ? defaultBusinessSlug : currentBusiness.slug
-
   return (
     <header
       className={`sticky top-0 z-30 border-b ${borderCls} print:hidden`}
@@ -67,7 +66,11 @@ export default function AdminChrome() {
           {TABS.map((t) => (
             <NavLink
               key={t.tab}
-              to={`/admin/${tabBusinessSlug}/${t.tab}`}
+              to={
+                isAllBusinesses && t.tab === 'finances'
+                  ? '/admin/all/finances'
+                  : `/admin/${defaultBusinessSlug || currentBusiness.slug}/${t.tab}`
+              }
               className={({ isActive }) =>
                 `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   isActive ? 'text-white' : 'opacity-70 hover:opacity-100'
