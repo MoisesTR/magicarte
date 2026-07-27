@@ -193,7 +193,7 @@ export default function JoyeriaProducts() {
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='mx-auto max-w-5xl px-4'>
-        <div className='mb-5 flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5'>
+        <div className='admin-page-header mb-5 flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-5'>
           <div>
             <h1 className='text-xl font-bold text-gray-800'>Productos de Joyería</h1>
             <p className='mt-0.5 text-xs text-gray-400'>{products.length} producto{products.length !== 1 ? 's' : ''} en {currentBusiness?.name}</p>
@@ -237,13 +237,13 @@ export default function JoyeriaProducts() {
       <CategoryManager isOpen={showCategories} onClose={() => setShowCategories(false)} />
 
       {showForm && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
-          <form onSubmit={save} className='max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl'>
-            <div className='flex items-center justify-between border-b border-gray-100 p-5'>
-              <h2 className='text-lg font-bold text-gray-800'>{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+        <div className='admin-modal-backdrop'>
+          <form onSubmit={save} role='dialog' aria-modal='true' aria-labelledby='jewelry-product-form-title' className='admin-modal-panel max-w-lg bg-white'>
+            <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'>
+              <h2 id='jewelry-product-form-title' className='text-lg font-bold text-gray-800'>{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
               <button type='button' onClick={resetForm} className='text-gray-400 hover:text-gray-600' aria-label='Cerrar'>×</button>
             </div>
-            <div className='space-y-4 p-5'>
+            <div className='admin-modal-body space-y-4 p-5'>
               <div>
                 <label className='mb-1.5 block text-xs font-medium text-gray-600'>Imagen</label>
                 <label className='flex h-32 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 hover:bg-gray-100'>
@@ -269,7 +269,7 @@ export default function JoyeriaProducts() {
                 </div>
               </div>
             </div>
-            <div className='flex gap-3 border-t border-gray-100 p-5'>
+            <div className='admin-modal-footer flex gap-3 border-t border-gray-100 p-5'>
               <button type='button' onClick={resetForm} className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Cancelar</button>
               <button disabled={saving} className='flex-1 rounded-xl bg-[#B08A3C] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'>{saving ? 'Guardando...' : editingProduct ? 'Actualizar producto' : 'Crear producto'}</button>
             </div>

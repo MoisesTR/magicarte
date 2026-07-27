@@ -1099,11 +1099,11 @@ export default function Orders() {
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='max-w-7xl mx-auto px-4'>
         {/* Header */}
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
           <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4'>
             <div>
               <h1 className='text-xl font-bold text-gray-800'>Gestión de Pedidos</h1>
-              <p className='text-xs text-gray-400 mt-0.5'>{user.email}</p>
+              <p className='text-xs text-gray-400 mt-0.5'>{currentBusiness?.name} · {user.email}</p>
             </div>
           </div>
 
@@ -1762,11 +1762,11 @@ export default function Orders() {
             )}
           </>
         ) : (
-          <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
-            <div className='bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col'>
-              <div className='flex justify-between items-center p-5 border-b'>
+          <div className='admin-modal-backdrop'>
+            <div role='dialog' aria-modal='true' aria-labelledby='order-form-title' className='admin-modal-panel max-w-4xl bg-white'>
+              <div className='admin-modal-header flex justify-between items-center p-5 border-b'>
                 <div>
-                  <h2 className='text-base font-bold text-gray-800'>
+                  <h2 id='order-form-title' className='text-base font-bold text-gray-800'>
                     {editingOrder ? `Pedido #${editingOrder.order_number}` : 'Nuevo Pedido'}
                   </h2>
                   {editingOrder && (
@@ -1775,7 +1775,8 @@ export default function Orders() {
                 </div>
                 <button
                   onClick={resetForm}
-                  className='text-gray-400 hover:text-gray-600 transition-colors'
+                  aria-label='Cerrar'
+                  className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors'
                 >
                   <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                     <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
@@ -1784,7 +1785,7 @@ export default function Orders() {
               </div>
 
               <form onSubmit={handleSubmit} className='flex flex-col flex-1 overflow-hidden'>
-                <div className='flex-1 overflow-y-auto p-5 space-y-5'>
+                <div className='admin-modal-body p-5 space-y-5'>
 
                   {/* Cliente */}
                   <div>
@@ -2559,7 +2560,7 @@ export default function Orders() {
                   </div>
 
                 </div>
-                <div className='flex gap-3 p-4 border-t bg-white rounded-b-2xl'>
+                <div className='admin-modal-footer flex gap-3 p-4 border-t bg-white rounded-b-2xl'>
                   <button
                     type='button'
                     onClick={resetForm}

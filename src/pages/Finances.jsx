@@ -30,7 +30,7 @@ function CombinedFinances({ loading, earnings, settlements }) {
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='mx-auto max-w-5xl space-y-5 px-4'>
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Studio HQ</p>
           <h1 className='mt-1 text-xl font-bold text-gray-800'>Finanzas consolidadas</h1>
           <p className='mt-1 text-sm text-gray-500'>Totales acumulados de los negocios a los que tienes acceso.</p>
@@ -285,11 +285,11 @@ export default function Finances() {
       <div className='max-w-5xl mx-auto px-4 space-y-5'>
 
         {/* Header */}
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
           <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3'>
             <div>
               <h1 className='text-xl font-bold text-gray-800'>Finanzas</h1>
-              <p className='text-xs text-gray-400 mt-0.5'>{user.email}</p>
+              <p className='text-xs text-gray-400 mt-0.5'>{currentBusiness?.name} · {user.email}</p>
             </div>
           </div>
         </div>

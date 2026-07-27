@@ -141,17 +141,17 @@ export default function CategoryManager({ isOpen, onClose }) {
   if (!isOpen) return null
 
   return (
-    <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
-      <div className='bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto'>
-        <div className='p-6'>
+    <div className='admin-modal-backdrop'>
+      <div role='dialog' aria-modal='true' aria-labelledby='category-manager-title' className='admin-modal-panel max-w-lg bg-white'>
+        <div className='admin-modal-body p-6'>
 
           {/* Header */}
           <div className='flex justify-between items-center mb-6'>
             <div>
-              <h2 className='text-xl font-bold text-gray-800'>Gestionar Categorías</h2>
+              <h2 id='category-manager-title' className='text-xl font-bold text-gray-800'>Gestionar Categorías</h2>
               <p className='text-sm text-gray-400 mt-0.5'>{categories.length} categoría{categories.length !== 1 ? 's' : ''}</p>
             </div>
-            <button onClick={onClose} className='text-gray-400 hover:text-gray-600 transition-colors'>
+            <button onClick={onClose} aria-label='Cerrar' className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors'>
               <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                 <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
               </svg>

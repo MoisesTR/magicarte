@@ -20,6 +20,9 @@ const fmtDate = (d) =>
 
 /** Your take / partner's take for one engraving order, from the snapshot fields. */
 function splitOf(o) {
+  if (o.partner_share_amount != null && o.your_share_amount != null) {
+    return { mine: Number(o.your_share_amount), partner: Number(o.partner_share_amount) }
+  }
   const total = Number(o.total_amount || 0)
   const mat = Number(o.material_cost || 0)
   const pct = Number(o.partner_split_pct || 0) / 100
@@ -142,7 +145,7 @@ export default function JoyeriaOrders() {
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='max-w-4xl mx-auto px-4'>
         {/* header */}
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
           <div>
             <h1 className='text-xl font-bold text-gray-800'>Grabados</h1>
             <p className='text-xs text-gray-400 mt-0.5'>
@@ -280,6 +283,7 @@ export default function JoyeriaOrders() {
       {showForm && (
         <QuickEngravingForm
           businessId={currentBusinessId}
+          businessName={currentBusiness?.name}
           partnerName={partnerConfig?.partner_name || 'Papá'}
           partnerSplitPct={partnerConfig?.partner_split_pct ?? 50}
           editingOrder={editingOrder}

@@ -20,7 +20,7 @@ import toast from 'react-hot-toast'
 import heic2any from 'heic2any'
 
 export default function Admin() {
-  const { currentBusinessId } = useBusiness()
+  const { currentBusinessId, currentBusiness } = useBusiness()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [products, setProducts] = useState([])
@@ -356,12 +356,6 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     fetchProducts()
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setProducts([])
-  }
-
   // Show loading while checking auth
   if (checkingAuth) {
     return (
@@ -388,11 +382,11 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       <div className='max-w-7xl mx-auto px-4'>
 
         {/* Header */}
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-6 mb-6'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-6 mb-6'>
           <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
             <div>
-              <h1 className='text-2xl sm:text-3xl font-bold text-gray-800'>Panel de Administración</h1>
-              <p className='text-gray-500 text-sm mt-1'>{user.email}</p>
+              <h1 className='text-2xl sm:text-3xl font-bold text-gray-800'>Productos</h1>
+              <p className='text-gray-500 text-sm mt-1'>{currentBusiness?.name} · {user.email}</p>
             </div>
             <div className='flex flex-wrap gap-2'>
               <button
@@ -406,12 +400,6 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                 className='bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors'
               >
                 📁 Categorías
-              </button>
-              <button
-                onClick={handleLogout}
-                className='bg-red-50 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-red-100 transition-colors'
-              >
-                Cerrar Sesión
               </button>
             </div>
           </div>
@@ -558,16 +546,17 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
 
         {/* Form Modal */}
         {showForm && (
-          <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
-            <div className='bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
-              <div className='p-6'>
+          <div className='admin-modal-backdrop'>
+            <div role='dialog' aria-modal='true' aria-labelledby='product-form-title' className='admin-modal-panel max-w-2xl bg-white'>
+              <div className='admin-modal-body p-6'>
                 <div className='flex justify-between items-center mb-6'>
-                  <h2 className='text-2xl font-bold text-gray-800'>
+                  <h2 id='product-form-title' className='text-2xl font-bold text-gray-800'>
                     {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
                   </h2>
                   <button
                     onClick={resetForm}
-                    className='text-gray-500 hover:text-gray-700 text-2xl'
+                    aria-label='Cerrar'
+                    className='rounded-lg px-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 text-2xl'
                   >
                     ×
                   </button>

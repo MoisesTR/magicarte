@@ -262,7 +262,7 @@ export default function HikariOrders() {
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='max-w-4xl mx-auto px-4'>
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
           <div>
             <h1 className='text-xl font-bold text-gray-800'>Pedidos de impresión 3D</h1>
             <p className='text-xs text-gray-400 mt-0.5'>
@@ -383,18 +383,18 @@ export default function HikariOrders() {
       </div>
 
       {showForm && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
-          <form onSubmit={handleSave} className='w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-xl'>
-            <div className='flex items-center justify-between border-b border-gray-100 p-5'>
-              <h2 className='text-lg font-bold text-gray-800'>{editingOrder ? 'Editar pedido' : 'Nuevo pedido'}</h2>
-              <button type='button' onClick={resetForm} className='text-gray-400 hover:text-gray-600'>
+        <div className='admin-modal-backdrop'>
+          <form onSubmit={handleSave} role='dialog' aria-modal='true' aria-labelledby='hikari-order-form-title' className='admin-modal-panel max-w-2xl bg-white'>
+            <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'>
+              <h2 id='hikari-order-form-title' className='text-lg font-bold text-gray-800'>{editingOrder ? 'Editar pedido' : 'Nuevo pedido'}</h2>
+              <button type='button' onClick={resetForm} aria-label='Cerrar' className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600'>
                 <svg className='h-6 w-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                   <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
                 </svg>
               </button>
             </div>
 
-            <div className='space-y-4 p-5'>
+            <div className='admin-modal-body space-y-4 p-5'>
               <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
                 <div className='sm:col-span-2'>
                   <label className='mb-1.5 block text-xs font-medium text-gray-600'>Cliente</label>
@@ -520,7 +520,7 @@ export default function HikariOrders() {
               </div>
             </div>
 
-            <div className='flex gap-3 border-t border-gray-100 p-5'>
+            <div className='admin-modal-footer flex gap-3 border-t border-gray-100 p-5'>
               <button type='button' onClick={resetForm} className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50'>
                 Cancelar
               </button>

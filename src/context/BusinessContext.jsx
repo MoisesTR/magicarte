@@ -212,6 +212,11 @@ export function BusinessProvider({ children }) {
     }
   }, [isAdmin, currentBusiness])
 
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-admin', isAdmin)
+    return () => document.documentElement.removeAttribute('data-admin')
+  }, [isAdmin])
+
   // Magic Arte's id — public-facing pages always scope to this, regardless of
   // which business is selected in the admin switcher, and regardless of
   // whether the signed-in user (if any) has admin access to it.

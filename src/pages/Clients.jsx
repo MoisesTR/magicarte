@@ -203,12 +203,6 @@ export default function Clients() {
     fetchClients()
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    navigate('/admin')
-  }
-
   if (checkingAuth) {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
@@ -227,11 +221,11 @@ export default function Clients() {
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
       <div className='max-w-6xl mx-auto px-4'>
-        <div className='bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
+        <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
           <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3'>
             <div>
               <h1 className='text-xl font-bold text-gray-800'>Clientes</h1>
-              <p className='text-xs text-gray-400 mt-0.5'>{clients.length} cliente{clients.length !== 1 ? 's' : ''} guardado{clients.length !== 1 ? 's' : ''}</p>
+              <p className='text-xs text-gray-400 mt-0.5'>{clients.length} cliente{clients.length !== 1 ? 's' : ''} guardado{clients.length !== 1 ? 's' : ''} · {currentBusiness?.name}</p>
             </div>
             <div className='flex flex-wrap gap-2'>
 	              <button
@@ -243,12 +237,6 @@ export default function Clients() {
                 className='px-4 py-2 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity'
               >
                 + Nuevo Cliente
-              </button>
-              <button
-                onClick={handleLogout}
-                className='px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-100 transition-colors'
-              >
-                Cerrar Sesión
               </button>
             </div>
           </div>
@@ -435,20 +423,20 @@ export default function Clients() {
         )}
 
         {showForm && (
-          <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
-            <div className='bg-white rounded-2xl shadow-xl w-full max-w-xl'>
-              <div className='flex items-center justify-between p-5 border-b border-gray-100'>
-                <h2 className='text-lg font-bold text-gray-900'>
+          <div className='admin-modal-backdrop'>
+            <div role='dialog' aria-modal='true' aria-labelledby='client-form-title' className='admin-modal-panel max-w-xl bg-white'>
+              <div className='admin-modal-header flex items-center justify-between p-5 border-b border-gray-100'>
+                <h2 id='client-form-title' className='text-lg font-bold text-gray-900'>
                   {editingClient ? 'Editar cliente' : 'Nuevo cliente'}
                 </h2>
-                <button onClick={resetForm} className='text-gray-400 hover:text-gray-600'>
+                <button onClick={resetForm} aria-label='Cerrar' className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600'>
                   <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                     <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
                   </svg>
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className='p-5 space-y-4'>
+              <form onSubmit={handleSubmit} className='admin-modal-body p-5 space-y-4'>
                 <div>
                   <label className='block text-xs font-medium text-gray-600 mb-1.5'>Nombre *</label>
                   <input
@@ -526,9 +514,9 @@ export default function Clients() {
         )}
 
         {confirmDeleteId && (
-          <div className='fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4'>
-            <div className='bg-white rounded-2xl shadow-xl w-full max-w-sm p-5'>
-              <h2 className='text-lg font-bold text-gray-900'>Eliminar cliente</h2>
+          <div className='admin-modal-backdrop'>
+            <div role='alertdialog' aria-modal='true' aria-labelledby='delete-client-title' className='admin-modal-panel max-w-sm bg-white p-5'>
+              <h2 id='delete-client-title' className='text-lg font-bold text-gray-900'>Eliminar cliente</h2>
               <p className='text-sm text-gray-500 mt-2'>Esta acción no elimina pedidos existentes, solo el registro del catálogo de clientes.</p>
               <div className='flex gap-3 mt-5'>
                 <button

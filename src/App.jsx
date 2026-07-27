@@ -32,24 +32,27 @@ const Inventory = lazy(() => import('./pages/Inventory'))
 const ORDERS_BY_BUSINESS = {
   hikari: HikariOrders,
   'joyeria-trigueros': JoyeriaOrders,
-  'ema-accesorios': JoyeriaOrders,
 }
 const PRODUCTS_BY_BUSINESS = {
   hikari: HikariProducts,
   'joyeria-trigueros': JoyeriaProducts,
-  'ema-accesorios': JoyeriaProducts,
 }
 
 function BusinessOrders() {
   const { business } = useParams()
   const Page = ORDERS_BY_BUSINESS[business] || MagicArteOrders
-  return <Page />
+  return <Page key={business} />
 }
 
 function BusinessProducts() {
   const { business } = useParams()
   const Page = PRODUCTS_BY_BUSINESS[business] || MagicArteProducts
-  return <Page />
+  return <Page key={business} />
+}
+
+function BusinessScopedPage({ page: Page }) {
+  const { business } = useParams()
+  return <Page key={business} />
 }
 
 // Bare /admin → last-used business (or Magic Arte), Orders tab.
@@ -104,9 +107,10 @@ export default function App() {
                 <Route path='/admin' element={<AdminIndexRedirect />} />
                 <Route path='/admin/:business/orders' element={<BusinessOrders />} />
                 <Route path='/admin/:business/products' element={<BusinessProducts />} />
-                <Route path='/admin/:business/inventory' element={<Inventory />} />
-                <Route path='/admin/:business/clients' element={<Clients />} />
-                <Route path='/admin/:business/finances' element={<Finances />} />
+                <Route path='/admin/:business/inventory' element={<BusinessScopedPage page={Inventory} />} />
+                <Route path='/admin/:business/clients' element={<BusinessScopedPage page={Clients} />} />
+                <Route path='/admin/:business/finances' element={<BusinessScopedPage page={Finances} />} />
+                <Route path='/admin/all/inventory' element={<Navigate to='/admin/magicarte/inventory' replace />} />
                 {/* Legacy un-scoped admin URLs → Magic Arte. */}
                 <Route path='/admin/orders' element={<Navigate to='/admin/magicarte/orders' replace />} />
                 <Route path='/admin/products' element={<Navigate to='/admin/magicarte/products' replace />} />
