@@ -30,8 +30,21 @@ export function createInventoryItem(item, businessId) {
     .single()
 }
 
-export function updateInventoryItem(id, item) {
-  return supabase.from('inventory_items').update(item).eq('id', id).select().single()
+export function updateInventoryItem(id, item, businessId) {
+  return supabase
+    .from('inventory_items')
+    .update(item)
+    .eq('id', id)
+    .eq('business_id', businessId)
+    .select()
+    .single()
+}
+
+/** Hide an item from inventory without erasing its ledger history. */
+export function removeInventoryItem(id, businessId) {
+  return supabase
+    .rpc('remove_inventory_item', { p_item_id: id, p_business_id: businessId })
+    .single()
 }
 
 export function addInventoryMovement(movement, businessId) {

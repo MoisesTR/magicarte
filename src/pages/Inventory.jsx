@@ -8,6 +8,7 @@ import {
   createInventoryItem,
   fetchInventoryMovements,
   fetchInventoryStock,
+  removeInventoryItem,
   updateInventoryItem,
 } from '../data/inventory'
 
@@ -260,6 +261,8 @@ export default function Inventory() {
   const [showFilamentForm, setShowFilamentForm] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [editingFilament, setEditingFilament] = useState(null)
+  const [removalTarget, setRemovalTarget] = useState(null)
+  const [removing, setRemoving] = useState(false)
   const [itemForm, setItemForm] = useState(itemFormInitial)
   const [movementForm, setMovementForm] = useState(movementFormInitial)
   const [filamentForm, setFilamentForm] = useState(filamentFormInitial)
@@ -273,6 +276,7 @@ export default function Inventory() {
   }, [])
 
   useEffect(() => {
+    setRemovalTarget(null)
     if (user && currentBusinessId) loadInventory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentBusinessId])
@@ -290,25 +294,26 @@ export default function Inventory() {
     setLoading(false)
   }
 
+  const inventoryItems = useMemo(() => items.filter((item) => !item.deleted_at), [items])
   const visibleItems = useMemo(() => {
-    if (filter === 'low') return items.filter((item) => item.is_low_stock && item.is_active)
-    if (filter === 'all') return items
-    return items.filter((item) => item.is_active)
-  }, [filter, items])
+    if (filter === 'low') return inventoryItems.filter((item) => item.is_low_stock && item.is_active)
+    if (filter === 'all') return inventoryItems
+    return inventoryItems.filter((item) => item.is_active)
+  }, [filter, inventoryItems])
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
-  const activeItems = useMemo(() => items.filter((item) => item.is_active), [items])
+  const activeItems = useMemo(() => inventoryItems.filter((item) => item.is_active), [inventoryItems])
   const unitOptions = useMemo(
-    () => uniqueTextOptions([...INVENTORY_UNIT_OPTIONS, ...items.map((item) => item.unit)]),
-    [items],
+    () => uniqueTextOptions([...INVENTORY_UNIT_OPTIONS, ...inventoryItems.map((item) => item.unit)]),
+    [inventoryItems],
   )
   const supplierOptions = useMemo(
-    () => uniqueTextOptions([...DEFAULT_SUPPLIER_OPTIONS, ...items.map((item) => item.supplier_name)]),
-    [items],
+    () => uniqueTextOptions([...DEFAULT_SUPPLIER_OPTIONS, ...inventoryItems.map((item) => item.supplier_name)]),
+    [inventoryItems],
   )
   const isHikari = currentBusiness?.slug === 'hikari'
-  const lowStockCount = items.filter((item) => item.is_low_stock && item.is_active).length
-  const totalValue = items
+  const lowStockCount = inventoryItems.filter((item) => item.is_low_stock && item.is_active).length
+  const totalValue = inventoryItems
     .filter((item) => item.is_active)
     .reduce((total, item) => total + Number(item.current_stock || 0) * Number(item.unit_cost || 0), 0)
   const movementItem = itemById.get(movementForm.inventory_item_id)
@@ -416,6 +421,32 @@ export default function Inventory() {
     setShowMovementForm(true)
   }
 
+  const confirmRemoval = (item) => {
+    setRemovalTarget(item)
+  }
+
+  const removeItem = async () => {
+    if (!removalTarget || removing) return
+
+    setRemoving(true)
+    try {
+      const { data, error } = await removeInventoryItem(removalTarget.id, currentBusinessId)
+      if (error) throw error
+
+      if (Number(data?.movement_count || 0) > 0) {
+        toast.success('Artículo eliminado del inventario. Su historial se conservó.')
+      } else {
+        toast.success('Artículo eliminado del inventario.')
+      }
+      setRemovalTarget(null)
+      await loadInventory()
+    } catch (error) {
+      toast.error(`No se pudo eliminar el artículo: ${error.message}`)
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const saveFilament = async (event) => {
     event.preventDefault()
     const color = filamentForm.color.trim()
@@ -466,7 +497,7 @@ export default function Inventory() {
         is_active: editingFilament ? editingFilament.is_active : true,
       }
       if (editingFilament) {
-        const { error } = await updateInventoryItem(editingFilament.id, item)
+        const { error } = await updateInventoryItem(editingFilament.id, item, currentBusinessId)
         if (error) throw error
         toast.success(`Filamento ${color} actualizado`)
       } else {
@@ -520,7 +551,7 @@ export default function Inventory() {
     try {
       const item = normaliseItem(itemForm)
       if (editingItem) {
-        const { error } = await updateInventoryItem(editingItem.id, item)
+        const { error } = await updateInventoryItem(editingItem.id, item, currentBusinessId)
         if (error) throw error
         toast.success('Artículo actualizado')
       } else {
@@ -631,7 +662,7 @@ export default function Inventory() {
         </div>
 
         <div className='mb-5 grid gap-3 sm:grid-cols-3'>
-          <Stat label='Artículos activos' value={items.filter((item) => item.is_active).length} />
+          <Stat label='Artículos activos' value={inventoryItems.filter((item) => item.is_active).length} />
           <Stat label='Bajo stock' value={lowStockCount} danger={lowStockCount > 0} />
           <Stat label='Valor estimado' value={money(totalValue)} />
         </div>
@@ -681,6 +712,7 @@ export default function Inventory() {
                   <div className='mt-3 grid grid-cols-2 gap-2'>
                     <button onClick={() => openMovement(item)} disabled={!item.is_active} className='min-h-10 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
                     <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='min-h-10 rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
+                    <button onClick={() => confirmRemoval(item)} className='col-span-2 min-h-10 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50'>Eliminar del inventario</button>
                   </div>
                 </article>
               ))}
@@ -719,9 +751,10 @@ export default function Inventory() {
                         {!item.is_active ? <Badge tone='gray'>Inactivo</Badge> : item.is_low_stock ? <Badge tone='red'>Reponer</Badge> : <Badge tone='green'>Disponible</Badge>}
                       </td>
                       <td className='px-4 py-3'>
-                        <div className='flex justify-end gap-2'>
+                        <div className='flex flex-wrap justify-end gap-2'>
                           <button onClick={() => openMovement(item)} disabled={!item.is_active} className='rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
                           <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
+                          <button onClick={() => confirmRemoval(item)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50'>Eliminar</button>
                         </div>
                       </td>
                     </tr>
@@ -886,6 +919,27 @@ export default function Inventory() {
             </div>
             <FormActions onCancel={resetMovementForm} saving={saving} label={movementSubmitLabel} color={currentBusiness?.primary_color} />
           </form>
+        </Modal>
+      )}
+
+      {removalTarget && (
+        <Modal title='Eliminar del inventario' onClose={() => !removing && setRemovalTarget(null)}>
+          <div className='space-y-4'>
+            <div>
+              <p className='font-semibold text-gray-800'>¿Quieres eliminar “{removalTarget.name}”?</p>
+              <p className='mt-2 text-sm leading-relaxed text-gray-500'>Dejará de aparecer en el inventario. Si ya tiene entradas o salidas, conservaremos ese historial para no alterar tus costos ni la contabilidad.</p>
+            </div>
+            {Number(removalTarget.current_stock || 0) !== 0 && (
+              <div className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
+                <p className='font-semibold'>Existencia registrada: {removalTarget.inventory_kind === 'filament' ? filamentAmount(removalTarget.current_stock, removalTarget.grams_per_spool) : `${amount(removalTarget.current_stock)} ${removalTarget.unit}`}</p>
+                <p className='mt-1 text-xs leading-relaxed'>Eliminarlo no registra una salida. Si necesitas corregir el conteo, cancela y registra primero un ajuste de inventario.</p>
+              </div>
+            )}
+            <div className='admin-modal-footer -mx-5 -mb-5 flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-5 sm:flex-row'>
+              <button type='button' disabled={removing} onClick={() => setRemovalTarget(null)} className='w-full rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 sm:w-auto'>Cancelar</button>
+              <button type='button' disabled={removing} onClick={removeItem} className='w-full rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 sm:flex-1'>{removing ? 'Eliminando...' : 'Eliminar del inventario'}</button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
