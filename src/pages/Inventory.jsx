@@ -64,6 +64,41 @@ const MOVEMENT_TYPES = {
   return: 'Devolución',
 }
 
+const INVENTORY_UNIT_OPTIONS = [
+  'unidad',
+  'pieza',
+  'par',
+  'set',
+  'paquete',
+  'caja',
+  'bolsa',
+  'docena',
+  'rollo',
+  'hoja',
+  'spool',
+  'g',
+  'kg',
+  'm',
+  'cm',
+  'litro',
+  'ml',
+]
+const QUICK_UNIT_OPTIONS = ['unidad', 'pieza', 'par', 'paquete', 'caja', 'bolsa']
+const DEFAULT_SUPPLIER_OPTIONS = ['Amazon', 'Temu', 'AliExpress', 'SHEIN', 'Proveedor local']
+
+function uniqueTextOptions(values) {
+  const seen = new Set()
+  return values
+    .map((value) => String(value || '').trim())
+    .filter((value) => {
+      if (!value) return false
+      const key = value.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
 const itemFormInitial = {
   name: '',
   sku: '',
@@ -254,6 +289,14 @@ export default function Inventory() {
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
   const activeItems = useMemo(() => items.filter((item) => item.is_active), [items])
+  const unitOptions = useMemo(
+    () => uniqueTextOptions([...INVENTORY_UNIT_OPTIONS, ...items.map((item) => item.unit)]),
+    [items],
+  )
+  const supplierOptions = useMemo(
+    () => uniqueTextOptions([...DEFAULT_SUPPLIER_OPTIONS, ...items.map((item) => item.supplier_name)]),
+    [items],
+  )
   const isHikari = currentBusiness?.slug === 'hikari'
   const lowStockCount = items.filter((item) => item.is_low_stock && item.is_active).length
   const totalValue = items
@@ -735,7 +778,17 @@ export default function Inventory() {
                 <p className='font-semibold'>Existencia inicial: {filamentAmount(filamentForm.quantity_unit === 'spool' ? Number(filamentForm.quantity || 0) * Number(filamentForm.grams_per_spool || 0) : Number(filamentForm.quantity || 0), filamentForm.grams_per_spool)}</p>
                 {filamentForm.purchase_cost !== '' && <><PurchaseConversion form={filamentForm} className='text-sky-800' /><p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(filamentLandedCost.totalNio)}</p><p className='mt-0.5 text-xs text-sky-800'>Costo por gramo: {preciseMoney(filamentLandedCost.totalNio / ((filamentForm.quantity_unit === 'spool' ? Number(filamentForm.quantity || 0) * Number(filamentForm.grams_per_spool || 0) : Number(filamentForm.quantity || 0)) || 1))}</p>{filamentForm.quantity_unit === 'spool' && <p className='mt-0.5 text-xs text-sky-800'>Costo por spool: {money(filamentLandedCost.totalNio / (Number(filamentForm.quantity) || 1))}</p>}</>}
               </div></>}
-              <Field className='sm:col-span-2' label='Proveedor'><input value={filamentForm.supplier_name} onChange={(event) => setFilamentForm({ ...filamentForm, supplier_name: event.target.value })} placeholder='Opcional' className='field' /></Field>
+              <SuggestedTextField
+                id='filament-supplier'
+                className='sm:col-span-2'
+                label='Proveedor'
+                value={filamentForm.supplier_name}
+                onChange={(supplier_name) => setFilamentForm((current) => ({ ...current, supplier_name }))}
+                options={supplierOptions}
+                quickOptions={DEFAULT_SUPPLIER_OPTIONS}
+                placeholder='Ej. Amazon, Temu o proveedor local'
+                help='Elige uno, busca un proveedor ya usado en este negocio o escribe uno nuevo.'
+              />
               <Field className='sm:col-span-2' label='Notas'><textarea rows={2} value={filamentForm.notes} onChange={(event) => setFilamentForm({ ...filamentForm, notes: event.target.value })} placeholder='Marca, acabado, lote...' className='field' /></Field>
             </div>
             <FormActions onCancel={resetFilamentForm} saving={saving} label={editingFilament ? 'Guardar cambios' : 'Agregar filamento'} color={currentBusiness?.primary_color} />
@@ -750,7 +803,17 @@ export default function Inventory() {
               <Field className='sm:col-span-2' label='Nombre'><input required value={itemForm.name} onChange={(event) => setItemForm({ ...itemForm, name: event.target.value })} className='field' /></Field>
               <Field label='Código / SKU'><input value={itemForm.sku} onChange={(event) => setItemForm({ ...itemForm, sku: event.target.value })} className='field' /></Field>
               <Field label='Tipo'><select value={itemForm.item_type} onChange={(event) => setItemForm({ ...itemForm, item_type: event.target.value })} className='field'>{Object.entries(ITEM_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-              <Field label='Unidad'><input required value={itemForm.unit} onChange={(event) => setItemForm({ ...itemForm, unit: event.target.value })} placeholder='unidad, gramo, caja...' className='field' /></Field>
+              <SuggestedTextField
+                id='inventory-item-unit'
+                label='Unidad de medida'
+                value={itemForm.unit}
+                onChange={(unit) => setItemForm((current) => ({ ...current, unit }))}
+                options={unitOptions}
+                quickOptions={QUICK_UNIT_OPTIONS}
+                placeholder='Elige o escribe otra unidad'
+                help='Así contarás el stock. Ej.: 24 placas = unidad; 6 pares de aretes = par.'
+                required
+              />
               {!editingItem && <>
                 <Field label='Cantidad que recibiste'><input type='number' min='0' step='0.001' value={itemForm.opening_quantity} onChange={(event) => setItemForm({ ...itemForm, opening_quantity: event.target.value })} placeholder='Ej. 100' className='field' /></Field>
                 <PurchaseCostFields form={itemForm} setForm={setItemForm} />
@@ -758,7 +821,17 @@ export default function Inventory() {
               </>}
               <Field label='Alerta bajo stock'><input type='number' min='0' step='0.001' value={itemForm.low_stock_threshold} onChange={(event) => setItemForm({ ...itemForm, low_stock_threshold: event.target.value })} placeholder='0' className='field' /></Field>
               <Field label={editingItem ? 'Costo promedio actual (C$)' : 'Costo por unidad manual (opcional)'}><input type='number' min='0' step='0.01' value={itemForm.unit_cost} onChange={(event) => setItemForm({ ...itemForm, unit_cost: event.target.value })} placeholder='0' className='field' /></Field>
-              <Field className='sm:col-span-2' label='Proveedor'><input value={itemForm.supplier_name} onChange={(event) => setItemForm({ ...itemForm, supplier_name: event.target.value })} className='field' /></Field>
+              <SuggestedTextField
+                id='inventory-item-supplier'
+                className='sm:col-span-2'
+                label='Proveedor'
+                value={itemForm.supplier_name}
+                onChange={(supplier_name) => setItemForm((current) => ({ ...current, supplier_name }))}
+                options={supplierOptions}
+                quickOptions={DEFAULT_SUPPLIER_OPTIONS}
+                placeholder='Ej. Amazon, Temu o proveedor local'
+                help='Proveedor es quien te vendió el artículo. El courier se registra aparte como delivery.'
+              />
               <Field className='sm:col-span-2' label='Notas'><textarea rows={2} value={itemForm.notes} onChange={(event) => setItemForm({ ...itemForm, notes: event.target.value })} className='field' /></Field>
               {editingItem && <label className='flex items-center gap-2 text-sm text-gray-600 sm:col-span-2'><input type='checkbox' checked={itemForm.is_active} onChange={(event) => setItemForm({ ...itemForm, is_active: event.target.checked })} />Activo en inventario</label>}
             </div>
@@ -868,6 +941,47 @@ function MovementCost({ movement }) {
       <span className='block'>{originalMoney(movement.original_purchase_cost, purchaseCurrency)} + delivery {originalMoney(movement.original_delivery_cost, deliveryCurrency)}</span>
       {convertedFromUsd && <span className='block'>TC {Number(movement.exchange_rate_to_nio || 0).toLocaleString('es-NI', { maximumFractionDigits: 4 })} · puesto {money(Number(movement.purchase_cost) + Number(movement.delivery_cost || 0))}</span>}
     </span>
+  )
+}
+
+function SuggestedTextField({ id, label, value, onChange, options, quickOptions = [], placeholder, help, required = false, className = '' }) {
+  const selectedValue = String(value || '').toLowerCase()
+
+  return (
+    <div className={className}>
+      <label htmlFor={id} className='mb-1.5 block text-xs font-medium text-gray-600'>{label}</label>
+      {quickOptions.length > 0 && (
+        <div className='mb-2 flex flex-wrap gap-1.5' role='group' aria-label={`Opciones rápidas para ${label.toLowerCase()}`}>
+          {quickOptions.map((option) => {
+            const selected = selectedValue === option.toLowerCase()
+            return (
+              <button
+                key={option}
+                type='button'
+                aria-pressed={selected}
+                onClick={() => onChange(option)}
+                className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${selected ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                {option}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <input
+        id={id}
+        required={required}
+        list={`${id}-options`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className='field'
+      />
+      <datalist id={`${id}-options`}>
+        {options.map((option) => <option key={option} value={option} />)}
+      </datalist>
+      {help && <span className='mt-1 block text-[11px] leading-relaxed text-gray-400'>{help}</span>}
+    </div>
   )
 }
 
