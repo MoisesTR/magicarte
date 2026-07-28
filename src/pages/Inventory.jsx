@@ -64,6 +64,16 @@ const MOVEMENT_TYPES = {
   return: 'Devolución',
 }
 
+const MOVEMENT_FORM_LABELS = {
+  purchase: 'Compra o reposición (entra)',
+  sale: 'Venta (sale)',
+  consumption: 'Usado en un pedido (sale)',
+  adjustment: 'Corrección de inventario',
+  return: 'Devolución del cliente (entra)',
+}
+
+const FIXED_EXCHANGE_RATE_TO_NIO = 36.6243
+
 const INVENTORY_UNIT_OPTIONS = [
   'unidad',
   'pieza',
@@ -106,10 +116,9 @@ const itemFormInitial = {
   unit: 'unidad',
   opening_quantity: '',
   purchase_cost: '',
-  purchase_currency: 'NIO',
+  purchase_currency: 'USD',
   delivery_cost: '',
-  delivery_currency: 'NIO',
-  exchange_rate: '',
+  delivery_currency: 'USD',
   low_stock_threshold: '',
   unit_cost: '',
   supplier_name: '',
@@ -124,10 +133,9 @@ const movementFormInitial = {
   quantity: '',
   unit_cost: '',
   purchase_cost: '',
-  purchase_currency: 'NIO',
+  purchase_currency: 'USD',
   delivery_cost: '',
-  delivery_currency: 'NIO',
-  exchange_rate: '',
+  delivery_currency: 'USD',
   note: '',
   quantity_unit: 'g',
 }
@@ -140,10 +148,9 @@ const filamentFormInitial = {
   grams_per_spool: '1000',
   low_stock_quantity: '',
   purchase_cost: '',
-  purchase_currency: 'NIO',
+  purchase_currency: 'USD',
   delivery_cost: '',
-  delivery_currency: 'NIO',
-  exchange_rate: '',
+  delivery_currency: 'USD',
   supplier_name: '',
   notes: '',
 }
@@ -151,6 +158,7 @@ const filamentFormInitial = {
 const money = (value) => `C$ ${Number(value || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const preciseMoney = (value) => `C$ ${Number(value || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
 const amount = (value) => Number(value || 0).toLocaleString('es-NI', { maximumFractionDigits: 3 })
+const exchangeRate = (value) => Number(value || 0).toLocaleString('es-NI', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 
 const originalMoney = (value, currency = 'NIO') => {
   const formatted = Number(value || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -163,10 +171,14 @@ function usesUsd(form) {
   return purchaseUsesUsd || deliveryUsesUsd
 }
 
+function hasUsdCurrency(form) {
+  return form.purchase_currency === 'USD' || form.delivery_currency === 'USD'
+}
+
 function landedCost(form) {
   const purchaseOriginal = Number(form.purchase_cost) || 0
   const deliveryOriginal = Number(form.delivery_cost) || 0
-  const exchangeRate = usesUsd(form) ? Number(form.exchange_rate) || 0 : 1
+  const exchangeRate = usesUsd(form) ? FIXED_EXCHANGE_RATE_TO_NIO : 1
   const purchaseNio = Math.round((purchaseOriginal * (form.purchase_currency === 'USD' ? exchangeRate : 1) + Number.EPSILON) * 100) / 100
   const deliveryNio = Math.round((deliveryOriginal * (form.delivery_currency === 'USD' ? exchangeRate : 1) + Number.EPSILON) * 100) / 100
 
@@ -191,9 +203,6 @@ function purchaseCostError(form, { required = false } = {}) {
   const deliveryCost = Number(form.delivery_cost || 0)
   if (!Number.isFinite(packageCost) || packageCost < 0) return 'El costo del paquete no puede ser negativo'
   if (!Number.isFinite(deliveryCost) || deliveryCost < 0) return 'El delivery no puede ser negativo'
-  if (usesUsd(form) && !(Number(form.exchange_rate) > 0)) {
-    return 'Escribe la tasa de cambio en córdobas por US$1'
-  }
   return null
 }
 
@@ -310,6 +319,9 @@ export default function Inventory() {
   const itemLandedCost = landedCost(itemForm)
   const filamentLandedCost = landedCost(filamentForm)
   const movementLandedCost = landedCost(movementForm)
+  const movementSubmitLabel = movementForm.movement_type === 'adjustment'
+    ? movementForm.adjustment_direction === 'out' ? 'Registrar salida' : 'Registrar entrada'
+    : ['sale', 'consumption'].includes(movementForm.movement_type) ? 'Registrar salida' : 'Registrar entrada'
 
   const resetItemForm = () => {
     setShowItemForm(false)
@@ -382,10 +394,9 @@ export default function Inventory() {
       unit: item.unit || 'unidad',
       opening_quantity: '',
       purchase_cost: '',
-      purchase_currency: 'NIO',
+      purchase_currency: 'USD',
       delivery_cost: '',
-      delivery_currency: 'NIO',
-      exchange_rate: '',
+      delivery_currency: 'USD',
       low_stock_threshold: item.low_stock_threshold ?? '',
       unit_cost: item.unit_cost ?? '',
       supplier_name: item.supplier_name || '',
@@ -583,7 +594,7 @@ export default function Inventory() {
         note: movementForm.note.trim() || null,
       }, currentBusinessId)
       if (error) throw error
-      toast.success('Movimiento registrado')
+      toast.success('Inventario actualizado')
       resetMovementForm()
       loadInventory()
     } catch (error) {
@@ -604,11 +615,11 @@ export default function Inventory() {
           <div>
             <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>{currentBusiness?.name}</p>
             <h1 className='text-xl font-bold text-gray-800'>Inventario</h1>
-            <p className='mt-0.5 text-sm text-gray-500'>{isHikari ? 'Filamentos por color, existencias y movimientos con historial.' : 'Artículos, existencias y movimientos con historial.'}</p>
+            <p className='mt-0.5 text-sm text-gray-500'>{isHikari ? 'Filamentos por color, existencias e historial de entradas y salidas.' : 'Artículos, existencias e historial de entradas y salidas.'}</p>
           </div>
           <div className='flex flex-wrap gap-2'>
             <button onClick={() => openMovement()} disabled={!activeItems.length} className='rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50'>
-              + Movimiento
+              + Entrada / salida
             </button>
             {isHikari && <button onClick={openCreateFilament} className='rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90' style={{ backgroundColor: currentBusiness?.primary_color || '#B08A3C' }}>
               + Filamento
@@ -668,7 +679,7 @@ export default function Inventory() {
                     <div><p className='text-[11px] font-semibold uppercase tracking-wide text-gray-400'>Costo promedio</p><p className='mt-1 font-bold text-gray-800'>{money(item.unit_cost)}</p></div>
                   </div>
                   <div className='mt-3 grid grid-cols-2 gap-2'>
-                    <button onClick={() => openMovement(item)} disabled={!item.is_active} className='min-h-10 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Movimiento</button>
+                    <button onClick={() => openMovement(item)} disabled={!item.is_active} className='min-h-10 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
                     <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='min-h-10 rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
                   </div>
                 </article>
@@ -709,7 +720,7 @@ export default function Inventory() {
                       </td>
                       <td className='px-4 py-3'>
                         <div className='flex justify-end gap-2'>
-                          <button onClick={() => openMovement(item)} disabled={!item.is_active} className='rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Movimiento</button>
+                          <button onClick={() => openMovement(item)} disabled={!item.is_active} className='rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
                           <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
                         </div>
                       </td>
@@ -724,12 +735,12 @@ export default function Inventory() {
         <section className='mt-6 overflow-hidden rounded-2xl bg-white shadow-soft'>
           <div className='flex items-center justify-between border-b border-gray-100 px-5 py-4'>
             <div>
-              <h2 className='font-bold text-gray-800'>Movimientos recientes</h2>
-              <p className='text-xs text-gray-400'>El historial no se modifica: los errores se corrigen con un ajuste.</p>
+              <h2 className='font-bold text-gray-800'>Historial de inventario</h2>
+              <p className='text-xs text-gray-400'>Muestra cada entrada y salida. Los errores se corrigen con un ajuste.</p>
             </div>
           </div>
           {movements.length === 0 ? (
-            <p className='p-5 text-sm text-gray-400'>Todavía no hay movimientos.</p>
+            <p className='p-5 text-sm text-gray-400'>Todavía no hay entradas ni salidas.</p>
           ) : (
             <div className='divide-y divide-gray-100'>
               {movements.map((movement) => {
@@ -841,8 +852,11 @@ export default function Inventory() {
       )}
 
       {showMovementForm && (
-        <Modal title='Registrar movimiento' onClose={resetMovementForm}>
+        <Modal title='Actualizar existencias' onClose={resetMovementForm}>
           <form onSubmit={saveMovement} className='space-y-4'>
+            <p className='rounded-xl bg-sky-50 p-3 text-sm text-sky-900'>
+              Úsalo después de crear el artículo: una compra o devolución aumenta el stock; una venta o uso en pedido lo reduce; un ajuste corrige el conteo.
+            </p>
             <Field label='Artículo'>
               <select required value={movementForm.inventory_item_id} onChange={(event) => {
                 const item = itemById.get(event.target.value)
@@ -853,7 +867,7 @@ export default function Inventory() {
               </select>
             </Field>
             <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <Field label='Movimiento'><select value={movementForm.movement_type} onChange={(event) => setMovementForm({ ...movementForm, movement_type: event.target.value })} className='field'>{['purchase', 'sale', 'consumption', 'adjustment', 'return'].map((value) => <option key={value} value={value}>{MOVEMENT_TYPES[value]}</option>)}</select></Field>
+              <Field label='¿Qué pasó con el stock?'><select value={movementForm.movement_type} onChange={(event) => setMovementForm({ ...movementForm, movement_type: event.target.value })} className='field'>{['purchase', 'sale', 'consumption', 'adjustment', 'return'].map((value) => <option key={value} value={value}>{MOVEMENT_FORM_LABELS[value]}</option>)}</select></Field>
               {movementForm.movement_type === 'adjustment' ? <Field label='Dirección'><select value={movementForm.adjustment_direction} onChange={(event) => setMovementForm({ ...movementForm, adjustment_direction: event.target.value })} className='field'><option value='in'>Aumentar stock</option><option value='out'>Reducir stock</option></select></Field> : <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
               {movementForm.movement_type === 'adjustment' && <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
               {movementIsFilament && <Field label='Registrar como'><select value={movementForm.quantity_unit} onChange={(event) => setMovementForm({ ...movementForm, quantity_unit: event.target.value })} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>}
@@ -870,7 +884,7 @@ export default function Inventory() {
               ) : <Field label='Costo unitario (opcional)'><input type='number' min='0' step='0.01' value={movementForm.unit_cost} onChange={(event) => setMovementForm({ ...movementForm, unit_cost: event.target.value })} className='field' /></Field>}
               <Field className='sm:col-span-2' label='Nota'><textarea rows={2} value={movementForm.note} onChange={(event) => setMovementForm({ ...movementForm, note: event.target.value })} placeholder='Factura, motivo del ajuste, pedido...' className='field' /></Field>
             </div>
-            <FormActions onCancel={resetMovementForm} saving={saving} label='Registrar movimiento' color={currentBusiness?.primary_color} />
+            <FormActions onCancel={resetMovementForm} saving={saving} label={movementSubmitLabel} color={currentBusiness?.primary_color} />
           </form>
         </Modal>
       )}
@@ -887,8 +901,8 @@ function PurchaseCostFields({ form, setForm, purchaseRequired = false }) {
         <div className='grid grid-cols-[minmax(0,1fr)_7rem] gap-2'>
           <input required={purchaseRequired} type='number' min='0' step='0.01' value={form.purchase_cost} onChange={(event) => update('purchase_cost', event.target.value)} placeholder={form.purchase_currency === 'USD' ? 'Ej. 25' : 'Ej. 1500'} className='field' />
           <select value={form.purchase_currency} onChange={(event) => update('purchase_currency', event.target.value)} className='field' aria-label='Moneda del costo del paquete'>
-            <option value='NIO'>C$</option>
             <option value='USD'>US$</option>
+            <option value='NIO'>C$</option>
           </select>
         </div>
       </Field>
@@ -896,16 +910,17 @@ function PurchaseCostFields({ form, setForm, purchaseRequired = false }) {
         <div className='grid grid-cols-[minmax(0,1fr)_7rem] gap-2'>
           <input type='number' min='0' step='0.01' value={form.delivery_cost} onChange={(event) => update('delivery_cost', event.target.value)} placeholder={form.delivery_currency === 'USD' ? 'Ej. 5' : 'Ej. 300'} className='field' />
           <select value={form.delivery_currency} onChange={(event) => update('delivery_currency', event.target.value)} className='field' aria-label='Moneda del delivery'>
-            <option value='NIO'>C$</option>
             <option value='USD'>US$</option>
+            <option value='NIO'>C$</option>
           </select>
         </div>
       </Field>
-      {usesUsd(form) && (
-        <Field className='sm:col-span-2' label='Tasa de cambio (C$ por US$1)'>
-          <input required={purchaseRequired || form.purchase_cost !== '' || form.delivery_cost !== ''} type='number' min='0.000001' step='0.0001' value={form.exchange_rate} onChange={(event) => update('exchange_rate', event.target.value)} placeholder='Ej. 36.80' className='field' />
-          <span className='mt-1 block text-[11px] text-gray-400'>Usa la tasa real que aplicó tu tarjeta, banco o courier para esta compra.</span>
-        </Field>
+      {hasUsdCurrency(form) && (
+        <div className='rounded-xl border border-gray-200 bg-gray-50 p-3 sm:col-span-2'>
+          <p className='text-xs font-medium text-gray-600'>Tasa de cambio fija</p>
+          <p className='mt-0.5 font-bold text-gray-800'>US$1 = C$ {exchangeRate(FIXED_EXCHANGE_RATE_TO_NIO)}</p>
+          <p className='mt-1 text-[11px] text-gray-400'>Se aplica automáticamente y no se puede modificar.</p>
+        </div>
       )}
     </>
   )
@@ -917,7 +932,7 @@ function PurchaseConversion({ form, className = 'text-amber-800' }) {
     <div className={`space-y-0.5 text-xs ${className}`}>
       <p>Artículos: {originalMoney(cost.purchaseOriginal, form.purchase_currency)}{form.purchase_currency === 'USD' ? ` → ${money(cost.purchaseNio)}` : ''}</p>
       <p>Delivery: {originalMoney(cost.deliveryOriginal, form.delivery_currency)}{form.delivery_currency === 'USD' ? ` → ${money(cost.deliveryNio)}` : ''}</p>
-      {usesUsd(form) && <p>Tasa usada: US$1 = {money(cost.exchangeRate)}</p>}
+      {usesUsd(form) && <p>Tasa fija: US$1 = C$ {exchangeRate(cost.exchangeRate)}</p>}
     </div>
   )
 }
@@ -939,7 +954,7 @@ function MovementCost({ movement }) {
   return (
     <span className='max-w-80 text-xs text-gray-400'>
       <span className='block'>{originalMoney(movement.original_purchase_cost, purchaseCurrency)} + delivery {originalMoney(movement.original_delivery_cost, deliveryCurrency)}</span>
-      {convertedFromUsd && <span className='block'>TC {Number(movement.exchange_rate_to_nio || 0).toLocaleString('es-NI', { maximumFractionDigits: 4 })} · puesto {money(Number(movement.purchase_cost) + Number(movement.delivery_cost || 0))}</span>}
+      {convertedFromUsd && <span className='block'>TC {exchangeRate(movement.exchange_rate_to_nio)} · puesto {money(Number(movement.purchase_cost) + Number(movement.delivery_cost || 0))}</span>}
     </span>
   )
 }
@@ -1001,7 +1016,7 @@ function Modal({ title, onClose, children }) {
 }
 
 function FormActions({ onCancel, saving, label, color }) {
-  return <div className='admin-modal-footer sticky bottom-0 -mx-5 -mb-5 flex gap-3 border-t border-gray-100 bg-white p-5'><button type='button' onClick={onCancel} className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Cancelar</button><button disabled={saving} className='flex-1 rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50' style={{ backgroundColor: color || '#B08A3C' }}>{saving ? 'Guardando...' : label}</button></div>
+  return <div className='admin-modal-footer -mx-5 -mb-5 flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-5 sm:flex-row'><button type='button' onClick={onCancel} className='w-full rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 sm:w-auto'>Cancelar</button><button disabled={saving} className='w-full rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1' style={{ backgroundColor: color || '#B08A3C' }}>{saving ? 'Guardando...' : label}</button></div>
 }
 
 function Stat({ label, value, danger = false }) {
