@@ -23,7 +23,7 @@ const FILAMENT_UNITS = {
   spool: 'spools',
   g: 'gramos',
 }
-const FILAMENT_COLORS = [
+const COLOR_OPTIONS = [
   ['Negro', '#111827'],
   ['Carbón', '#374151'],
   ['Blanco', '#f8fafc'],
@@ -51,8 +51,17 @@ const FILAMENT_COLORS = [
   ['Lila', '#c084fc'],
   ['Magenta', '#c026d3'],
   ['Rosa', '#ec4899'],
+  ['Rosa palo', '#d8a7b1'],
   ['Fucsia', '#e11d8f'],
+  ['Camel', '#c19a6b'],
+  ['Marrón', '#6f4e37'],
+  ['Crema', '#fffdd0'],
+  ['Lavanda', '#b57edc'],
+  ['Verde menta', '#98ff98'],
+  ['Azul rey', '#4169e1'],
+  ['Bronce', '#cd7f32'],
   ['Transparente', '#dbeafe'],
+  ['Multicolor', 'conic-gradient(#ef4444, #eab308, #22c55e, #3b82f6, #a855f7, #ef4444)'],
   ['Brilla en oscuro', '#d9f99d'],
 ]
 
@@ -113,10 +122,12 @@ function uniqueTextOptions(values) {
 const itemFormInitial = {
   name: '',
   sku: '',
+  color: '',
   item_type: 'material',
   unit: 'unidad',
   opening_quantity: '',
   purchase_cost: '',
+  purchase_cost_mode: 'total',
   purchase_currency: 'USD',
   delivery_cost: '',
   delivery_currency: 'USD',
@@ -134,6 +145,7 @@ const movementFormInitial = {
   quantity: '',
   unit_cost: '',
   purchase_cost: '',
+  purchase_cost_mode: 'total',
   purchase_currency: 'USD',
   delivery_cost: '',
   delivery_currency: 'USD',
@@ -149,6 +161,7 @@ const filamentFormInitial = {
   grams_per_spool: '1000',
   low_stock_quantity: '',
   purchase_cost: '',
+  purchase_cost_mode: 'total',
   purchase_currency: 'USD',
   delivery_cost: '',
   delivery_currency: 'USD',
@@ -166,6 +179,11 @@ const originalMoney = (value, currency = 'NIO') => {
   return currency === 'USD' ? `US$ ${formatted}` : `C$ ${formatted}`
 }
 
+const originalUnitMoney = (value, currency = 'NIO') => {
+  const formatted = Number(value || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  return currency === 'USD' ? `US$ ${formatted}` : `C$ ${formatted}`
+}
+
 function usesUsd(form) {
   const purchaseUsesUsd = form.purchase_currency === 'USD' && Number(form.purchase_cost) > 0
   const deliveryUsesUsd = form.delivery_currency === 'USD' && Number(form.delivery_cost) > 0
@@ -176,8 +194,22 @@ function hasUsdCurrency(form) {
   return form.purchase_currency === 'USD' || form.delivery_currency === 'USD'
 }
 
+function purchaseQuantity(form) {
+  const quantity = Number(Object.hasOwn(form, 'opening_quantity') ? form.opening_quantity : form.quantity)
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 0
+}
+
+function roundCurrency(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100
+}
+
+function purchaseOriginalTotal(form) {
+  const enteredCost = Number(form.purchase_cost) || 0
+  return roundCurrency(form.purchase_cost_mode === 'unit' ? enteredCost * purchaseQuantity(form) : enteredCost)
+}
+
 function landedCost(form) {
-  const purchaseOriginal = Number(form.purchase_cost) || 0
+  const purchaseOriginal = purchaseOriginalTotal(form)
   const deliveryOriginal = Number(form.delivery_cost) || 0
   const exchangeRate = usesUsd(form) ? FIXED_EXCHANGE_RATE_TO_NIO : 1
   const purchaseNio = Math.round((purchaseOriginal * (form.purchase_currency === 'USD' ? exchangeRate : 1) + Number.EPSILON) * 100) / 100
@@ -194,16 +226,17 @@ function landedCost(form) {
 }
 
 function purchaseCostError(form, { required = false } = {}) {
-  const hasPackageCost = form.purchase_cost !== ''
+  const hasPurchaseCost = form.purchase_cost !== ''
   const hasDeliveryCost = form.delivery_cost !== ''
-  if (required && !hasPackageCost) return 'Escribe el costo del paquete'
-  if (!hasPackageCost && hasDeliveryCost) return 'Escribe el costo del paquete para poder incluir el delivery'
-  if (!hasPackageCost) return null
+  if (required && !hasPurchaseCost) return 'Escribe el costo de la compra'
+  if (!hasPurchaseCost && hasDeliveryCost) return 'Escribe el costo de la compra para poder incluir el delivery'
+  if (!hasPurchaseCost) return null
 
-  const packageCost = Number(form.purchase_cost)
+  const purchaseCost = Number(form.purchase_cost)
   const deliveryCost = Number(form.delivery_cost || 0)
-  if (!Number.isFinite(packageCost) || packageCost < 0) return 'El costo del paquete no puede ser negativo'
+  if (!Number.isFinite(purchaseCost) || purchaseCost < 0) return 'El costo de la compra no puede ser negativo'
   if (!Number.isFinite(deliveryCost) || deliveryCost < 0) return 'El delivery no puede ser negativo'
+  if (form.purchase_cost_mode === 'unit' && !(purchaseQuantity(form) > 0)) return 'Escribe la cantidad para calcular el costo total'
   return null
 }
 
@@ -229,14 +262,25 @@ function filamentAmount(grams, gramsPerSpool) {
   return `${amount(spools)} spool${Math.abs(spools) === 1 ? '' : 's'} · ${amount(grams)} g`
 }
 
-function filamentColorHex(colorName) {
-  return FILAMENT_COLORS.find(([name]) => name.toLowerCase() === String(colorName || '').toLowerCase())?.[1] || '#e5e7eb'
+function inventoryColor(colorName) {
+  return COLOR_OPTIONS.find(([name]) => name.toLowerCase() === String(colorName || '').toLowerCase())?.[1] || '#e5e7eb'
+}
+
+function itemColorName(item) {
+  return item?.inventory_kind === 'filament' ? item.filament_color : item?.variant_color
+}
+
+function generalItemDetail(item) {
+  return [item.variant_color ? `Color: ${item.variant_color}` : null, item.sku || item.supplier_name || 'Sin código / proveedor']
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function normaliseItem(form) {
   return {
     name: form.name.trim(),
     sku: form.sku.trim() || null,
+    variant_color: form.color.trim() || null,
     item_type: form.item_type,
     unit: form.unit.trim() || 'unidad',
     low_stock_threshold: Number(form.low_stock_threshold) || 0,
@@ -294,26 +338,25 @@ export default function Inventory() {
     setLoading(false)
   }
 
-  const inventoryItems = useMemo(() => items.filter((item) => !item.deleted_at), [items])
   const visibleItems = useMemo(() => {
-    if (filter === 'low') return inventoryItems.filter((item) => item.is_low_stock && item.is_active)
-    if (filter === 'all') return inventoryItems
-    return inventoryItems.filter((item) => item.is_active)
-  }, [filter, inventoryItems])
+    if (filter === 'low') return items.filter((item) => item.is_low_stock && item.is_active)
+    if (filter === 'all') return items
+    return items.filter((item) => item.is_active)
+  }, [filter, items])
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
-  const activeItems = useMemo(() => inventoryItems.filter((item) => item.is_active), [inventoryItems])
+  const activeItems = useMemo(() => items.filter((item) => item.is_active), [items])
   const unitOptions = useMemo(
-    () => uniqueTextOptions([...INVENTORY_UNIT_OPTIONS, ...inventoryItems.map((item) => item.unit)]),
-    [inventoryItems],
+    () => uniqueTextOptions([...INVENTORY_UNIT_OPTIONS, ...items.map((item) => item.unit)]),
+    [items],
   )
   const supplierOptions = useMemo(
-    () => uniqueTextOptions([...DEFAULT_SUPPLIER_OPTIONS, ...inventoryItems.map((item) => item.supplier_name)]),
-    [inventoryItems],
+    () => uniqueTextOptions([...DEFAULT_SUPPLIER_OPTIONS, ...items.map((item) => item.supplier_name)]),
+    [items],
   )
   const isHikari = currentBusiness?.slug === 'hikari'
-  const lowStockCount = inventoryItems.filter((item) => item.is_low_stock && item.is_active).length
-  const totalValue = inventoryItems
+  const lowStockCount = items.filter((item) => item.is_low_stock && item.is_active).length
+  const totalValue = items
     .filter((item) => item.is_active)
     .reduce((total, item) => total + Number(item.current_stock || 0) * Number(item.unit_cost || 0), 0)
   const movementItem = itemById.get(movementForm.inventory_item_id)
@@ -382,11 +425,54 @@ export default function Inventory() {
         ? String(Number(value) * gramsPerSpool)
         : String(Number(value) / gramsPerSpool)
     }
+    const convertUnitPrice = (value) => {
+      if (value === '' || !(gramsPerSpool > 0)) return value
+      const converted = previousUnit === 'spool'
+        ? Number(value) / gramsPerSpool
+        : Number(value) * gramsPerSpool
+      return String(Math.round((converted + Number.EPSILON) * 1_000_000) / 1_000_000)
+    }
     setFilamentForm({
       ...filamentForm,
       quantity_unit: nextUnit,
       quantity: convert(filamentForm.quantity),
       low_stock_quantity: convert(filamentForm.low_stock_quantity),
+      purchase_cost: filamentForm.purchase_cost_mode === 'unit'
+        ? convertUnitPrice(filamentForm.purchase_cost)
+        : filamentForm.purchase_cost,
+    })
+  }
+
+  const changeMovementQuantityUnit = (nextUnit) => {
+    setMovementForm((current) => {
+      const previousUnit = current.quantity_unit
+      if (previousUnit === nextUnit) return current
+
+      const gramsPerSpool = Number(movementItem?.grams_per_spool || 0)
+      if (!(gramsPerSpool > 0)) return { ...current, quantity_unit: nextUnit }
+
+      const convert = (value) => {
+        if (value === '') return value
+        return previousUnit === 'spool'
+          ? String(Number(value) * gramsPerSpool)
+          : String(Number(value) / gramsPerSpool)
+      }
+      const convertUnitPrice = (value) => {
+        if (value === '') return value
+        const converted = previousUnit === 'spool'
+          ? Number(value) / gramsPerSpool
+          : Number(value) * gramsPerSpool
+        return String(Math.round((converted + Number.EPSILON) * 1_000_000) / 1_000_000)
+      }
+
+      return {
+        ...current,
+        quantity_unit: nextUnit,
+        quantity: convert(current.quantity),
+        purchase_cost: current.purchase_cost_mode === 'unit'
+          ? convertUnitPrice(current.purchase_cost)
+          : current.purchase_cost,
+      }
     })
   }
 
@@ -395,10 +481,12 @@ export default function Inventory() {
     setItemForm({
       name: item.name || '',
       sku: item.sku || '',
+      color: item.variant_color || '',
       item_type: item.item_type,
       unit: item.unit || 'unidad',
       opening_quantity: '',
       purchase_cost: '',
+      purchase_cost_mode: 'total',
       purchase_currency: 'USD',
       delivery_cost: '',
       delivery_currency: 'USD',
@@ -430,14 +518,13 @@ export default function Inventory() {
 
     setRemoving(true)
     try {
-      const { data, error } = await removeInventoryItem(removalTarget.id, currentBusinessId)
+      const { error } = await removeInventoryItem(removalTarget.id, currentBusinessId)
       if (error) throw error
 
-      if (Number(data?.movement_count || 0) > 0) {
-        toast.success('Artículo eliminado del inventario. Su historial se conservó.')
-      } else {
-        toast.success('Artículo eliminado del inventario.')
-      }
+      const removedItemId = removalTarget.id
+      setItems((current) => current.filter((item) => item.id !== removedItemId))
+      setMovements((current) => current.filter((movement) => movement.inventory_item_id !== removedItemId))
+      toast.success('Artículo e historial eliminados permanentemente.')
       setRemovalTarget(null)
       await loadInventory()
     } catch (error) {
@@ -456,7 +543,7 @@ export default function Inventory() {
     const receivedGrams = filamentForm.quantity_unit === 'spool' ? quantity * gramsPerSpool : quantity
     const lowStockQuantity = Number(filamentForm.low_stock_quantity) || 0
     const lowStockGrams = filamentForm.quantity_unit === 'spool' ? lowStockQuantity * gramsPerSpool : lowStockQuantity
-    const hasPackageCost = filamentForm.purchase_cost !== ''
+    const hasPurchaseCost = filamentForm.purchase_cost !== ''
     const costError = purchaseCostError(filamentForm)
 
     if (!color) {
@@ -505,13 +592,13 @@ export default function Inventory() {
         if (error) throw error
         const { error: movementError } = await addInventoryMovement({
           inventory_item_id: data.id,
-          movement_type: hasPackageCost ? 'purchase' : 'opening',
+          movement_type: hasPurchaseCost ? 'purchase' : 'opening',
           quantity_delta: receivedGrams,
-          unit_cost: hasPackageCost ? null : 0,
-          ...(hasPackageCost
+          unit_cost: hasPurchaseCost ? null : 0,
+          ...(hasPurchaseCost
             ? purchaseMovementCost(filamentForm)
             : { purchase_cost: null, delivery_cost: 0 }),
-          note: hasPackageCost ? 'Compra inicial de filamento' : 'Saldo inicial de filamento',
+          note: hasPurchaseCost ? 'Compra inicial de filamento' : 'Saldo inicial de filamento',
         }, currentBusinessId)
         if (movementError) throw movementError
         toast.success(`Filamento ${color} agregado`)
@@ -532,13 +619,13 @@ export default function Inventory() {
       return
     }
     const receivedQuantity = Number(itemForm.opening_quantity)
-    const hasPackageCost = itemForm.purchase_cost !== ''
+    const hasPurchaseCost = itemForm.purchase_cost !== ''
     const costError = purchaseCostError(itemForm)
     if (receivedQuantity < 0) {
       toast.error('La cantidad recibida no puede ser negativa')
       return
     }
-    if (hasPackageCost && !(receivedQuantity > 0)) {
+    if (hasPurchaseCost && !(receivedQuantity > 0)) {
       toast.error('Escribe cuántas unidades recibiste')
       return
     }
@@ -560,13 +647,13 @@ export default function Inventory() {
         if (receivedQuantity > 0) {
           const { error: movementError } = await addInventoryMovement({
             inventory_item_id: data.id,
-            movement_type: hasPackageCost ? 'purchase' : 'opening',
+            movement_type: hasPurchaseCost ? 'purchase' : 'opening',
             quantity_delta: receivedQuantity,
-            unit_cost: hasPackageCost ? null : item.unit_cost,
-            ...(hasPackageCost
+            unit_cost: hasPurchaseCost ? null : item.unit_cost,
+            ...(hasPurchaseCost
               ? purchaseMovementCost(itemForm)
               : { purchase_cost: null, delivery_cost: 0 }),
-            note: hasPackageCost ? 'Compra inicial' : 'Saldo inicial',
+            note: hasPurchaseCost ? 'Compra inicial' : 'Saldo inicial',
           }, currentBusinessId)
           if (movementError) throw movementError
         }
@@ -662,7 +749,7 @@ export default function Inventory() {
         </div>
 
         <div className='mb-5 grid gap-3 sm:grid-cols-3'>
-          <Stat label='Artículos activos' value={inventoryItems.filter((item) => item.is_active).length} />
+          <Stat label='Artículos activos' value={items.filter((item) => item.is_active).length} />
           <Stat label='Bajo stock' value={lowStockCount} danger={lowStockCount > 0} />
           <Stat label='Valor estimado' value={money(totalValue)} />
         </div>
@@ -698,10 +785,10 @@ export default function Inventory() {
                   <div className='flex items-start justify-between gap-3'>
                     <div className='min-w-0'>
                       <div className='flex items-center gap-2'>
-                        {item.inventory_kind === 'filament' && <span aria-hidden='true' className='h-6 w-6 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ backgroundColor: filamentColorHex(item.filament_color) }} />}
+                        {itemColorName(item) && <span aria-hidden='true' className='h-6 w-6 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
                         <h2 className='truncate font-bold text-gray-800'>{item.name}</h2>
                       </div>
-                      <p className='mt-1 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · ${item.filament_color}` : ITEM_TYPES[item.item_type]}</p>
+                      <p className='mt-1 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · ${item.filament_color}` : `${ITEM_TYPES[item.item_type]}${item.variant_color ? ` · Color: ${item.variant_color}` : ''}`}</p>
                     </div>
                     {!item.is_active ? <Badge tone='gray'>Inactivo</Badge> : item.is_low_stock ? <Badge tone='red'>Reponer</Badge> : <Badge tone='green'>Disponible</Badge>}
                   </div>
@@ -734,10 +821,10 @@ export default function Inventory() {
                     <tr key={item.id} className={!item.is_active ? 'opacity-55' : ''}>
                       <td className='px-4 py-3'>
                         <div className='flex items-center gap-2'>
-                          {item.inventory_kind === 'filament' && <span aria-hidden='true' className='h-5 w-5 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ backgroundColor: filamentColorHex(item.filament_color) }} />}
+                          {itemColorName(item) && <span aria-hidden='true' className='h-5 w-5 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
                           <p className='font-semibold text-gray-800'>{item.name}</p>
                         </div>
-                        <p className='mt-0.5 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · Color: ${item.filament_color}` : item.sku || item.supplier_name || 'Sin código / proveedor'}</p>
+                        <p className='mt-0.5 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · Color: ${item.filament_color}` : generalItemDetail(item)}</p>
                       </td>
                       <td className='px-4 py-3 text-gray-600'>{ITEM_TYPES[item.item_type]}</td>
                       <td className='px-4 py-3'>
@@ -782,7 +869,7 @@ export default function Inventory() {
                 return (
                   <div key={movement.id} className='flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm'>
                     <div className='min-w-44 flex-1'>
-                      <p className='font-semibold text-gray-700'>{item?.name || 'Artículo eliminado'}</p>
+                      <p className='font-semibold text-gray-700'>{item?.name || 'Artículo eliminado'}{item?.variant_color ? ` · ${item.variant_color}` : ''}</p>
                       <p className='text-xs text-gray-400'>{new Date(movement.occurred_at).toLocaleString('es-NI', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
                     <span className='text-gray-500'>{MOVEMENT_TYPES[movement.movement_type]}</span>
@@ -803,21 +890,16 @@ export default function Inventory() {
           <form onSubmit={saveFilament} className='space-y-4'>
             <p className='rounded-xl bg-sky-50 p-3 text-sm text-sky-900'>{editingFilament ? 'Corrige el color, material, peso del spool o alerta. La existencia y el costo acumulado no se alteran.' : 'Cada color queda como un artículo separado. El sistema guarda gramos para que puedas descontar lo usado en cada impresión, aunque lo registres por spools.'}</p>
             <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <Field className='sm:col-span-2' label='Color'>
-                <div className='mb-2 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2'>
-                  {FILAMENT_COLORS.map(([name, hex]) => {
-                    const selected = filamentForm.color.trim().toLowerCase() === name.toLowerCase()
-                    return <button key={name} type='button' aria-pressed={selected} onClick={() => setFilamentForm({ ...filamentForm, color: name })} className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all ${selected ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-500' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}><span aria-hidden='true' className='h-4 w-4 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ backgroundColor: hex }} />{name}</button>
-                  })}
-                </div>
-                <input required value={filamentForm.color} onChange={(event) => setFilamentForm({ ...filamentForm, color: event.target.value })} placeholder='Elige arriba o escribe Ej. Rojo seda' className='field' />
-              </Field>
+              <div className='sm:col-span-2'>
+                <label htmlFor='filament-color' className='mb-1.5 block text-xs font-medium text-gray-600'>Color</label>
+                <ColorPicker id='filament-color' required value={filamentForm.color} onChange={(color) => setFilamentForm((current) => ({ ...current, color }))} />
+              </div>
               <Field label='Material'><input required list='filament-materials' value={filamentForm.material} onChange={(event) => setFilamentForm({ ...filamentForm, material: event.target.value })} placeholder='PLA' className='field' /><datalist id='filament-materials'>{FILAMENT_MATERIALS.map((material) => <option key={material} value={material} />)}</datalist></Field>
               {!editingFilament && <Field label={`Cantidad recibida (${FILAMENT_UNITS[filamentForm.quantity_unit]})`}><input required type='number' min='0.001' step='0.001' value={filamentForm.quantity} onChange={(event) => setFilamentForm({ ...filamentForm, quantity: event.target.value })} placeholder={filamentForm.quantity_unit === 'spool' ? 'Ej. 2' : 'Ej. 2000'} className='field' /></Field>}
               <Field label={editingFilament ? 'Unidad para la alerta' : 'La cantidad está en'}><select value={filamentForm.quantity_unit} onChange={(event) => changeFilamentUnit(event.target.value)} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>
               <Field label='Gramos por spool'><input required type='number' min='0.001' step='0.001' value={filamentForm.grams_per_spool} onChange={(event) => setFilamentForm({ ...filamentForm, grams_per_spool: event.target.value })} placeholder='1000' className='field' /></Field>
               <Field label={`Alerta bajo stock (${FILAMENT_UNITS[filamentForm.quantity_unit]})`}><input type='number' min='0' step='0.001' value={filamentForm.low_stock_quantity} onChange={(event) => setFilamentForm({ ...filamentForm, low_stock_quantity: event.target.value })} placeholder={filamentForm.quantity_unit === 'spool' ? 'Ej. 0.5' : 'Ej. 250'} className='field' /></Field>
-              {!editingFilament && <><PurchaseCostFields form={filamentForm} setForm={setFilamentForm} />
+              {!editingFilament && <><PurchaseCostFields form={filamentForm} setForm={setFilamentForm} unitLabel={filamentForm.quantity_unit === 'spool' ? 'spool' : 'gramo'} />
               <div className='rounded-xl bg-sky-50 p-3 text-sm text-sky-900 sm:col-span-2'>
                 <p className='font-semibold'>Existencia inicial: {filamentAmount(filamentForm.quantity_unit === 'spool' ? Number(filamentForm.quantity || 0) * Number(filamentForm.grams_per_spool || 0) : Number(filamentForm.quantity || 0), filamentForm.grams_per_spool)}</p>
                 {filamentForm.purchase_cost !== '' && <><PurchaseConversion form={filamentForm} className='text-sky-800' /><p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(filamentLandedCost.totalNio)}</p><p className='mt-0.5 text-xs text-sky-800'>Costo por gramo: {preciseMoney(filamentLandedCost.totalNio / ((filamentForm.quantity_unit === 'spool' ? Number(filamentForm.quantity || 0) * Number(filamentForm.grams_per_spool || 0) : Number(filamentForm.quantity || 0)) || 1))}</p>{filamentForm.quantity_unit === 'spool' && <p className='mt-0.5 text-xs text-sky-800'>Costo por spool: {money(filamentLandedCost.totalNio / (Number(filamentForm.quantity) || 1))}</p>}</>}
@@ -847,6 +929,10 @@ export default function Inventory() {
               <Field className='sm:col-span-2' label='Nombre'><input required value={itemForm.name} onChange={(event) => setItemForm({ ...itemForm, name: event.target.value })} className='field' /></Field>
               <Field label='Código / SKU'><input value={itemForm.sku} onChange={(event) => setItemForm({ ...itemForm, sku: event.target.value })} className='field' /></Field>
               <Field label='Tipo'><select value={itemForm.item_type} onChange={(event) => setItemForm({ ...itemForm, item_type: event.target.value })} className='field'>{Object.entries(ITEM_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
+              <div className='sm:col-span-2'>
+                <label htmlFor='inventory-item-color' className='mb-1.5 block text-xs font-medium text-gray-600'>Color (opcional)</label>
+                <ColorPicker id='inventory-item-color' value={itemForm.color} onChange={(color) => setItemForm((current) => ({ ...current, color }))} />
+              </div>
               <SuggestedTextField
                 id='inventory-item-unit'
                 label='Unidad de medida'
@@ -860,11 +946,11 @@ export default function Inventory() {
               />
               {!editingItem && <>
                 <Field label='Cantidad que recibiste'><input type='number' min='0' step='0.001' value={itemForm.opening_quantity} onChange={(event) => setItemForm({ ...itemForm, opening_quantity: event.target.value })} placeholder='Ej. 100' className='field' /></Field>
-                <PurchaseCostFields form={itemForm} setForm={setItemForm} />
-                {itemForm.purchase_cost !== '' && <div className='rounded-xl bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2'><PurchaseConversion form={itemForm} /><p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(itemLandedCost.totalNio)}</p><p className='mt-0.5 text-xs text-amber-800'>Costo por {itemForm.unit || 'unidad'}: {money(itemLandedCost.totalNio / (Number(itemForm.opening_quantity) || 1))}</p><p className='mt-1 text-xs text-amber-800'>Incluye el delivery y se registrará como tu primera compra.</p></div>}
+                <PurchaseCostFields form={itemForm} setForm={setItemForm} unitLabel={itemForm.unit || 'unidad'} />
+                {itemForm.purchase_cost !== '' && <div className='rounded-xl bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2'><p className='mb-1 font-semibold'>Compra: {amount(itemForm.opening_quantity)} {itemForm.unit || 'unidad'}</p><PurchaseConversion form={itemForm} /><p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(itemLandedCost.totalNio)}</p><p className='mt-0.5 text-xs text-amber-800'>Costo por {itemForm.unit || 'unidad'}: {money(itemLandedCost.totalNio / (Number(itemForm.opening_quantity) || 1))}</p><p className='mt-1 text-xs text-amber-800'>Incluye el delivery y se registrará como tu primera compra.</p></div>}
               </>}
               <Field label='Alerta bajo stock'><input type='number' min='0' step='0.001' value={itemForm.low_stock_threshold} onChange={(event) => setItemForm({ ...itemForm, low_stock_threshold: event.target.value })} placeholder='0' className='field' /></Field>
-              <Field label={editingItem ? 'Costo promedio actual (C$)' : 'Costo por unidad manual (opcional)'}><input type='number' min='0' step='0.01' value={itemForm.unit_cost} onChange={(event) => setItemForm({ ...itemForm, unit_cost: event.target.value })} placeholder='0' className='field' /></Field>
+              {(editingItem || itemForm.purchase_cost === '') && <Field label={editingItem ? 'Costo promedio actual (C$)' : 'Costo por unidad manual (opcional)'}><input type='number' min='0' step='0.0001' value={itemForm.unit_cost} onChange={(event) => setItemForm({ ...itemForm, unit_cost: event.target.value })} placeholder='0' className='field' /></Field>}
               <SuggestedTextField
                 id='inventory-item-supplier'
                 className='sm:col-span-2'
@@ -893,20 +979,27 @@ export default function Inventory() {
             <Field label='Artículo'>
               <select required value={movementForm.inventory_item_id} onChange={(event) => {
                 const item = itemById.get(event.target.value)
-                setMovementForm({ ...movementForm, inventory_item_id: event.target.value, unit_cost: item?.unit_cost ?? '', quantity_unit: item?.inventory_kind === 'filament' ? 'spool' : 'g' })
+                setMovementForm({
+                  ...movementFormInitial,
+                  inventory_item_id: event.target.value,
+                  movement_type: movementForm.movement_type,
+                  adjustment_direction: movementForm.adjustment_direction,
+                  unit_cost: item?.unit_cost ?? '',
+                  quantity_unit: item?.inventory_kind === 'filament' ? 'spool' : 'g',
+                })
               }} className='field'>
                 <option value=''>Selecciona un artículo</option>
-                {activeItems.map((item) => <option key={item.id} value={item.id}>{item.name} · {amount(item.current_stock)} {item.unit}</option>)}
+                {activeItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.variant_color ? ` · ${item.variant_color}` : ''} · {amount(item.current_stock)} {item.unit}</option>)}
               </select>
             </Field>
             <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
               <Field label='¿Qué pasó con el stock?'><select value={movementForm.movement_type} onChange={(event) => setMovementForm({ ...movementForm, movement_type: event.target.value })} className='field'>{['purchase', 'sale', 'consumption', 'adjustment', 'return'].map((value) => <option key={value} value={value}>{MOVEMENT_FORM_LABELS[value]}</option>)}</select></Field>
               {movementForm.movement_type === 'adjustment' ? <Field label='Dirección'><select value={movementForm.adjustment_direction} onChange={(event) => setMovementForm({ ...movementForm, adjustment_direction: event.target.value })} className='field'><option value='in'>Aumentar stock</option><option value='out'>Reducir stock</option></select></Field> : <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
               {movementForm.movement_type === 'adjustment' && <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
-              {movementIsFilament && <Field label='Registrar como'><select value={movementForm.quantity_unit} onChange={(event) => setMovementForm({ ...movementForm, quantity_unit: event.target.value })} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>}
+              {movementIsFilament && <Field label='Registrar como'><select value={movementForm.quantity_unit} onChange={(event) => changeMovementQuantityUnit(event.target.value)} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>}
               {movementForm.movement_type === 'purchase' ? (
                 <>
-                  <PurchaseCostFields form={movementForm} setForm={setMovementForm} purchaseRequired />
+                  <PurchaseCostFields form={movementForm} setForm={setMovementForm} unitLabel={movementIsFilament ? movementForm.quantity_unit === 'spool' ? 'spool' : 'gramo' : movementItem?.unit || 'unidad'} purchaseRequired />
                   <div className='rounded-xl bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2'>
                     <PurchaseConversion form={movementForm} />
                     <p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(movementLandedCost.totalNio)}</p>
@@ -923,21 +1016,21 @@ export default function Inventory() {
       )}
 
       {removalTarget && (
-        <Modal title='Eliminar del inventario' onClose={() => !removing && setRemovalTarget(null)}>
+        <Modal title='Eliminar artículo permanentemente' onClose={() => !removing && setRemovalTarget(null)}>
           <div className='space-y-4'>
             <div>
-              <p className='font-semibold text-gray-800'>¿Quieres eliminar “{removalTarget.name}”?</p>
-              <p className='mt-2 text-sm leading-relaxed text-gray-500'>Dejará de aparecer en el inventario. Si ya tiene entradas o salidas, conservaremos ese historial para no alterar tus costos ni la contabilidad.</p>
+              <p className='font-semibold text-gray-800'>¿Eliminar “{removalTarget.name}{removalTarget.variant_color ? ` · ${removalTarget.variant_color}` : ''}” y todo su historial?</p>
+              <p className='mt-2 text-sm leading-relaxed text-gray-500'>Se eliminarán permanentemente el artículo y todas sus entradas y salidas. Esta acción no se puede deshacer.</p>
             </div>
             {Number(removalTarget.current_stock || 0) !== 0 && (
               <div className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
-                <p className='font-semibold'>Existencia registrada: {removalTarget.inventory_kind === 'filament' ? filamentAmount(removalTarget.current_stock, removalTarget.grams_per_spool) : `${amount(removalTarget.current_stock)} ${removalTarget.unit}`}</p>
-                <p className='mt-1 text-xs leading-relaxed'>Eliminarlo no registra una salida. Si necesitas corregir el conteo, cancela y registra primero un ajuste de inventario.</p>
+                <p className='font-semibold'>Existencia actual: {removalTarget.inventory_kind === 'filament' ? filamentAmount(removalTarget.current_stock, removalTarget.grams_per_spool) : `${amount(removalTarget.current_stock)} ${removalTarget.unit}`}</p>
+                <p className='mt-1 text-xs leading-relaxed'>Al eliminar, esta existencia y su valor desaparecerán del inventario; no se registrará una salida.</p>
               </div>
             )}
             <div className='admin-modal-footer -mx-5 -mb-5 flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-5 sm:flex-row'>
               <button type='button' disabled={removing} onClick={() => setRemovalTarget(null)} className='w-full rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 sm:w-auto'>Cancelar</button>
-              <button type='button' disabled={removing} onClick={removeItem} className='w-full rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 sm:flex-1'>{removing ? 'Eliminando...' : 'Eliminar del inventario'}</button>
+              <button type='button' disabled={removing} onClick={removeItem} className='w-full rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 sm:flex-1'>{removing ? 'Eliminando...' : 'Eliminar permanentemente'}</button>
             </div>
           </div>
         </Modal>
@@ -946,19 +1039,70 @@ export default function Inventory() {
   )
 }
 
-function PurchaseCostFields({ form, setForm, purchaseRequired = false }) {
+function PurchaseCostFields({ form, setForm, unitLabel = 'unidad', purchaseRequired = false }) {
   const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
+  const costMode = form.purchase_cost_mode || 'total'
+  const quantity = purchaseQuantity(form)
+  const calculatedTotal = purchaseOriginalTotal(form)
+
+  const changeCostMode = (nextMode) => {
+    setForm((current) => {
+      const currentMode = current.purchase_cost_mode || 'total'
+      if (currentMode === nextMode) return current
+
+      const currentCost = Number(current.purchase_cost)
+      const currentQuantity = purchaseQuantity(current)
+      if (current.purchase_cost === '' || !Number.isFinite(currentCost) || !(currentQuantity > 0)) {
+        return { ...current, purchase_cost_mode: nextMode }
+      }
+
+      const convertedCost = nextMode === 'unit'
+        ? currentCost / currentQuantity
+        : currentCost * currentQuantity
+      const precision = nextMode === 'unit' ? 6 : 2
+      const factor = 10 ** precision
+      const purchaseCost = String(Math.round((convertedCost + Number.EPSILON) * factor) / factor)
+      return { ...current, purchase_cost_mode: nextMode, purchase_cost: purchaseCost }
+    })
+  }
 
   return (
     <>
-      <Field label='Costo del paquete'>
+      <div className='sm:col-span-2'>
+        <p className='mb-1.5 text-xs font-medium text-gray-600'>¿Cómo tienes el precio?</p>
+        <div className='grid grid-cols-2 gap-2 rounded-xl bg-gray-50 p-1' role='group' aria-label='Forma de ingresar el costo de la compra'>
+          {[
+            ['total', 'Precio total'],
+            ['unit', 'Precio por unidad'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type='button'
+              aria-pressed={costMode === value}
+              onClick={() => changeCostMode(value)}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${costMode === value ? 'bg-white text-amber-900 shadow-sm ring-1 ring-amber-200' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className='mt-1 text-[11px] leading-relaxed text-gray-400'>{costMode === 'unit' ? 'Escribe lo que pagaste por cada unidad; multiplicaremos por la cantidad.' : 'Escribe lo que pagaste por todas las unidades juntas.'}</p>
+      </div>
+      <Field label={costMode === 'unit' ? `Precio por ${unitLabel}` : 'Costo total de la compra'}>
         <div className='grid grid-cols-[minmax(0,1fr)_7rem] gap-2'>
-          <input required={purchaseRequired} type='number' min='0' step='0.01' value={form.purchase_cost} onChange={(event) => update('purchase_cost', event.target.value)} placeholder={form.purchase_currency === 'USD' ? 'Ej. 25' : 'Ej. 1500'} className='field' />
-          <select value={form.purchase_currency} onChange={(event) => update('purchase_currency', event.target.value)} className='field' aria-label='Moneda del costo del paquete'>
+          <input required={purchaseRequired} type='number' min='0' step={costMode === 'unit' ? '0.000001' : '0.01'} value={form.purchase_cost} onChange={(event) => update('purchase_cost', event.target.value)} placeholder={costMode === 'unit' ? form.purchase_currency === 'USD' ? 'Ej. 3' : 'Ej. 110' : form.purchase_currency === 'USD' ? 'Ej. 18' : 'Ej. 660'} className='field' />
+          <select value={form.purchase_currency} onChange={(event) => update('purchase_currency', event.target.value)} className='field' aria-label='Moneda del costo de la compra'>
             <option value='USD'>US$</option>
             <option value='NIO'>C$</option>
           </select>
         </div>
+        {costMode === 'unit' && (
+          <span className='mt-1 block text-[11px] leading-relaxed text-gray-400'>
+            {quantity > 0 && form.purchase_cost !== ''
+              ? `Subtotal: ${amount(quantity)} × ${originalUnitMoney(form.purchase_cost, form.purchase_currency)} = ${originalMoney(calculatedTotal, form.purchase_currency)}`
+              : 'Completa la cantidad y el precio para ver el total.'}
+          </span>
+        )}
       </Field>
       <Field label='Delivery hasta Nicaragua'>
         <div className='grid grid-cols-[minmax(0,1fr)_7rem] gap-2'>
@@ -984,7 +1128,7 @@ function PurchaseConversion({ form, className = 'text-amber-800' }) {
   const cost = landedCost(form)
   return (
     <div className={`space-y-0.5 text-xs ${className}`}>
-      <p>Artículos: {originalMoney(cost.purchaseOriginal, form.purchase_currency)}{form.purchase_currency === 'USD' ? ` → ${money(cost.purchaseNio)}` : ''}</p>
+      <p>Artículos (total): {originalMoney(cost.purchaseOriginal, form.purchase_currency)}{form.purchase_currency === 'USD' ? ` → ${money(cost.purchaseNio)}` : ''}</p>
       <p>Delivery: {originalMoney(cost.deliveryOriginal, form.delivery_currency)}{form.delivery_currency === 'USD' ? ` → ${money(cost.deliveryNio)}` : ''}</p>
       {usesUsd(form) && <p>Tasa fija: US$1 = C$ {exchangeRate(cost.exchangeRate)}</p>}
     </div>
@@ -1010,6 +1154,46 @@ function MovementCost({ movement }) {
       <span className='block'>{originalMoney(movement.original_purchase_cost, purchaseCurrency)} + delivery {originalMoney(movement.original_delivery_cost, deliveryCurrency)}</span>
       {convertedFromUsd && <span className='block'>TC {exchangeRate(movement.exchange_rate_to_nio)} · puesto {money(Number(movement.purchase_cost) + Number(movement.delivery_cost || 0))}</span>}
     </span>
+  )
+}
+
+function ColorPicker({ id, value, onChange, required = false }) {
+  const selectedValue = String(value || '').trim().toLowerCase()
+
+  return (
+    <>
+      <div className='mb-2 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2' role='group' aria-label='Colores rápidos'>
+        {COLOR_OPTIONS.map(([name, color]) => {
+          const selected = selectedValue === name.toLowerCase()
+          return (
+            <button
+              key={name}
+              type='button'
+              aria-pressed={selected}
+              onClick={() => onChange(name)}
+              className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all ${selected ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-500' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+            >
+              <span aria-hidden='true' className='h-4 w-4 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: color }} />
+              {name}
+            </button>
+          )
+        })}
+      </div>
+      <div className='flex gap-2'>
+        <input
+          id={id}
+          required={required}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder='Elige arriba o escribe otro color'
+          className='field min-w-0 flex-1'
+        />
+        {!required && value && (
+          <button type='button' onClick={() => onChange('')} className='shrink-0 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-500 hover:bg-gray-50'>Quitar</button>
+        )}
+      </div>
+      <span className='mt-1 block text-[11px] leading-relaxed text-gray-400'>Para separar existencias, registra cada color como un artículo distinto.</span>
+    </>
   )
 }
 

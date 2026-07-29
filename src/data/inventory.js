@@ -40,7 +40,7 @@ export function updateInventoryItem(id, item, businessId) {
     .single()
 }
 
-/** Hide an item from inventory without erasing its ledger history. */
+/** Permanently delete an item and its inventory movements. */
 export function removeInventoryItem(id, businessId) {
   return supabase
     .rpc('remove_inventory_item', { p_item_id: id, p_business_id: businessId })
