@@ -207,7 +207,7 @@ export default function Clients() {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-[#51c879] mx-auto mb-4'></div>
+          <div className='admin-brand-spinner animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4'></div>
           <p className='text-gray-600'>Verificando autenticación...</p>
         </div>
       </div>
@@ -234,7 +234,7 @@ export default function Clients() {
                   setFormData(initialFormData)
                   setShowForm(true)
                 }}
-                className='px-4 py-2 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity'
+                className='admin-brand-gradient px-4 py-2 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity'
               >
                 + Nuevo Cliente
               </button>
@@ -342,7 +342,7 @@ export default function Clients() {
                         <p className='text-sm font-bold text-gray-900 truncate'>{client.name}</p>
                         <p className='text-xs text-gray-500'>{client.stats.orderCount} pedido{client.stats.orderCount !== 1 ? 's' : ''}</p>
                       </div>
-                      <p className='text-sm font-bold text-[#51c879] whitespace-nowrap'>{formatCurrency(client.stats.totalSpent)}</p>
+                      <p className='admin-brand-text text-sm font-bold whitespace-nowrap'>{formatCurrency(client.stats.totalSpent)}</p>
 	                    </article>
 	                  ))}
                 </div>
@@ -356,7 +356,7 @@ export default function Clients() {
             type='search'
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className='w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+            className='w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
             placeholder='Buscar por nombre, teléfono, red social o dirección...'
           />
         </div>
@@ -381,7 +381,7 @@ export default function Clients() {
 	                  <div className='flex gap-1'>
 	                    <button
 	                      onClick={() => editClient(client)}
-                      className='p-2 text-gray-500 hover:text-[#51c879] hover:bg-green-50 rounded-lg transition-colors'
+                      className='admin-brand-action p-2 text-gray-500 rounded-lg transition-colors'
                       title='Editar cliente'
                     >
                       <svg className='w-4 h-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -412,7 +412,7 @@ export default function Clients() {
                   </p>
                   <button
                     onClick={() => navigate(`/admin/${currentBusiness.slug}/orders`, { state: { clientId: client.id, clientName: client.name } })}
-                    className='text-xs font-semibold text-[#51c879] hover:text-[#45b56a] px-2 py-1 rounded-lg hover:bg-green-50 transition-colors'
+                    className='admin-brand-text admin-brand-action text-xs font-semibold px-2 py-1 rounded-lg transition-colors'
                   >
                     Ver pedidos →
                   </button>
@@ -444,7 +444,7 @@ export default function Clients() {
                     required
                     value={formData.name}
                     onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
                   />
                 </div>
 
@@ -455,7 +455,7 @@ export default function Clients() {
                       type='text'
                       value={formData.phone}
                       onChange={(event) => setFormData({ ...formData, phone: normalizePhone(event.target.value) })}
-                      className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                      className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
                       placeholder='88881234'
                     />
                   </div>
@@ -465,7 +465,7 @@ export default function Clients() {
                       type='text'
                       value={formData.social_media}
                       onChange={(event) => setFormData({ ...formData, social_media: event.target.value })}
-                      className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                      className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
                       placeholder='Facebook, Instagram...'
                     />
                   </div>
@@ -477,7 +477,7 @@ export default function Clients() {
                     type='text'
                     value={formData.delivery_address}
                     onChange={(event) => setFormData({ ...formData, delivery_address: event.target.value })}
-                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
+                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
                   />
                 </div>
 
@@ -487,7 +487,7 @@ export default function Clients() {
                     rows={3}
                     value={formData.notes}
                     onChange={(event) => setFormData({ ...formData, notes: event.target.value })}
-                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm resize-none'
+                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm resize-none'
                     placeholder='Preferencias, referencias, cliente frecuente...'
                   />
                 </div>
@@ -503,7 +503,7 @@ export default function Clients() {
                   <button
                     type='submit'
                     disabled={loading}
-                    className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all'
+                    className='admin-brand-gradient flex-1 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all'
                   >
                     {loading ? 'Guardando...' : editingClient ? 'Actualizar' : 'Crear cliente'}
                   </button>

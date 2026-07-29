@@ -74,13 +74,64 @@ const MOVEMENT_TYPES = {
   return: 'Devolución',
 }
 
-const MOVEMENT_FORM_LABELS = {
-  purchase: 'Compra o reposición (entra)',
-  sale: 'Venta (sale)',
-  consumption: 'Usado en un pedido (sale)',
-  adjustment: 'Corrección de inventario',
-  return: 'Devolución del cliente (entra)',
-}
+const MOVEMENT_ACTIONS = [
+  {
+    value: 'purchase',
+    label: 'Reponer',
+    description: 'Compré más del mismo artículo.',
+    directionLabel: '+ Entra',
+    directionClass: 'text-emerald-700',
+    quantityLabel: 'Cantidad recibida',
+    notePlaceholder: 'Proveedor, factura o referencia de la compra...',
+    submitLabel: 'Registrar reposición',
+  },
+  {
+    value: 'sale',
+    label: 'Registrar venta',
+    description: 'Vendí unidades de este artículo.',
+    directionLabel: '− Sale',
+    directionClass: 'text-red-600',
+    quantityLabel: 'Cantidad vendida',
+    notePlaceholder: 'Cliente o referencia de la venta...',
+    submitLabel: 'Registrar venta',
+  },
+  {
+    value: 'consumption',
+    label: 'Usar en pedido',
+    description: 'Lo utilicé para producir un pedido.',
+    directionLabel: '− Sale',
+    directionClass: 'text-red-600',
+    quantityLabel: 'Cantidad utilizada',
+    notePlaceholder: 'Pedido o trabajo donde se utilizó...',
+    submitLabel: 'Registrar uso',
+  },
+  {
+    value: 'return',
+    label: 'Devolución',
+    description: 'El cliente devolvió unidades.',
+    directionLabel: '+ Entra',
+    directionClass: 'text-emerald-700',
+    quantityLabel: 'Cantidad devuelta',
+    notePlaceholder: 'Cliente o motivo de la devolución...',
+    submitLabel: 'Registrar devolución',
+  },
+  {
+    value: 'adjustment',
+    label: 'Corregir conteo',
+    description: 'El stock real no coincide con el sistema.',
+    directionLabel: '± Ajuste',
+    directionClass: 'text-amber-700',
+    quantityLabel: 'Cantidad del ajuste',
+    notePlaceholder: 'Explica por qué estás corrigiendo el conteo...',
+    submitLabel: 'Guardar ajuste',
+  },
+]
+
+const STOCK_FLOW_OPTIONS = [
+  { value: 'in', label: 'Entrada', description: 'Compra o devolución' },
+  { value: 'out', label: 'Salida', description: 'Venta o uso' },
+  { value: 'adjustment', label: 'Corrección', description: 'Conteo físico' },
+]
 
 const FIXED_EXCHANGE_RATE_TO_NIO = 36.6243
 
@@ -262,6 +313,13 @@ function filamentAmount(grams, gramsPerSpool) {
   return `${amount(spools)} spool${Math.abs(spools) === 1 ? '' : 's'} · ${amount(grams)} g`
 }
 
+function inventoryAmount(item, value) {
+  if (!item) return '—'
+  return item.inventory_kind === 'filament'
+    ? filamentAmount(value, item.grams_per_spool)
+    : `${amount(value)} ${item.unit}`
+}
+
 function inventoryColor(colorName) {
   return COLOR_OPTIONS.find(([name]) => name.toLowerCase() === String(colorName || '').toLowerCase())?.[1] || '#e5e7eb'
 }
@@ -321,6 +379,14 @@ export default function Inventory() {
 
   useEffect(() => {
     setRemovalTarget(null)
+    setShowMovementForm(false)
+    setMovementForm(movementFormInitial)
+    setShowItemForm(false)
+    setEditingItem(null)
+    setItemForm(itemFormInitial)
+    setShowFilamentForm(false)
+    setEditingFilament(null)
+    setFilamentForm(filamentFormInitial)
     if (user && currentBusinessId) loadInventory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentBusinessId])
@@ -364,12 +430,24 @@ export default function Inventory() {
   const movementQuantityInStockUnit = movementIsFilament && movementForm.quantity_unit === 'spool'
     ? Number(movementForm.quantity || 0) * Number(movementItem.grams_per_spool || 0)
     : Number(movementForm.quantity || 0)
+  const movementFlow = ['purchase', 'return'].includes(movementForm.movement_type)
+    ? 'in'
+    : ['sale', 'consumption'].includes(movementForm.movement_type) ? 'out' : 'adjustment'
+  const movementReasonActions = movementFlow === 'in'
+    ? MOVEMENT_ACTIONS.filter((action) => ['purchase', 'return'].includes(action.value))
+    : MOVEMENT_ACTIONS.filter((action) => ['sale', 'consumption'].includes(action.value))
+  const movementAction = MOVEMENT_ACTIONS.find((action) => action.value === movementForm.movement_type) || MOVEMENT_ACTIONS[0]
+  const movementDirection = movementForm.movement_type === 'adjustment'
+    ? movementForm.adjustment_direction === 'out' ? -1 : 1
+    : ['sale', 'consumption'].includes(movementForm.movement_type) ? -1 : 1
+  const movementProjectedStock = movementItem && movementQuantityInStockUnit > 0
+    ? Number(movementItem.current_stock || 0) + movementQuantityInStockUnit * movementDirection
+    : null
+  const movementQuantityLabel = `${movementAction.quantityLabel}${movementIsFilament ? ` (${FILAMENT_UNITS[movementForm.quantity_unit]})` : ''}`
   const itemLandedCost = landedCost(itemForm)
   const filamentLandedCost = landedCost(filamentForm)
   const movementLandedCost = landedCost(movementForm)
-  const movementSubmitLabel = movementForm.movement_type === 'adjustment'
-    ? movementForm.adjustment_direction === 'out' ? 'Registrar salida' : 'Registrar entrada'
-    : ['sale', 'consumption'].includes(movementForm.movement_type) ? 'Registrar salida' : 'Registrar entrada'
+  const movementSubmitLabel = movementAction.submitLabel
 
   const resetItemForm = () => {
     setShowItemForm(false)
@@ -476,6 +554,34 @@ export default function Inventory() {
     })
   }
 
+  const changeMovementAction = (nextType) => {
+    setMovementForm((current) => {
+      if (current.movement_type === nextType) return current
+      const item = itemById.get(current.inventory_item_id)
+      return {
+        ...movementFormInitial,
+        inventory_item_id: current.inventory_item_id,
+        movement_type: nextType,
+        adjustment_direction: nextType === 'adjustment' ? 'in' : current.adjustment_direction,
+        unit_cost: item?.unit_cost ?? '',
+        quantity_unit: current.quantity_unit,
+      }
+    })
+  }
+
+  const changeMovementFlow = (nextFlow) => {
+    if (nextFlow === movementFlow) return
+    changeMovementAction(nextFlow === 'in' ? 'purchase' : nextFlow === 'out' ? 'sale' : 'adjustment')
+  }
+
+  const changeAdjustmentDirection = (nextDirection) => {
+    setMovementForm((current) => current.adjustment_direction === nextDirection ? current : {
+      ...current,
+      adjustment_direction: nextDirection,
+      quantity: '',
+    })
+  }
+
   const openEditItem = (item) => {
     setEditingItem(item)
     setItemForm({
@@ -507,6 +613,12 @@ export default function Inventory() {
       quantity_unit: item?.inventory_kind === 'filament' ? 'spool' : 'g',
     })
     setShowMovementForm(true)
+  }
+
+  const openDifferentItemFromMovement = (kind = 'item') => {
+    resetMovementForm()
+    if (kind === 'filament') openCreateFilament()
+    else openCreateItem()
   }
 
   const confirmRemoval = (item) => {
@@ -687,6 +799,11 @@ export default function Inventory() {
       toast.error('Este filamento no tiene un peso por spool válido')
       return
     }
+    const projectedStock = Number(item.current_stock || 0) + movementQuantity * movementDirection
+    if (projectedStock < 0) {
+      toast.error(`Solo hay ${inventoryAmount(item, item.current_stock)} disponibles. Revisa la cantidad de salida.`)
+      return
+    }
     const isPurchase = movementForm.movement_type === 'purchase'
     const costError = isPurchase ? purchaseCostError(movementForm, { required: true }) : null
     if (costError) {
@@ -694,17 +811,12 @@ export default function Inventory() {
       return
     }
 
-    const direction =
-      movementForm.movement_type === 'adjustment'
-        ? movementForm.adjustment_direction === 'out' ? -1 : 1
-        : ['sale', 'consumption'].includes(movementForm.movement_type) ? -1 : 1
-
     setSaving(true)
     try {
       const { error } = await addInventoryMovement({
         inventory_item_id: item.id,
         movement_type: movementForm.movement_type,
-        quantity_delta: movementQuantity * direction,
+        quantity_delta: movementQuantity * movementDirection,
         unit_cost: isPurchase || movementForm.unit_cost === '' ? null : Number(movementForm.unit_cost),
         ...(isPurchase
           ? purchaseMovementCost(movementForm)
@@ -737,7 +849,7 @@ export default function Inventory() {
           </div>
           <div className='flex flex-wrap gap-2'>
             <button onClick={() => openMovement()} disabled={!activeItems.length} className='rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50'>
-              + Entrada / salida
+              + Actualizar stock
             </button>
             {isHikari && <button onClick={openCreateFilament} className='rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90' style={{ backgroundColor: currentBusiness?.primary_color || '#B08A3C' }}>
               + Filamento
@@ -751,7 +863,7 @@ export default function Inventory() {
         <div className='mb-5 grid gap-3 sm:grid-cols-3'>
           <Stat label='Artículos activos' value={items.filter((item) => item.is_active).length} />
           <Stat label='Bajo stock' value={lowStockCount} danger={lowStockCount > 0} />
-          <Stat label='Valor estimado' value={money(totalValue)} />
+          <Stat label='Invertido en stock' value={money(totalValue)} help='Existencia × costo promedio' />
         </div>
 
         <div className='mb-4 flex flex-wrap gap-2'>
@@ -797,7 +909,7 @@ export default function Inventory() {
                     <div><p className='text-[11px] font-semibold uppercase tracking-wide text-gray-400'>Costo promedio</p><p className='mt-1 font-bold text-gray-800'>{money(item.unit_cost)}</p></div>
                   </div>
                   <div className='mt-3 grid grid-cols-2 gap-2'>
-                    <button onClick={() => openMovement(item)} disabled={!item.is_active} className='min-h-10 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
+                    <button onClick={() => openMovement(item)} disabled={!item.is_active} className='min-h-10 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Actualizar stock</button>
                     <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='min-h-10 rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
                     <button onClick={() => confirmRemoval(item)} className='col-span-2 min-h-10 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50'>Eliminar del inventario</button>
                   </div>
@@ -839,7 +951,7 @@ export default function Inventory() {
                       </td>
                       <td className='px-4 py-3'>
                         <div className='flex flex-wrap justify-end gap-2'>
-                          <button onClick={() => openMovement(item)} disabled={!item.is_active} className='rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Entrada / salida</button>
+                          <button onClick={() => openMovement(item)} disabled={!item.is_active} className='rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40'>Actualizar stock</button>
                           <button onClick={() => item.inventory_kind === 'filament' ? openEditFilament(item) : openEditItem(item)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
                           <button onClick={() => confirmRemoval(item)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50'>Eliminar</button>
                         </div>
@@ -971,46 +1083,133 @@ export default function Inventory() {
       )}
 
       {showMovementForm && (
-        <Modal title='Actualizar existencias' onClose={resetMovementForm}>
+        <Modal title='Actualizar stock' onClose={() => !saving && resetMovementForm()}>
           <form onSubmit={saveMovement} className='space-y-4'>
-            <p className='rounded-xl bg-sky-50 p-3 text-sm text-sky-900'>
-              Úsalo después de crear el artículo: una compra o devolución aumenta el stock; una venta o uso en pedido lo reduce; un ajuste corrige el conteo.
-            </p>
-            <Field label='Artículo'>
-              <select required value={movementForm.inventory_item_id} onChange={(event) => {
-                const item = itemById.get(event.target.value)
-                setMovementForm({
-                  ...movementFormInitial,
-                  inventory_item_id: event.target.value,
-                  movement_type: movementForm.movement_type,
-                  adjustment_direction: movementForm.adjustment_direction,
-                  unit_cost: item?.unit_cost ?? '',
-                  quantity_unit: item?.inventory_kind === 'filament' ? 'spool' : 'g',
-                })
-              }} className='field'>
-                <option value=''>Selecciona un artículo</option>
-                {activeItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.variant_color ? ` · ${item.variant_color}` : ''} · {amount(item.current_stock)} {item.unit}</option>)}
-              </select>
-            </Field>
-            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-              <Field label='¿Qué pasó con el stock?'><select value={movementForm.movement_type} onChange={(event) => setMovementForm({ ...movementForm, movement_type: event.target.value })} className='field'>{['purchase', 'sale', 'consumption', 'adjustment', 'return'].map((value) => <option key={value} value={value}>{MOVEMENT_FORM_LABELS[value]}</option>)}</select></Field>
-              {movementForm.movement_type === 'adjustment' ? <Field label='Dirección'><select value={movementForm.adjustment_direction} onChange={(event) => setMovementForm({ ...movementForm, adjustment_direction: event.target.value })} className='field'><option value='in'>Aumentar stock</option><option value='out'>Reducir stock</option></select></Field> : <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
-              {movementForm.movement_type === 'adjustment' && <Field label={movementIsFilament ? `Cantidad (${FILAMENT_UNITS[movementForm.quantity_unit]})` : 'Cantidad'}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} className='field' /></Field>}
-              {movementIsFilament && <Field label='Registrar como'><select value={movementForm.quantity_unit} onChange={(event) => changeMovementQuantityUnit(event.target.value)} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>}
-              {movementForm.movement_type === 'purchase' ? (
-                <>
-                  <PurchaseCostFields form={movementForm} setForm={setMovementForm} unitLabel={movementIsFilament ? movementForm.quantity_unit === 'spool' ? 'spool' : 'gramo' : movementItem?.unit || 'unidad'} purchaseRequired />
-                  <div className='rounded-xl bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2'>
-                    <PurchaseConversion form={movementForm} />
-                    <p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(movementLandedCost.totalNio)}</p>
-                    <p className='mt-0.5 text-xs text-amber-800'>Costo por {movementItem?.unit || 'unidad'}: {movementIsFilament ? preciseMoney(movementLandedCost.totalNio / (movementQuantityInStockUnit || 1)) : money(movementLandedCost.totalNio / (movementQuantityInStockUnit || 1))}</p>
-                    {movementIsFilament && movementForm.quantity_unit === 'spool' && <p className='mt-0.5 text-xs text-amber-800'>Costo por spool: {money(movementLandedCost.totalNio / (Number(movementForm.quantity) || 1))}</p>}
-                  </div>
-                </>
-              ) : <Field label='Costo unitario (opcional)'><input type='number' min='0' step='0.01' value={movementForm.unit_cost} onChange={(event) => setMovementForm({ ...movementForm, unit_cost: event.target.value })} className='field' /></Field>}
-              <Field className='sm:col-span-2' label='Nota'><textarea rows={2} value={movementForm.note} onChange={(event) => setMovementForm({ ...movementForm, note: event.target.value })} placeholder='Factura, motivo del ajuste, pedido...' className='field' /></Field>
+            <div id='movement-same-item-help' className='rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900'>
+              <p className='font-semibold'>¿Llegaron más unidades del mismo artículo?</p>
+              <p className='mt-1 text-xs leading-relaxed text-sky-800'>Usa <strong>Entrada → Reponer</strong>. Sumaremos las nuevas unidades y actualizaremos el costo promedio. El producto, color, modelo, presentación y SKU deben coincidir.</p>
+              <div className={`mt-3 grid gap-2 ${isHikari ? 'grid-cols-2' : ''}`}>
+                {isHikari && <button type='button' disabled={saving} onClick={() => openDifferentItemFromMovement('filament')} className='rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50'>Nuevo filamento</button>}
+                <button type='button' disabled={saving} onClick={() => openDifferentItemFromMovement('item')} className='rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50'>
+                  {isHikari ? 'Otro artículo' : '¿Es diferente? Registrar artículo nuevo'}
+                </button>
+              </div>
             </div>
-            <FormActions onCancel={resetMovementForm} saving={saving} label={movementSubmitLabel} color={currentBusiness?.primary_color} />
+
+            <section className='space-y-3'>
+              <FormStep number='1' title='Artículo existente' description='El stock se actualizará únicamente en este registro.' />
+              <label htmlFor='movement-item' className='block'>
+                <span className='mb-1.5 block text-xs font-medium text-gray-600'>Selecciona el artículo</span>
+                <select id='movement-item' required disabled={saving} aria-describedby='movement-same-item-help' value={movementForm.inventory_item_id} onChange={(event) => {
+                  const item = itemById.get(event.target.value)
+                  setMovementForm({
+                    ...movementFormInitial,
+                    inventory_item_id: event.target.value,
+                    movement_type: movementForm.movement_type,
+                    adjustment_direction: movementForm.adjustment_direction,
+                    unit_cost: item?.unit_cost ?? '',
+                    quantity_unit: item?.inventory_kind === 'filament' ? 'spool' : 'g',
+                  })
+                }} className='field'>
+                  <option value=''>Selecciona un artículo</option>
+                  {activeItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.variant_color ? ` · ${item.variant_color}` : ''} · {inventoryAmount(item, item.current_stock)}</option>)}
+                </select>
+              </label>
+
+              {movementItem && (
+                <div className='rounded-xl border border-gray-200 bg-gray-50 p-3'>
+                  <div className='flex items-start gap-3'>
+                    {itemColorName(movementItem) && <span aria-hidden='true' className='mt-0.5 h-8 w-8 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(movementItem)) }} />}
+                    <div className='min-w-0 flex-1'>
+                      <p className='break-words text-sm font-bold text-gray-800'>{movementItem.name}</p>
+                      <p className='mt-0.5 break-words text-xs text-gray-500'>{movementIsFilament ? `${movementItem.filament_material} · Color: ${movementItem.filament_color}` : generalItemDetail(movementItem)}</p>
+                    </div>
+                  </div>
+                  <div className='mt-3 grid grid-cols-2 gap-2 border-t border-gray-200 pt-3 text-xs'>
+                    <div><p className='text-gray-400'>Existencia actual</p><p className='mt-0.5 font-bold text-gray-800'>{inventoryAmount(movementItem, movementItem.current_stock)}</p></div>
+                    <div><p className='text-gray-400'>Costo promedio</p><p className='mt-0.5 font-bold text-gray-800'>{movementIsFilament ? preciseMoney(movementItem.unit_cost) : money(movementItem.unit_cost)}</p></div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {movementItem ? (
+              <>
+            <section className='space-y-3 border-t border-gray-100 pt-4'>
+              <FormStep number='2' title='Movimiento' description='Entrada suma compras o devoluciones; salida descuenta ventas o artículos usados.' />
+              <div className='grid grid-cols-3 gap-2' role='group' aria-label='Dirección del movimiento'>
+                {STOCK_FLOW_OPTIONS.map((option) => {
+                  const selected = movementFlow === option.value
+                  return (
+                    <button key={option.value} type='button' disabled={saving} aria-pressed={selected} onClick={() => changeMovementFlow(option.value)} className={`min-h-14 rounded-xl border px-2 py-2 text-center transition-colors disabled:opacity-50 ${selected ? 'border-amber-300 bg-amber-50 text-amber-900 ring-1 ring-amber-200' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                      <span className='block text-xs font-bold'>{option.label}</span>
+                      <span className='mt-0.5 block text-[10px] leading-tight opacity-75'>{option.description}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {movementFlow === 'adjustment' ? (
+                <div>
+                  <p className='mb-1.5 text-xs font-medium text-gray-600'>¿Cómo corregirás el conteo?</p>
+                  <div className='grid grid-cols-2 gap-2' role='group' aria-label='Dirección de la corrección'>
+                    {[['in', 'Sumar stock'], ['out', 'Restar stock']].map(([value, label]) => {
+                      const selected = movementForm.adjustment_direction === value
+                      return <button key={value} type='button' disabled={saving} aria-pressed={selected} onClick={() => changeAdjustmentDirection(value)} className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors disabled:opacity-50 ${selected ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>{label}</button>
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className='mb-1.5 text-xs font-medium text-gray-600'>Motivo de la {movementFlow === 'in' ? 'entrada' : 'salida'}</p>
+                  <div className='grid grid-cols-2 gap-2' role='group' aria-label={`Motivo de la ${movementFlow === 'in' ? 'entrada' : 'salida'}`}>
+                    {movementReasonActions.map((action) => {
+                      const selected = movementForm.movement_type === action.value
+                      return (
+                        <button key={action.value} type='button' disabled={saving} aria-pressed={selected} onClick={() => changeMovementAction(action.value)} className={`rounded-xl border p-3 text-left transition-colors disabled:opacity-50 ${selected ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+                          <span className='flex items-center justify-between gap-2 text-xs font-bold'><span>{action.label}</span><span className={action.directionClass}>{action.directionLabel}</span></span>
+                          <span className='mt-1 block text-[10px] leading-relaxed opacity-75'>{action.description}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className='space-y-3 border-t border-gray-100 pt-4'>
+              <FormStep number='3' title='Cantidad y detalles' description='Revisa la existencia resultante antes de guardar.' />
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                <Field label={movementQuantityLabel}><input required type='number' min='0.001' step='0.001' value={movementForm.quantity} onChange={(event) => setMovementForm({ ...movementForm, quantity: event.target.value })} placeholder='Ej. 10' className='field' /></Field>
+                {movementIsFilament && <Field label='Registrar como'><select value={movementForm.quantity_unit} onChange={(event) => changeMovementQuantityUnit(event.target.value)} className='field'><option value='spool'>Spools</option><option value='g'>Gramos</option></select></Field>}
+
+                {movementProjectedStock !== null && (
+                  <div aria-live='polite' className={`rounded-xl border p-3 text-sm sm:col-span-2 ${movementProjectedStock < 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                    <p className='text-xs font-medium opacity-80'>Existencia después de registrar</p>
+                    <p className='mt-1 font-bold'>{inventoryAmount(movementItem, movementItem.current_stock)} {movementDirection > 0 ? '+' : '−'} {inventoryAmount(movementItem, Math.abs(movementQuantityInStockUnit))} = {inventoryAmount(movementItem, movementProjectedStock)}</p>
+                    {movementProjectedStock < 0 && <p className='mt-1 text-xs'>No puedes registrar una salida mayor que la existencia disponible.</p>}
+                  </div>
+                )}
+
+                {movementForm.movement_type === 'purchase' ? (
+                  <>
+                    <PurchaseCostFields form={movementForm} setForm={setMovementForm} unitLabel={movementIsFilament ? movementForm.quantity_unit === 'spool' ? 'spool' : 'gramo' : movementItem?.unit || 'unidad'} purchaseRequired />
+                    <div className='rounded-xl bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2'>
+                      <PurchaseConversion form={movementForm} />
+                      <p className='mt-1 font-semibold'>Costo puesto en Nicaragua: {money(movementLandedCost.totalNio)}</p>
+                      <p className='mt-0.5 text-xs text-amber-800'>Costo por {movementItem?.unit || 'unidad'}: {movementIsFilament ? preciseMoney(movementLandedCost.totalNio / (movementQuantityInStockUnit || 1)) : money(movementLandedCost.totalNio / (movementQuantityInStockUnit || 1))}</p>
+                      {movementIsFilament && movementForm.quantity_unit === 'spool' && <p className='mt-0.5 text-xs text-amber-800'>Costo por spool: {money(movementLandedCost.totalNio / (Number(movementForm.quantity) || 1))}</p>}
+                    </div>
+                  </>
+                ) : null}
+                <Field className='sm:col-span-2' label='Nota (opcional)'><textarea rows={2} value={movementForm.note} onChange={(event) => setMovementForm({ ...movementForm, note: event.target.value })} placeholder={movementAction.notePlaceholder} className='field' /></Field>
+              </div>
+            </section>
+              </>
+            ) : (
+              <div className='rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500'>Selecciona un artículo existente para indicar si entró, se vendió o se usó.</div>
+            )}
+            <FormActions onCancel={resetMovementForm} saving={saving} disabled={!movementItem} label={movementSubmitLabel} color={currentBusiness?.primary_color} />
           </form>
         </Modal>
       )}
@@ -1242,6 +1441,18 @@ function Field({ label, children, className = '' }) {
   return <label className={className}><span className='mb-1.5 block text-xs font-medium text-gray-600'>{label}</span>{children}</label>
 }
 
+function FormStep({ number, title, description }) {
+  return (
+    <div className='flex items-start gap-2.5'>
+      <span aria-hidden='true' className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-600'>{number}</span>
+      <div>
+        <h3 className='text-sm font-bold text-gray-800'>{title}</h3>
+        {description && <p className='mt-0.5 text-xs leading-relaxed text-gray-400'>{description}</p>}
+      </div>
+    </div>
+  )
+}
+
 function Modal({ title, onClose, children }) {
   return (
     <div className='admin-modal-backdrop'>
@@ -1253,12 +1464,12 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function FormActions({ onCancel, saving, label, color }) {
-  return <div className='admin-modal-footer -mx-5 -mb-5 flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-5 sm:flex-row'><button type='button' onClick={onCancel} className='w-full rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 sm:w-auto'>Cancelar</button><button disabled={saving} className='w-full rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1' style={{ backgroundColor: color || '#B08A3C' }}>{saving ? 'Guardando...' : label}</button></div>
+function FormActions({ onCancel, saving, disabled = false, label, color }) {
+  return <div className='admin-modal-footer -mx-5 -mb-5 flex flex-col-reverse gap-3 border-t border-gray-100 bg-white p-5 sm:flex-row'><button type='button' disabled={saving} onClick={onCancel} className='w-full rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 sm:w-auto'>Cancelar</button><button disabled={saving || disabled} className='w-full rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 sm:flex-1' style={{ backgroundColor: color || '#B08A3C' }}>{saving ? 'Guardando...' : label}</button></div>
 }
 
-function Stat({ label, value, danger = false }) {
-  return <div className='rounded-2xl bg-white p-4 shadow-soft'><p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>{label}</p><p className={`mt-1 text-xl font-bold ${danger ? 'text-red-600' : 'text-gray-800'}`}>{value}</p></div>
+function Stat({ label, value, danger = false, help = '' }) {
+  return <div className='rounded-2xl bg-white p-4 shadow-soft'><p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>{label}</p><p className={`mt-1 text-xl font-bold ${danger ? 'text-red-600' : 'text-gray-800'}`}>{value}</p>{help && <p className='mt-1 text-[11px] text-gray-400'>{help}</p>}</div>
 }
 
 function Panel({ children }) {
