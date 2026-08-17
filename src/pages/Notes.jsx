@@ -9,14 +9,31 @@ import { fetchProductsForBusiness } from '../data/products'
 const CATEGORIES = {
   idea: { label: 'Idea', tone: 'amber' },
   todo: { label: 'Pendiente', tone: 'blue' },
+  task: { label: 'Tarea', tone: 'teal' },
   in_progress: { label: 'En progreso', tone: 'purple' },
   remove: { label: 'Por quitar', tone: 'red' },
   general: { label: 'General', tone: 'gray' },
 }
 
+const PRIORITIES = {
+  low: { label: 'Baja', tone: 'gray' },
+  normal: { label: 'Normal', tone: 'blue' },
+  high: { label: 'Alta', tone: 'red' },
+}
+const PRIORITY_WEIGHT = { high: 0, normal: 1, low: 2 }
+
 const FILTERS = [['all', 'Todas'], ...Object.entries(CATEGORIES).map(([value, c]) => [value, c.label])]
 
-const noteFormInitial = { title: '', body: '', category: 'idea', product_id: '' }
+const noteFormInitial = { title: '', body: '', category: 'idea', priority: 'normal', product_id: '' }
+
+function sortNotes(list) {
+  return [...list].sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1
+    const priorityDiff = (PRIORITY_WEIGHT[a.priority] ?? 1) - (PRIORITY_WEIGHT[b.priority] ?? 1)
+    if (priorityDiff !== 0) return priorityDiff
+    return new Date(b.updated_at) - new Date(a.updated_at)
+  })
+}
 
 const formatDate = (value) =>
   new Date(value).toLocaleDateString('es-NI', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -64,7 +81,7 @@ export default function Notes() {
       fetchProductsForBusiness(currentBusinessId),
     ])
     if (notesResult.error) toast.error(`No se pudieron cargar las notas: ${notesResult.error.message}`)
-    else setNotes(notesResult.data || [])
+    else setNotes(sortNotes(notesResult.data || []))
     if (productsResult.error) toast.error(`No se pudieron cargar los productos: ${productsResult.error.message}`)
     else setProducts(productsResult.data || [])
     setLoading(false)
@@ -102,7 +119,13 @@ export default function Notes() {
 
   const openEdit = (note) => {
     setEditingNote(note)
-    setForm({ title: note.title, body: note.body || '', category: note.category, product_id: note.product_id || '' })
+    setForm({
+      title: note.title,
+      body: note.body || '',
+      category: note.category,
+      priority: note.priority || 'normal',
+      product_id: note.product_id || '',
+    })
     setShowForm(true)
   }
 
@@ -112,12 +135,7 @@ export default function Notes() {
       toast.error(`No se pudo actualizar: ${error.message}`)
       return
     }
-    setNotes((current) =>
-      current.map((n) => (n.id === note.id ? { ...n, is_pinned: !n.is_pinned } : n)).sort((a, b) => {
-        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1
-        return new Date(b.updated_at) - new Date(a.updated_at)
-      }),
-    )
+    setNotes((current) => sortNotes(current.map((n) => (n.id === note.id ? { ...n, is_pinned: !n.is_pinned } : n))))
   }
 
   const saveNote = async (event) => {
@@ -129,7 +147,13 @@ export default function Notes() {
 
     setSaving(true)
     try {
-      const note = { title: form.title.trim(), body: form.body.trim() || null, category: form.category, product_id: form.product_id || null }
+      const note = {
+        title: form.title.trim(),
+        body: form.body.trim() || null,
+        category: form.category,
+        priority: form.priority,
+        product_id: form.product_id || null,
+      }
       if (editingNote) {
         const { error } = await updateNote(editingNote.id, note, currentBusinessId)
         if (error) throw error
@@ -235,6 +259,9 @@ export default function Notes() {
                 <div className='flex items-start justify-between gap-2'>
                   <div className='flex flex-wrap items-center gap-2'>
                     <Badge tone={CATEGORIES[note.category]?.tone}>{CATEGORIES[note.category]?.label}</Badge>
+                    {note.priority !== 'normal' && (
+                      <Badge tone={PRIORITIES[note.priority]?.tone}>{PRIORITIES[note.priority]?.label}</Badge>
+                    )}
                     {note.product_id && productById.get(note.product_id) && (
                       <span className='rounded-full bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-500'>
                         {productById.get(note.product_id).name}
@@ -278,17 +305,31 @@ export default function Notes() {
                 className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none'
               />
             </div>
-            <div>
-              <label className='mb-1 block text-sm font-semibold text-gray-700'>Categoría</label>
-              <select
-                value={form.category}
-                onChange={(event) => setForm({ ...form, category: event.target.value })}
-                className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none'
-              >
-                {Object.entries(CATEGORIES).map(([value, c]) => (
-                  <option key={value} value={value}>{c.label}</option>
-                ))}
-              </select>
+            <div className='grid grid-cols-2 gap-3'>
+              <div>
+                <label className='mb-1 block text-sm font-semibold text-gray-700'>Categoría</label>
+                <select
+                  value={form.category}
+                  onChange={(event) => setForm({ ...form, category: event.target.value })}
+                  className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none'
+                >
+                  {Object.entries(CATEGORIES).map(([value, c]) => (
+                    <option key={value} value={value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className='mb-1 block text-sm font-semibold text-gray-700'>Prioridad</label>
+                <select
+                  value={form.priority}
+                  onChange={(event) => setForm({ ...form, priority: event.target.value })}
+                  className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none'
+                >
+                  {Object.entries(PRIORITIES).map(([value, p]) => (
+                    <option key={value} value={value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             {products.length > 0 && (
               <div>
@@ -356,6 +397,7 @@ function Badge({ tone, children }) {
   const colors = {
     amber: 'bg-amber-50 text-amber-700',
     blue: 'bg-blue-50 text-blue-700',
+    teal: 'bg-teal-50 text-teal-700',
     purple: 'bg-purple-50 text-purple-700',
     red: 'bg-red-50 text-red-600',
     gray: 'bg-gray-100 text-gray-500',
