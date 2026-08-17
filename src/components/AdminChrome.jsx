@@ -9,6 +9,7 @@ const TABS = [
   { tab: 'products', label: 'Productos', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
   { tab: 'inventory', label: 'Inventario', icon: 'M4 7.5L12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5m8-4.5L12 12m0 9v-9' },
   { tab: 'clients', label: 'Clientes', icon: 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm13 10v-2a4 4 0 00-3-3.87m-1-11.96a4 4 0 010 7.75' },
+  { tab: 'notes', label: 'Notas', icon: 'M9 3h9a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V7l5-4zm0 0v4a1 1 0 001 1h4M8 13h8m-8 4h5' },
   { tab: 'finances', label: 'Finanzas', icon: 'M12 2v20m5-16.5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6' },
 ]
 
