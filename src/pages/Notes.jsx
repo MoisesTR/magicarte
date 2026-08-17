@@ -22,9 +22,11 @@ const PRIORITIES = {
 }
 const PRIORITY_WEIGHT = { high: 0, normal: 1, low: 2 }
 
+const ASSIGNEES = ['Moisés', 'Ivonne']
+
 const FILTERS = [['all', 'Todas'], ...Object.entries(CATEGORIES).map(([value, c]) => [value, c.label])]
 
-const noteFormInitial = { title: '', body: '', category: 'idea', priority: 'normal', product_id: '' }
+const noteFormInitial = { title: '', body: '', category: 'idea', priority: 'normal', product_id: '', assigned_to: '' }
 
 function sortNotes(list) {
   return [...list].sort((a, b) => {
@@ -53,6 +55,7 @@ export default function Notes() {
   const [form, setForm] = useState(noteFormInitial)
   const [filter, setFilter] = useState('all')
   const [productFilter, setProductFilter] = useState('all')
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -69,6 +72,7 @@ export default function Notes() {
     setDeleteTarget(null)
     setFilter('all')
     setProductFilter('all')
+    setAssigneeFilter('all')
     setSearch('')
     if (user && currentBusinessId) loadNotes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,10 +104,11 @@ export default function Notes() {
     return notes.filter((note) => {
       if (filter !== 'all' && note.category !== filter) return false
       if (productFilter !== 'all' && note.product_id !== productFilter) return false
+      if (assigneeFilter !== 'all' && note.assigned_to !== assigneeFilter) return false
       if (!term) return true
       return note.title.toLowerCase().includes(term) || (note.body || '').toLowerCase().includes(term)
     })
-  }, [notes, filter, productFilter, search])
+  }, [notes, filter, productFilter, assigneeFilter, search])
 
   const resetForm = () => {
     setShowForm(false)
@@ -125,6 +130,7 @@ export default function Notes() {
       category: note.category,
       priority: note.priority || 'normal',
       product_id: note.product_id || '',
+      assigned_to: note.assigned_to || '',
     })
     setShowForm(true)
   }
@@ -153,6 +159,7 @@ export default function Notes() {
         category: form.category,
         priority: form.priority,
         product_id: form.product_id || null,
+        assigned_to: form.assigned_to || null,
       }
       if (editingNote) {
         const { error } = await updateNote(editingNote.id, note, currentBusinessId)
@@ -234,6 +241,16 @@ export default function Notes() {
                 ))}
               </select>
             )}
+            <select
+              value={assigneeFilter}
+              onChange={(event) => setAssigneeFilter(event.target.value)}
+              className='rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none'
+            >
+              <option value='all'>Todos los asignados</option>
+              {ASSIGNEES.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
             <input
               type='search'
               value={search}
@@ -280,7 +297,12 @@ export default function Notes() {
                 <h2 className='mt-2 font-bold text-gray-800'>{note.title}</h2>
                 {note.body && <p className='mt-1.5 flex-1 whitespace-pre-wrap text-sm text-gray-600'>{note.body}</p>}
                 <div className='mt-4 flex items-center justify-between gap-2 border-t border-gray-100 pt-3'>
-                  <p className='text-xs text-gray-400'>{formatDate(note.updated_at)}</p>
+                  <div className='flex items-center gap-2'>
+                    <p className='text-xs text-gray-400'>{formatDate(note.updated_at)}</p>
+                    {note.assigned_to && (
+                      <span className='rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700'>{note.assigned_to}</span>
+                    )}
+                  </div>
                   <div className='flex gap-2'>
                     <button onClick={() => openEdit(note)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50'>Editar</button>
                     <button onClick={() => setDeleteTarget(note)} className='rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50'>Eliminar</button>
@@ -330,6 +352,19 @@ export default function Notes() {
                   ))}
                 </select>
               </div>
+            </div>
+            <div>
+              <label className='mb-1 block text-sm font-semibold text-gray-700'>Asignado a (opcional)</label>
+              <select
+                value={form.assigned_to}
+                onChange={(event) => setForm({ ...form, assigned_to: event.target.value })}
+                className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none'
+              >
+                <option value=''>— Sin asignar —</option>
+                {ASSIGNEES.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
             {products.length > 0 && (
               <div>
