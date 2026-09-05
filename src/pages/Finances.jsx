@@ -6,9 +6,13 @@ import { useBusiness } from '../context/BusinessContext'
 import { fetchPaymentsForBusiness } from '../data/payments'
 import { fetchFinanceOrders } from '../data/orders'
 import { fetchBusinessEarnings, fetchPartnerSettlements } from '../data/businesses'
-
-const COMMISSION_RATE = 0.0675
-const TZ = 'America/Managua'
+import MachineGoals from '../components/MachineGoals'
+import {
+  COMMISSION_RATE,
+  TZ,
+  moneyNIO as money,
+  summarisePayments as summarise,
+} from '../utils/finance'
 
 function nicaraguaMonth(dateStr) {
   // Returns 'YYYY-MM' for a date string or ISO timestamp, in Nicaragua time.
@@ -119,27 +123,12 @@ function last6Months() {
   return months
 }
 
-function summarise(payments) {
-  const paid = payments.reduce((s, p) => s + Number(p.amount), 0)
-  const paidCard = payments.filter(p => p.method === 'tarjeta').reduce((s, p) => s + Number(p.amount), 0)
-  const commission = paidCard * COMMISSION_RATE
-  return { paid, paidCard, commission, net: paid - commission }
-}
-
 const methodColor = {
   efectivo: 'bg-emerald-100 text-emerald-800',
   transferencia: 'bg-sky-100 text-sky-800',
   tarjeta: 'bg-violet-100 text-violet-800',
 }
 const methodLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
-
-const money = (value) =>
-  new Intl.NumberFormat('es-NI', {
-    style: 'currency',
-    currency: 'NIO',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0))
 
 export default function Finances() {
   const navigate = useNavigate()
@@ -340,6 +329,8 @@ export default function Finances() {
                 </div>
               </div>
             </div>
+
+            <MachineGoals businessId={currentBusinessId} payments={payments} />
 
             {currentSettlement && (
               <div className='rounded-2xl border border-amber-200 bg-amber-50 p-5'>
