@@ -330,7 +330,7 @@ export default function Finances() {
               </div>
             </div>
 
-            <MachineGoals businessId={currentBusinessId} payments={payments} />
+            <MachineGoals businessId={currentBusinessId} />
 
             {currentSettlement && (
               <div className='rounded-2xl border border-amber-200 bg-amber-50 p-5'>

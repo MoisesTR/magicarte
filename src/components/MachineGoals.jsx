@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { useBusiness } from '../context/BusinessContext'
 import { createMachine, deleteMachine, fetchBusinessMachines, updateMachine } from '../data/machines'
+import { fetchPaymentAmounts } from '../data/payments'
 import { daysBetween, moneyNIO, nicaraguaDay, nicaraguaToday, summarisePayments } from '../utils/finance'
 
-const formInitial = { name: '', monthly_amount: '', cycle_day: '1', notes: '', is_active: true }
+const formInitial = { name: '', monthly_amount: '', cycle_day: '1', notes: '', is_active: true, shared_with: [] }
 
 const storageKey = (businessId) => `machine-goal:${businessId}`
 
 const toIsoDay = (date) => date.toISOString().slice(0, 10)
+
+/** The businesses a machine is linked to, as {id, name, slug} rows. */
+const linkedBusinessesOf = (machine) => (machine.business_machine_links || []).map((link) => link.businesses).filter(Boolean)
+
+const joinNames = (list) => {
+  if (list.length === 0) return ''
+  if (list.length === 1) return list[0]
+  return `${list.slice(0, -1).join(', ')} y ${list[list.length - 1]}`
+}
 
 /**
  * The billing cycle containing today, shifted by `offset` cycles.
@@ -26,7 +37,8 @@ function cycleRange(cycleDay, offset, today) {
 const dayLabel = (iso) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString('es-NI', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 
-export default function MachineGoals({ businessId, payments }) {
+export default function MachineGoals({ businessId }) {
+  const { businesses } = useBusiness()
   const [machines, setMachines] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState('')
@@ -35,6 +47,7 @@ export default function MachineGoals({ businessId, payments }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(formInitial)
   const [saving, setSaving] = useState(false)
+  const [payments, setPayments] = useState([])
 
   useEffect(() => {
     setSelectedId('')
@@ -66,6 +79,31 @@ export default function MachineGoals({ businessId, payments }) {
   }
 
   const selected = machines.find((m) => m.id === selectedId) || null
+  const linkedBusinesses = selected ? linkedBusinessesOf(selected) : []
+  const otherLinkedNames = joinNames(linkedBusinesses.filter((b) => b.id !== businessId).map((b) => b.name))
+  // Which businesses the goal must combine — keyed so the effect below also
+  // reruns when editing a machine changes its shared businesses, not just
+  // when a different machine is selected (its id alone wouldn't change).
+  const linkedBusinessKey = linkedBusinesses.map((b) => b.id).sort((a, b) => a - b).join(',')
+
+  // A shared machine's goal counts net receipts from every business it's
+  // linked to, not just the one currently being viewed.
+  useEffect(() => {
+    if (!selected) {
+      setPayments([])
+      return
+    }
+    let active = true
+    fetchPaymentAmounts(linkedBusinesses.map((b) => b.id)).then(({ data, error }) => {
+      if (!active) return
+      if (error) toast.error(`No se pudieron cargar los pagos: ${error.message}`)
+      else setPayments(data || [])
+    })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, linkedBusinessKey])
 
   const goal = useMemo(() => {
     if (!selected) return null
@@ -105,6 +143,9 @@ export default function MachineGoals({ businessId, payments }) {
             cycle_day: String(machine.cycle_day),
             notes: machine.notes || '',
             is_active: machine.is_active,
+            shared_with: linkedBusinessesOf(machine)
+              .map((b) => b.id)
+              .filter((id) => id !== businessId),
           }
         : formInitial,
     )
@@ -124,9 +165,10 @@ export default function MachineGoals({ businessId, payments }) {
       notes: form.notes.trim() || null,
       is_active: form.is_active,
     }
+    const linkedIds = [businessId, ...form.shared_with]
     const { data, error } = editing
-      ? await updateMachine(editing.id, payload, businessId)
-      : await createMachine(payload, businessId)
+      ? await updateMachine(editing.id, payload, linkedIds)
+      : await createMachine(payload, linkedIds)
     setSaving(false)
 
     if (error) return toast.error(`No se pudo guardar: ${error.message}`)
@@ -140,7 +182,7 @@ export default function MachineGoals({ businessId, payments }) {
   const removeMachine = async (machine) => {
     const { error } = await deleteMachine(machine.id, businessId)
     if (error) return toast.error(`No se pudo eliminar: ${error.message}`)
-    toast.success('Máquina eliminada')
+    toast.success(linkedBusinessesOf(machine).length > 1 ? 'Máquina quitada de este negocio' : 'Máquina eliminada')
     if (machine.id === selectedId) selectMachine('')
     await loadMachines()
   }
@@ -161,7 +203,8 @@ export default function MachineGoals({ businessId, payments }) {
             {machines.map((machine) => (
               <option key={machine.id} value={machine.id}>
                 {machine.name}
-                {machine.is_active ? '' : ' (inactiva)'}
+                {!machine.is_active ? ' (inactiva)' : ''}
+                {linkedBusinessesOf(machine).length > 1 ? ' · compartida' : ''}
               </option>
             ))}
           </select>
@@ -184,7 +227,7 @@ export default function MachineGoals({ businessId, payments }) {
         </p>
       ) : (
         <>
-          <div className='flex items-center justify-between gap-3 mb-4'>
+          <div className='flex items-center justify-between gap-3 mb-1'>
             <button
               onClick={() => setCycleOffset((offset) => offset - 1)}
               className='text-gray-400 hover:text-[#51c879] px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors'
@@ -206,7 +249,11 @@ export default function MachineGoals({ businessId, payments }) {
             </button>
           </div>
 
-          <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
+          {otherLinkedNames && (
+            <p className='text-center text-xs text-violet-500 mb-3'>Compartida con {otherLinkedNames}</p>
+          )}
+
+          <div className='grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3'>
             <div className='bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl'>
               <p className='text-xs text-gray-500 font-medium mb-1'>Meta del ciclo</p>
               <p className='text-xl font-bold text-gray-900'>{moneyNIO(goal.target)}</p>
@@ -246,7 +293,9 @@ export default function MachineGoals({ businessId, payments }) {
             />
           </div>
           <p className='text-[11px] text-gray-400 mt-2'>
-            Cuenta el neto recibido (pagos del ciclo menos comisión de tarjeta).
+            {otherLinkedNames
+              ? `Cuenta el neto recibido combinado de ${businesses.find((b) => b.id === businessId)?.name || 'este negocio'} y ${otherLinkedNames} (pagos del ciclo menos comisión de tarjeta).`
+              : 'Cuenta el neto recibido (pagos del ciclo menos comisión de tarjeta).'}
           </p>
         </>
       )}
@@ -257,6 +306,8 @@ export default function MachineGoals({ businessId, payments }) {
           editing={editing}
           form={form}
           saving={saving}
+          businesses={businesses}
+          businessId={businessId}
           onChange={setForm}
           onOpenForm={openForm}
           onSubmit={submitForm}
@@ -272,9 +323,16 @@ export default function MachineGoals({ businessId, payments }) {
   )
 }
 
-function MachineManager({ machines, editing, form, saving, onChange, onOpenForm, onSubmit, onDelete, onClose }) {
+function MachineManager({ machines, editing, form, saving, businesses, businessId, onChange, onOpenForm, onSubmit, onDelete, onClose }) {
   const field = (key) => (event) =>
     onChange({ ...form, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value })
+
+  const otherBusinesses = businesses.filter((b) => b.id !== businessId)
+  const toggleShared = (id) =>
+    onChange({
+      ...form,
+      shared_with: form.shared_with.includes(id) ? form.shared_with.filter((x) => x !== id) : [...form.shared_with, id],
+    })
 
   return (
     <div className='fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4'>
@@ -290,31 +348,39 @@ function MachineManager({ machines, editing, form, saving, onChange, onOpenForm,
           {machines.length === 0 ? (
             <p className='px-5 py-6 text-center text-sm text-gray-400'>Sin máquinas registradas.</p>
           ) : (
-            machines.map((machine) => (
-              <div key={machine.id} className='flex items-center gap-3 px-5 py-3'>
-                <div className='flex-1 min-w-0'>
-                  <p className='text-sm font-semibold text-gray-800 truncate'>
-                    {machine.name}
-                    {!machine.is_active && <span className='ml-2 text-xs font-normal text-gray-400'>inactiva</span>}
-                  </p>
-                  <p className='text-xs text-gray-400'>
-                    {moneyNIO(machine.monthly_amount)} · ciclo del {machine.cycle_day}
-                  </p>
+            machines.map((machine) => {
+              const sharedNames = joinNames(
+                linkedBusinessesOf(machine)
+                  .filter((b) => b.id !== businessId)
+                  .map((b) => b.name),
+              )
+              return (
+                <div key={machine.id} className='flex items-center gap-3 px-5 py-3'>
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm font-semibold text-gray-800 truncate'>
+                      {machine.name}
+                      {!machine.is_active && <span className='ml-2 text-xs font-normal text-gray-400'>inactiva</span>}
+                    </p>
+                    <p className='text-xs text-gray-400'>
+                      {moneyNIO(machine.monthly_amount)} · ciclo del {machine.cycle_day}
+                      {sharedNames && ` · compartida con ${sharedNames}`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onOpenForm(machine)}
+                    className='text-xs text-gray-400 hover:text-[#51c879] px-2 py-1 rounded-lg hover:bg-gray-50'
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => onDelete(machine)}
+                    className='text-xs text-gray-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50'
+                  >
+                    {sharedNames ? 'Quitar' : 'Eliminar'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => onOpenForm(machine)}
-                  className='text-xs text-gray-400 hover:text-[#51c879] px-2 py-1 rounded-lg hover:bg-gray-50'
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => onDelete(machine)}
-                  className='text-xs text-gray-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50'
-                >
-                  Eliminar
-                </button>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
@@ -355,6 +421,36 @@ function MachineManager({ machines, editing, form, saving, onChange, onOpenForm,
               </select>
             </label>
           </div>
+
+          {otherBusinesses.length > 0 && (
+            <div>
+              <span className='text-xs text-gray-500'>Compartir con</span>
+              <div className='mt-1 flex flex-wrap gap-2'>
+                {otherBusinesses.map((b) => (
+                  <label
+                    key={b.id}
+                    className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs cursor-pointer transition-colors ${
+                      form.shared_with.includes(b.id)
+                        ? 'border-[#51c879] bg-[#51c879]/10 text-emerald-800'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type='checkbox'
+                      checked={form.shared_with.includes(b.id)}
+                      onChange={() => toggleShared(b.id)}
+                      className='rounded'
+                    />
+                    {b.name}
+                  </label>
+                ))}
+              </div>
+              <p className='mt-1 text-[11px] text-gray-400'>
+                El neto de los negocios marcados se suma para cubrir esta misma meta.
+              </p>
+            </div>
+          )}
+
           <textarea
             value={form.notes}
             onChange={field('notes')}

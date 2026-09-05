@@ -18,6 +18,11 @@ export function fetchPaymentsForBusiness(businessId) {
   return query
 }
 
+/** Lean payment amounts (no joins) across one or more businesses — used for machine goal math. */
+export function fetchPaymentAmounts(businessIds) {
+  return supabase.from(TABLE.ORDER_PAYMENTS).select('amount, method, paid_at, business_id').in('business_id', businessIds)
+}
+
 /** Add a payment to an order, stamping the owning business. Returns the row. */
 export function addPayment(payment, businessId) {
   return supabase
