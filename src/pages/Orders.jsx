@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../config/supabaseClient'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
 import { useBusiness } from '../context/BusinessContext'
 import {
@@ -13,6 +13,7 @@ import {
   insertOrderItems,
 } from '../data/orders'
 import {
+  fetchClientsForBusiness,
   searchClientsByName,
   fetchClientById,
   findClientByPhone,
@@ -20,9 +21,19 @@ import {
 } from '../data/clients'
 import { addPayment as addPaymentRow, deletePayment as deletePaymentRow } from '../data/payments'
 import toast from 'react-hot-toast'
+import { fetchCalcQuote, fetchOrderForQuote, fetchProductForQuote } from '../data/calcQuotes'
+import { newOrderForm, orderFormFromQuote, calculatorDataFromQuote } from '../utils/quoteForms'
 
 export default function Orders() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const quoteParams = new URLSearchParams(location.search)
+  const quoteId = quoteParams.get('cotizacion')
+  const quoteDeliveryDate = quoteParams.get('entrega')
+  const handledQuote = useRef(null)
+  const quoteRequest = useRef(0)
+  const [sourceQuote, setSourceQuote] = useState(null)
+  const [existingQuoteOrder, setExistingQuoteOrder] = useState(null)
   const { currentBusinessId, currentBusiness } = useBusiness()
   // In-person business (engraving): no delivery / recipient / gift fields.
   const isInPerson = currentBusiness?.slug === 'joyeria-trigueros'
@@ -67,28 +78,7 @@ export default function Orders() {
   // Temporary UI toggles. Flip to true to bring these back.
   const SHOW_SOCIAL_MEDIA = false
   const SHOW_WHATSAPP_REMINDER = false
-  const [formData, setFormData] = useState({
-    client_id: null,
-    customer_name: '',
-    customer_phone: '',
-    customer_social_media: '',
-    delivery_address: '',
-    delivery_method: 'delivery',
-    order_date: new Date().toISOString().split('T')[0],
-    status: 'pending',
-    priority: 'normal',
-    payment_status: 'unpaid',
-    payment_method: 'not_specified',
-    follow_up_reason: '',
-    follow_up_date: '',
-    notes: '',
-    estimated_delivery_date: '',
-    delivery_fee: 0,
-    recipient_name: '',
-    recipient_phone: '',
-    is_gift: false,
-    items: []
-  })
+  const [formData, setFormData] = useState(() => newOrderForm(new Date().toISOString().split('T')[0]))
 
   useEffect(() => {
     const checkUser = async () => {
@@ -110,6 +100,57 @@ export default function Orders() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusinessId, user])
+
+  useEffect(() => {
+    if (!user || !currentBusinessId || !quoteId) return
+    const key = `${currentBusinessId}:${quoteId}:${quoteDeliveryDate || ''}`
+    if (handledQuote.current === key) return
+    let ignore = false
+    const request = ++quoteRequest.current
+    const isCurrent = () => !ignore && request === quoteRequest.current
+
+    const loadQuote = async () => {
+      try {
+        const { data: quote, error } = await fetchCalcQuote(quoteId, currentBusinessId)
+        if (!isCurrent()) return
+        if (error || !quote) {
+          handledQuote.current = key
+          toast.error('No se encontró la cotización')
+          return
+        }
+        const [clientsResult, productResult, orderResult] = await Promise.all([
+          fetchClientsForBusiness(currentBusinessId),
+          fetchProductForQuote(quoteId, currentBusinessId),
+          fetchOrderForQuote(quoteId, currentBusinessId),
+        ])
+        if (!isCurrent()) return
+        // Only the quote is required; client matching and duplicate notices are best-effort.
+        handledQuote.current = key
+        const prefilled = orderFormFromQuote(quote, {
+          deliveryDate: quoteDeliveryDate,
+          clients: clientsResult.error ? [] : (clientsResult.data || []),
+          linkedProduct: productResult.error ? null : productResult.data,
+          orderDate: new Date().toISOString().split('T')[0],
+        })
+        prefilled.items[0]._key = crypto.randomUUID()
+        setFormData(prefilled)
+        setEditingOrder(null)
+        setEditPayments([])
+        setClientMatches([])
+        setClientSearchOpen(false)
+        setSourceQuote(quote)
+        setExistingQuoteOrder(orderResult.error ? null : orderResult.data)
+        setShowForm(true)
+      } catch {
+        if (isCurrent()) {
+          handledQuote.current = key
+          toast.error('No se pudo completar el formulario desde la cotización')
+        }
+      }
+    }
+    loadQuote()
+    return () => { ignore = true }
+  }, [user, currentBusinessId, quoteId, quoteDeliveryDate])
 
   // Engraving is a log of completed jobs → show all by default; otherwise active.
   useEffect(() => {
@@ -450,6 +491,7 @@ export default function Orders() {
 
         await deleteOrderItems(orderId)
       } else {
+        if (sourceQuote) orderData.calculator_data = calculatorDataFromQuote(sourceQuote)
         const { data, error } = await createOrder(orderData, currentBusinessId)
 
         if (error) throw error
@@ -483,6 +525,12 @@ export default function Orders() {
 
       if (itemsError) throw itemsError
 
+      if (!editingOrder && sourceQuote) {
+        const params = new URLSearchParams(location.search)
+        params.delete('cotizacion')
+        params.delete('entrega')
+        navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true })
+      }
       toast.success(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
       resetForm()
       fetchOrders()
@@ -494,28 +542,10 @@ export default function Orders() {
   }
 
   const resetForm = () => {
-    setFormData({
-      client_id: null,
-      customer_name: '',
-      customer_phone: '',
-      customer_social_media: '',
-      delivery_address: '',
-      delivery_method: 'delivery',
-      order_date: new Date().toISOString().split('T')[0],
-      status: 'pending',
-      priority: 'normal',
-      payment_status: 'unpaid',
-      payment_method: 'not_specified',
-      follow_up_reason: '',
-      follow_up_date: '',
-      notes: '',
-      estimated_delivery_date: '',
-      delivery_fee: 0,
-      recipient_name: '',
-      recipient_phone: '',
-      is_gift: false,
-      items: []
-    })
+    quoteRequest.current += 1
+    setSourceQuote(null)
+    setExistingQuoteOrder(null)
+    setFormData(newOrderForm(new Date().toISOString().split('T')[0]))
     setEditingOrder(null)
     setEditPayments([])
     setClientMatches([])
@@ -524,6 +554,9 @@ export default function Orders() {
   }
 
   const editOrder = (order) => {
+    quoteRequest.current += 1
+    setSourceQuote(null)
+    setExistingQuoteOrder(null)
     setFormData({
       client_id: order.client_id || null,
       customer_name: order.customer_name,
@@ -1181,7 +1214,7 @@ export default function Orders() {
               {/* Row 1: Action + Search */}
               <div className='flex flex-wrap items-center gap-3'>
                 <button
-                  onClick={() => setShowForm(true)}
+                  onClick={() => { quoteRequest.current += 1; setShowForm(true) }}
                   className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all shadow-lg'
                 >
                   + Nuevo Pedido
@@ -1786,6 +1819,15 @@ export default function Orders() {
 
               <form onSubmit={handleSubmit} className='flex flex-col flex-1 overflow-hidden'>
                 <div className='admin-modal-body p-5 space-y-5'>
+
+                  {sourceQuote && !editingOrder && (
+                    <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
+                      Completado desde la cotización «{sourceQuote.name}». Revisa y guarda.
+                      {existingQuoteOrder && (
+                        <p className='mt-1'>Esta cotización ya tiene el pedido #{existingQuoteOrder.order_number}</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Cliente */}
                   <div>

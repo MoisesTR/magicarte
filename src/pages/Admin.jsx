@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
@@ -18,8 +19,17 @@ import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 import toast from 'react-hot-toast'
 import heic2any from 'heic2any'
+import { fetchCalcQuote, fetchProductForQuote } from '../data/calcQuotes'
+import { newProductForm, productFormFromQuote } from '../utils/quoteForms'
 
 export default function Admin() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const quoteId = new URLSearchParams(location.search).get('cotizacion')
+  const handledQuote = useRef(null)
+  const quoteRequest = useRef(0)
+  const [sourceQuote, setSourceQuote] = useState(null)
+  const [existingQuoteProduct, setExistingQuoteProduct] = useState(null)
   const { currentBusinessId, currentBusiness } = useBusiness()
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
@@ -54,28 +64,8 @@ export default function Admin() {
     }
   }
 
-  const DEFAULT_MATERIAL = 'Trabajo realizado en MDF (Fibrán) mediante técnica de corte láser. Cada pieza es lijada, pintada a mano y barnizada con capa protectora 🎨'
-  const DEFAULT_CARE = `Para limpiar tu producto te recomendamos usar una brocha seca (como las de maquillaje) o un plumero para sacar el polvo de los relieves y rendijas de forma delicada.
-
-No recomendamos usar ningún producto líquido, ya sea agua o químicos de limpieza, ya que pueden afectar el acabado de la madera (MDF) o la pintura.
-
-No exponer a los rayos directos del sol durante períodos prolongados de tiempo, ya que podría opacar la pintura y perder su brillo.
-
-Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cuidado y cariño. El MDF no resiste impactos fuertes ni caídas.`
-
   // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    description: '',
-    category_id: '',
-    stock_quantity: 1,
-    image_url: '',
-    secondary_images: [],
-    material_technique: DEFAULT_MATERIAL,
-    care_instructions: DEFAULT_CARE,
-    is_visible: true
-  })
+  const [formData, setFormData] = useState(newProductForm)
 
   const [imageFiles, setImageFiles] = useState({
     main: null,
@@ -245,6 +235,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
       if (editingProduct) {
         result = await updateProduct(editingProduct.id, productData)
       } else {
+        if (sourceQuote) productData.calc_quote_id = sourceQuote.id
         result = await createProduct(productData, currentBusinessId)
       }
 
@@ -257,6 +248,12 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
           toast.error(`Error al guardar el producto: ${result.error.message}`)
         }
       } else {
+        if (!editingProduct && sourceQuote) {
+          const params = new URLSearchParams(location.search)
+          params.delete('cotizacion')
+          params.delete('entrega')
+          navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true })
+        }
         toast.success(editingProduct ? 'Producto actualizado!' : 'Producto creado!')
         resetForm()
         fetchProducts()
@@ -279,20 +276,10 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      price: '',
-      width: '',
-      length: '',
-      description: '',
-      category_id: '',
-      stock_quantity: 1,
-      image_url: '',
-      secondary_images: [],
-      material_technique: DEFAULT_MATERIAL,
-      care_instructions: DEFAULT_CARE,
-      is_visible: true
-    })
+    quoteRequest.current += 1
+    setSourceQuote(null)
+    setExistingQuoteProduct(null)
+    setFormData(newProductForm())
     setImageFiles({ main: null, secondary: [] })
     setMainPreviewUrl(null)
     setEditingProduct(null)
@@ -302,6 +289,9 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
   }
 
   const editProduct = (product) => {
+    quoteRequest.current += 1
+    setSourceQuote(null)
+    setExistingQuoteProduct(null)
     setFormData({
       name: product.name || '',
       price: product.price || '',
@@ -351,6 +341,45 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusinessId, user])
 
+  useEffect(() => {
+    if (!user || !currentBusinessId || currentBusiness.slug !== 'magicarte' || !quoteId) return
+    const key = `${currentBusinessId}:${quoteId}`
+    if (handledQuote.current === key) return
+    let ignore = false
+    const request = ++quoteRequest.current
+    const isCurrent = () => !ignore && request === quoteRequest.current
+
+    const loadQuote = async () => {
+      try {
+        const { data: quote, error } = await fetchCalcQuote(quoteId, currentBusinessId)
+        if (!isCurrent()) return
+        if (error || !quote) {
+          handledQuote.current = key
+          toast.error('No se encontró la cotización')
+          return
+        }
+        const { data: product, error: productError } = await fetchProductForQuote(quoteId, currentBusinessId)
+        if (!isCurrent()) return
+        // The duplicate notice is best-effort; it must never block the prefilled form.
+        handledQuote.current = key
+        setFormData(productFormFromQuote(quote))
+        setEditingProduct(null)
+        setImageFiles({ main: null, secondary: [] })
+        setMainPreviewUrl(null)
+        setSourceQuote(quote)
+        setExistingQuoteProduct(productError ? null : product)
+        setShowForm(true)
+      } catch {
+        if (isCurrent()) {
+          handledQuote.current = key
+          toast.error('No se pudo completar el formulario desde la cotización')
+        }
+      }
+    }
+    loadQuote()
+    return () => { ignore = true }
+  }, [user, currentBusinessId, currentBusiness.slug, quoteId])
+
   const handleLogin = (userData) => {
     setUser(userData)
     fetchProducts()
@@ -390,7 +419,7 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
             </div>
             <div className='flex flex-wrap gap-2'>
               <button
-                onClick={() => setShowForm(true)}
+                onClick={() => { quoteRequest.current += 1; setShowForm(true) }}
                 className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm'
               >
                 + Nuevo Producto
@@ -563,6 +592,15 @@ Cada pieza es una obra artesanal única, por lo que te pedimos manejarla con cui
                 </div>
 
                 <form onSubmit={handleSubmit} className='space-y-6'>
+                  {sourceQuote && !editingProduct && (
+                    <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
+                      Completado desde la cotización «{sourceQuote.name}». Se guardará oculto: agrega la foto y actívalo cuando esté listo.
+                      {existingQuoteProduct && (
+                        <p className='mt-1'>Esta cotización ya tiene el producto «{existingQuoteProduct.name}»</p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Basic Info */}
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                     <div>
