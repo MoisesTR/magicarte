@@ -73,11 +73,16 @@ function validDeliveryDate(value) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : ''
 }
 
+// Whole-order calculator measurements describe the nest of all pieces, not one piece.
+function pieceDimension(state, key) {
+  return state?.materialScope === 'order' ? '' : positiveDimension(state?.[key])
+}
+
 export function orderFormFromQuote(quote, { deliveryDate, clients = [], linkedProduct, orderDate = '' } = {}) {
   const name = normalizedName(quote.client_name)
   const client = name ? clients.find(client => normalizedName(client.name) === name) : null
-  const width = positiveDimension(quote.state?.widthCm)
-  const height = positiveDimension(quote.state?.heightCm)
+  const width = pieceDimension(quote.state, 'widthCm')
+  const height = pieceDimension(quote.state, 'heightCm')
   return {
     ...newOrderForm(orderDate),
     client_id: client?.id || null,
@@ -124,8 +129,8 @@ export function productFormFromQuote(quote) {
     ...defaults,
     name: quote.name,
     price: roundedPrice(quote.unit_price),
-    width: positiveDimension(quote.state?.widthCm),
-    length: positiveDimension(quote.state?.heightCm),
+    width: pieceDimension(quote.state, 'widthCm'),
+    length: pieceDimension(quote.state, 'heightCm'),
     material_technique: TEMPLATE_MATERIALS.get(quote.template_id) || defaults.material_technique,
     is_visible: false,
   }

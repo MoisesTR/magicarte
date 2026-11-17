@@ -162,3 +162,14 @@ test('mappers are deterministic and do not mutate quote, clients or linked produ
   assert.deepEqual(productFormFromQuote(frozenQuote), productFormFromQuote(frozenQuote))
   assert.deepEqual(calculatorDataFromQuote(frozenQuote), calculatorDataFromQuote(frozenQuote))
 })
+
+test('whole-order measurements are never copied as the piece size', () => {
+  const nested = { ...quote, state: { widthCm: 30, heightCm: 23, materialScope: 'order' } }
+  assert.equal(orderFormFromQuote(nested).items[0].product_description, '')
+  const product = productFormFromQuote(nested)
+  assert.equal(product.width, '')
+  assert.equal(product.length, '')
+  const perPiece = { ...quote, state: { widthCm: 30, heightCm: 23, materialScope: 'piece' } }
+  assert.equal(productFormFromQuote(perPiece).width, 30)
+  assert.equal(orderFormFromQuote(perPiece).items[0].product_description, 'Medida: 30 × 23 cm')
+})
