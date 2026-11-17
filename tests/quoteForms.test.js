@@ -173,3 +173,8 @@ test('whole-order measurements are never copied as the piece size', () => {
   assert.equal(productFormFromQuote(perPiece).width, 30)
   assert.equal(orderFormFromQuote(perPiece).items[0].product_description, 'Medida: 30 × 23 cm')
 })
+
+test('layered ornament quotes suggest the wood and acrylic technique', () => {
+  const form = productFormFromQuote({ ...quote, template_id: 'layeredOrnament' })
+  assert.equal(form.material_technique, 'Madera cortada y grabada con láser, con capa de acrílico.')
+})

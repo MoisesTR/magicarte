@@ -14,6 +14,7 @@ const TEMPLATE_MATERIALS = new Map([
   ['uvOnWood', 'Impresión UV a todo color sobre madera.'],
   ['print3d', 'Pieza impresa en 3D.'],
   ['print3dUv', 'Pieza impresa en 3D con detalles en impresión UV.'],
+  ['layeredOrnament', 'Madera cortada y grabada con láser, con capa de acrílico.'],
 ])
 
 export function newOrderForm(orderDate = '') {
