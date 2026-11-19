@@ -26,6 +26,7 @@ const HikariProducts = lazy(() => import('./pages/hikari/Products'))
 const JoyeriaOrders = lazy(() => import('./pages/joyeria/Orders'))
 const JoyeriaProducts = lazy(() => import('./pages/joyeria/Products'))
 const Inventory = lazy(() => import('./pages/Inventory'))
+const PublicFilamentColors = lazy(() => import('./pages/PublicFilamentColors'))
 const Notes = lazy(() => import('./pages/Notes'))
 
 // Tab → per-business component. Falls back to the Magic Arte screen for any
@@ -104,6 +105,7 @@ export default function App() {
                 <Route path='/' element={<Home />} />
                 <Route path='/products' element={<Products />} />
                 <Route path='/product/:id' element={<ProductDetail />} />
+                <Route path='/:business/colores' element={<PublicFilamentColors />} />
                 {/* Admin: the active business lives in the URL. */}
                 <Route path='/admin' element={<AdminIndexRedirect />} />
                 <Route path='/admin/:business/orders' element={<BusinessOrders />} />

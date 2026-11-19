@@ -1,0 +1,57 @@
+.filament-wall, .public-colors { --filament-accent: #8973be; --filament-ink: #292737; --filament-paper: #f8f6f1; color: var(--filament-ink); min-width: 0; }
+.filament-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.filament-card { display: flex; min-width: 0; flex-direction: column; text-align: left; padding: 12px; border: 1px solid #eae7e0; border-radius: 24px; background: #fffefa; box-shadow: 0 4px 16px #29273704; color: var(--filament-ink); }
+button.filament-card { cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s; }
+button.filament-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px #29273710; border-color: var(--filament-accent); }
+.filament-wall button:focus-visible, .filament-card:focus-visible, .public-colors button:focus-visible, .filament-drawer button:focus-visible { outline: 3px solid var(--filament-accent); outline-offset: 4px; }
+.filament-card-art { position: relative; display: grid; place-items: center; min-width: 0; padding: 10px 0 20px; border-radius: 16px; background: radial-gradient(ellipse at 50% 45%, #eeeae263, transparent 72%); }
+.filament-spool { display: inline-block; position: relative; width: min(100%, 174px); aspect-ratio: 1; padding: 6%; filter: drop-shadow(0 12px 8px #29273717); }
+.filament-spool::before { content: ''; position: absolute; inset: 9% 5% 4% 11%; border-radius: 50%; background: var(--spool-color); box-shadow: inset 0 -8px 0 #0003, 0 0 0 1px #0002; }
+.filament-spool-disc { position: relative; display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(circle at center, transparent 0 2px, #00000010 2.5px 3px), var(--spool-color); box-shadow: inset 0 0 0 5px #00000026, inset 0 0 0 8px #ffffff45, inset 0 -10px 18px #00000012, 0 0 0 1px #00000020; }
+.filament-spool-disc::after { content: ''; position: absolute; inset: 12%; border-radius: 50%; border: 1px solid #ffffff50; box-shadow: 0 0 0 2px #00000008; }
+.filament-spool-finish { position: absolute; inset: 8px; border-radius: 50%; }
+.filament-spool-silk .filament-spool-finish { background: linear-gradient(125deg, transparent 15%, #ffffff06 30%, #ffffff7a 46%, #ffffff08 61%, #00000018 80%, transparent); }
+.filament-spool-marble .filament-spool-finish { background-image: radial-gradient(#31313e55 .7px, transparent 1px), radial-gradient(#31313e33 1px, transparent 1.6px); background-position: 2px 3px, 8px 12px; background-size: 13px 17px, 23px 21px; opacity: .65; }
+.filament-spool-wood .filament-spool-finish { background: repeating-linear-gradient(83deg, transparent 0 6px, #51341816 7px, transparent 9px, #fff2 11px, transparent 17px); }
+.filament-spool-glass .filament-spool-disc { background: linear-gradient(125deg, #ffffffa6, #ffffff1a 48%, #ffffffb3), conic-gradient(#b7bec666 25%, #f5f7fa66 0 50%, #b7bec666 0 75%, #f5f7fa66 0); background-size: 100% 100%, 16px 16px; box-shadow: inset 0 0 0 5px #fff9, inset 0 0 0 8px #9ca9bb77, inset 0 -10px 18px #92adbf33, 0 0 0 1px #adbac7; }
+.filament-spool-glass::before { background: #d6e1e5; }
+.filament-spool-hub { position: absolute; z-index: 1; display: grid; place-items: center; width: 29%; aspect-ratio: 1; border-radius: 50%; background: linear-gradient(135deg, #eee9df, #c6c3bc); box-shadow: 0 0 0 3px #ffffff65, 0 2px 3px #0002; }
+.filament-spool-hub > span { width: 52%; aspect-ratio: 1; border-radius: 50%; background: #fbfaf7; box-shadow: inset 2px 4px 6px #0005, 0 0 0 1px #0001; }
+.filament-spool-large { width: min(100%, 270px); padding: 5%; }
+.filament-card-caption { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; padding: 2px 2px 4px; }
+.filament-card-material { color: #716c7b; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; overflow-wrap: anywhere; }
+.filament-card-name { font-size: 15px; line-height: 1.25; font-weight: 750; overflow-wrap: anywhere; }
+.filament-card-english { font-size: 11px; line-height: 1.4; color: #726c7c; overflow-wrap: anywhere; }
+.filament-stock-text { margin-top: 10px; font-size: 12px; font-weight: 650; }
+.filament-stock-bar { display: block; height: 5px; margin-top: 6px; overflow: hidden; border-radius: 9px; background: #eeece8; }
+.filament-stock-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--filament-accent); }
+.filament-card-empty .filament-spool { filter: grayscale(.85) opacity(.55); }
+.filament-badge { position: absolute; right: -2px; bottom: 2px; border: 1px solid #f4dca0; border-radius: 20px; padding: 4px 8px; background: #fff6dc; font-size: 10px; font-weight: 700; line-height: 1.3; color: #845711; }
+.filament-badge-muted { background: #f0efed; border-color: #dedbd6; color: #736e79; }
+.filament-pill, .filament-action { min-height: 40px; border: 1px solid #e0dcd5; border-radius: 99px; background: #fffefa; padding: 8px 14px; font-size: 12px; font-weight: 650; color: #514b5d; cursor: pointer; }
+.filament-pill[aria-pressed='true'] { background: var(--filament-ink); color: #fff; border-color: var(--filament-ink); }
+.filament-action { border-radius: 14px; }
+.filament-action-primary { background: var(--filament-ink); color: white; border-color: var(--filament-ink); }
+.filament-action:disabled { opacity: .45; cursor: not-allowed; }
+.filament-group-heading { display: flex; align-items: baseline; gap: 8px; margin: 24px 0 14px; font-size: 19px; font-weight: 750; }
+.filament-group-heading > span { font-size: 12px; font-weight: 500; color: #827b87; }
+.filament-wall-header { padding: 24px; border: 1px solid #e8e3d9; border-radius: 26px; background: linear-gradient(120deg, #fffdf7, #eee8f366); }
+.filament-wall-title { font-size: clamp(26px, 5vw, 40px); letter-spacing: -.04em; line-height: 1.1; font-weight: 800; }
+.filament-drawer { --filament-accent: #8973be; --filament-ink: #292737; }
+.filament-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 18px; border-radius: 20px; background: #f8f6f1; }
+.filament-detail-grid dt { font-size: 11px; color: #746b7d; }
+.filament-detail-grid dd { margin: 4px 0 0; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.public-colors { min-height: 100vh; background: var(--filament-paper); }
+.public-colors-inner { max-width: 1240px; margin: auto; padding: 0 20px 42px; }
+.public-colors-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 24px 0; border-bottom: 1px solid #e3ded5; }
+.public-colors-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.public-colors-monogram { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 13px; color: #fff; background: var(--filament-ink); font-weight: 800; box-shadow: 4px 4px 0 var(--filament-accent); }
+.public-colors-hero { position: relative; padding: 42px 0 34px; max-width: 680px; }
+.public-colors-eyebrow { font-size: 10px; text-transform: uppercase; font-weight: 750; letter-spacing: .16em; color: #766e80; }
+.public-colors-title { margin-top: 14px; font-size: clamp(38px, 7vw, 76px); font-weight: 800; line-height: 1.02; letter-spacing: -.055em; }
+.public-colors-title em { font-style: normal; color: var(--filament-accent); }
+.public-colors-footer { margin-top: 36px; padding-top: 24px; border-top: 1px solid #e3ded5; font-size: 12px; color: #776f7e; }
+@media (min-width: 640px) { .filament-card { padding: 16px; } .filament-grid { gap: 18px; } .public-colors-inner { padding-right: 32px; padding-left: 32px; } .filament-card-name { font-size: 17px; } }
+@media (min-width: 760px) { .filament-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .filament-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { button.filament-card { transition: none; } button.filament-card:hover { transform: none; } }

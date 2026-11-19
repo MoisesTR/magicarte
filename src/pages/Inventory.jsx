@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import AdminLogin from '../components/AdminLogin'
+import Swatch from '../components/Swatch'
+import FilamentWall from '../components/FilamentWall'
+import { applyBambuCode, colorFields, filamentSwatch } from '../utils/filamentColors'
+import { readWallPreferences, saveWallPreferences } from '../utils/filamentWall'
+import { copyColorLink } from '../utils/shareColors'
 import { supabase } from '../config/supabaseClient'
 import { useBusiness } from '../context/BusinessContext'
 import {
@@ -206,6 +211,9 @@ const movementFormInitial = {
 
 const filamentFormInitial = {
   color: '',
+  bambu_code: '',
+  color_hex: '',
+  color_transparent: false,
   material: 'PLA',
   quantity: '',
   quantity_unit: 'spool',
@@ -369,6 +377,21 @@ export default function Inventory() {
   const [movementForm, setMovementForm] = useState(movementFormInitial)
   const [filamentForm, setFilamentForm] = useState(filamentFormInitial)
   const [filter, setFilter] = useState('active')
+  const [wallPreferences, setWallPreferences] = useState(() => readWallPreferences(currentBusiness?.slug))
+  const [manualColorLink, setManualColorLink] = useState('')
+  const [wallBusinessSlug, setWallBusinessSlug] = useState(currentBusiness?.slug)
+
+  useEffect(() => {
+    // BusinessContext can first render its fallback while resolving the URL slug.
+    // Never persist fallback preferences over the real business's saved choices.
+    if (wallBusinessSlug !== currentBusiness?.slug) {
+      setWallPreferences(readWallPreferences(currentBusiness?.slug))
+      setWallBusinessSlug(currentBusiness?.slug)
+      setManualColorLink('')
+      return
+    }
+    saveWallPreferences(currentBusiness?.slug, wallPreferences)
+  }, [currentBusiness?.slug, wallPreferences, wallBusinessSlug])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
@@ -421,6 +444,8 @@ export default function Inventory() {
     [items],
   )
   const isHikari = currentBusiness?.slug === 'hikari'
+  const hasFilaments = items.some((item) => item.inventory_kind === 'filament')
+  const showWall = hasFilaments && wallPreferences.view === 'wall'
   const lowStockCount = items.filter((item) => item.is_low_stock && item.is_active).length
   const totalValue = items
     .filter((item) => item.is_active)
@@ -448,6 +473,14 @@ export default function Inventory() {
   const filamentLandedCost = landedCost(filamentForm)
   const movementLandedCost = landedCost(movementForm)
   const movementSubmitLabel = movementAction.submitLabel
+
+  const copyPublicColors = async () => {
+    const url = `${window.location.origin}/hikari/colores`
+    if (await copyColorLink(url)) {
+      setManualColorLink('')
+      toast.success('Enlace de colores copiado')
+    } else setManualColorLink(url)
+  }
 
   const resetItemForm = () => {
     setShowItemForm(false)
@@ -484,6 +517,8 @@ export default function Inventory() {
     setFilamentForm({
       ...filamentFormInitial,
       color: item.filament_color || '',
+      color_hex: filamentSwatch(item).hex || '',
+      color_transparent: filamentSwatch(item).transparent,
       material: item.filament_material || 'PLA',
       grams_per_spool: String(gramsPerSpool),
       low_stock_quantity: String(Number(item.low_stock_threshold || 0) / gramsPerSpool),
@@ -657,6 +692,13 @@ export default function Inventory() {
     const lowStockGrams = filamentForm.quantity_unit === 'spool' ? lowStockQuantity * gramsPerSpool : lowStockQuantity
     const hasPurchaseCost = filamentForm.purchase_cost !== ''
     const costError = purchaseCostError(filamentForm)
+    let colors
+    try {
+      colors = colorFields(filamentForm)
+    } catch (error) {
+      toast.error(error.message)
+      return
+    }
 
     if (!color) {
       toast.error('Escribe el color del filamento')
@@ -687,6 +729,7 @@ export default function Inventory() {
         unit: 'g',
         inventory_kind: 'filament',
         filament_color: color,
+        ...colors,
         filament_material: material,
         grams_per_spool: gramsPerSpool,
         low_stock_threshold: lowStockGrams,
@@ -860,12 +903,24 @@ export default function Inventory() {
           </div>
         </div>
 
+        {(hasFilaments || isHikari) && <div className='mb-5 flex flex-wrap items-center justify-between gap-3'>
+          {hasFilaments && <div role='group' aria-label='Vista del inventario' className='flex rounded-2xl border border-gray-200 bg-white p-1 shadow-sm'>
+            {[[ 'wall', 'Muro de colores' ], [ 'list', 'Lista' ]].map(([view, label]) => <button key={view} type='button' aria-pressed={wallPreferences.view === view} onClick={() => setWallPreferences((current) => ({ ...current, view }))} className={`min-h-10 rounded-xl px-4 py-2 text-sm font-semibold ${wallPreferences.view === view ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}
+          </div>}
+          {isHikari && <button type='button' onClick={copyPublicColors} className='min-h-10 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Copiar enlace de colores</button>}
+          {manualColorLink && <label className='block w-full text-sm text-gray-600'>Copia este enlace para compartir<input readOnly aria-label='Enlace público de colores' value={manualColorLink} onFocus={(event) => event.target.select()} className='field mt-1 min-h-10 w-full min-w-0' /></label>}
+        </div>}
+
         <div className='mb-5 grid gap-3 sm:grid-cols-3'>
           <Stat label='Artículos activos' value={items.filter((item) => item.is_active).length} />
           <Stat label='Bajo stock' value={lowStockCount} danger={lowStockCount > 0} />
           <Stat label='Invertido en stock' value={money(totalValue)} help='Existencia × costo promedio' />
         </div>
 
+        {showWall ? loading ? <Panel>Cargando inventario...</Panel> : <>
+          <FilamentWall items={activeItems} businessId={currentBusinessId} preferences={wallPreferences} onPreferences={setWallPreferences} onEdit={openEditFilament} onRefresh={loadInventory} primaryColor={currentBusiness?.primary_color} />
+          {activeItems.some((item) => item.inventory_kind !== 'filament') && <p className='mt-4 text-xs text-gray-500'>Los demás artículos están en la vista Lista.</p>}
+        </> : <>
         <div className='mb-4 flex flex-wrap gap-2'>
           {[
             ['active', 'Activos'],
@@ -897,7 +952,7 @@ export default function Inventory() {
                   <div className='flex items-start justify-between gap-3'>
                     <div className='min-w-0'>
                       <div className='flex items-center gap-2'>
-                        {itemColorName(item) && <span aria-hidden='true' className='h-6 w-6 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
+                        {item.inventory_kind === 'filament' ? <Swatch {...filamentSwatch(item)} label={item.filament_color} /> : itemColorName(item) && <span aria-hidden='true' className='h-6 w-6 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
                         <h2 className='truncate font-bold text-gray-800'>{item.name}</h2>
                       </div>
                       <p className='mt-1 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · ${item.filament_color}` : `${ITEM_TYPES[item.item_type]}${item.variant_color ? ` · Color: ${item.variant_color}` : ''}`}</p>
@@ -933,7 +988,7 @@ export default function Inventory() {
                     <tr key={item.id} className={!item.is_active ? 'opacity-55' : ''}>
                       <td className='px-4 py-3'>
                         <div className='flex items-center gap-2'>
-                          {itemColorName(item) && <span aria-hidden='true' className='h-5 w-5 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
+                          {item.inventory_kind === 'filament' ? <Swatch {...filamentSwatch(item)} label={item.filament_color} /> : itemColorName(item) && <span aria-hidden='true' className='h-5 w-5 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(item)) }} />}
                           <p className='font-semibold text-gray-800'>{item.name}</p>
                         </div>
                         <p className='mt-0.5 text-xs text-gray-400'>{item.inventory_kind === 'filament' ? `${item.filament_material} · Color: ${item.filament_color}` : generalItemDetail(item)}</p>
@@ -964,6 +1019,8 @@ export default function Inventory() {
           </div>
         )}
 
+        </>}
+
         <section className='mt-6 overflow-hidden rounded-2xl bg-white shadow-soft'>
           <div className='flex items-center justify-between border-b border-gray-100 px-5 py-4'>
             <div>
@@ -980,8 +1037,11 @@ export default function Inventory() {
                 const entering = Number(movement.quantity_delta) > 0
                 return (
                   <div key={movement.id} className='flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm'>
-                    <div className='min-w-44 flex-1'>
-                      <p className='font-semibold text-gray-700'>{item?.name || 'Artículo eliminado'}{item?.variant_color ? ` · ${item.variant_color}` : ''}</p>
+                    <div className='min-w-0 basis-44 flex-1'>
+                      <p className='flex items-center gap-2 font-semibold text-gray-700'>
+                        {item?.inventory_kind === 'filament' && <Swatch {...filamentSwatch(item)} label={item.filament_color} />}
+                        <span className='min-w-0 break-words'>{item?.name || 'Artículo eliminado'}{item?.variant_color ? ` · ${item.variant_color}` : ''}</span>
+                      </p>
                       <p className='text-xs text-gray-400'>{new Date(movement.occurred_at).toLocaleString('es-NI', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
                     <span className='text-gray-500'>{MOVEMENT_TYPES[movement.movement_type]}</span>
@@ -1001,10 +1061,32 @@ export default function Inventory() {
         <Modal title={editingFilament ? 'Editar filamento' : 'Registrar filamento'} onClose={resetFilamentForm}>
           <form onSubmit={saveFilament} className='space-y-4'>
             <p className='rounded-xl bg-sky-50 p-3 text-sm text-sky-900'>{editingFilament ? 'Corrige el color, material, peso del spool o alerta. La existencia y el costo acumulado no se alteran.' : 'Cada color queda como un artículo separado. El sistema guarda gramos para que puedas descontar lo usado en cada impresión, aunque lo registres por spools.'}</p>
-            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+            <div className='grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2'>
+              <Field className='min-w-0 sm:col-span-2' label='Código Bambu (opcional)'>
+                <input inputMode='numeric' maxLength={5} value={filamentForm.bambu_code} onChange={(event) => setFilamentForm((current) => applyBambuCode(current, event.target.value))} placeholder='Ej. 11100' className='field min-h-8 min-w-0' />
+                <span className='mt-1 block text-[11px] text-gray-400'>Un código conocido completa el material, el nombre y la muestra de color. Puedes ajustarlos después.</span>
+              </Field>
               <div className='sm:col-span-2'>
                 <label htmlFor='filament-color' className='mb-1.5 block text-xs font-medium text-gray-600'>Color</label>
-                <ColorPicker id='filament-color' required value={filamentForm.color} onChange={(color) => setFilamentForm((current) => ({ ...current, color }))} />
+                <ColorPicker id='filament-color' required value={filamentForm.color} onChange={(color) => setFilamentForm((current) => {
+                  const paletteColor = COLOR_OPTIONS.find(([name]) => name === color)?.[1]
+                  return { ...current, color, ...(paletteColor ? { color_hex: /^#[0-9a-f]{6}$/i.test(paletteColor) ? paletteColor.toUpperCase() : '', color_transparent: color === 'Transparente' } : {}) }
+                })} />
+              </div>
+              <div className='min-w-0 sm:col-span-2'>
+                <div className='flex min-w-0 flex-wrap items-end gap-3'>
+                  <Field label='Muestra de color'>
+                    <input type='color' aria-label='Elegir color del filamento' value={/^#[0-9A-F]{6}$/i.test(filamentForm.color_hex) ? filamentForm.color_hex : '#808080'} onChange={(event) => setFilamentForm((current) => ({ ...current, color_hex: event.target.value.toUpperCase() }))} className='h-10 w-14 cursor-pointer rounded-lg border border-gray-200 p-1' />
+                  </Field>
+                  <Field className='min-w-0 flex-1' label='Hexadecimal (opcional)'>
+                    <input value={filamentForm.color_hex} maxLength={7} pattern='#[0-9A-Fa-f]{6}' onChange={(event) => setFilamentForm((current) => ({ ...current, color_hex: event.target.value.toUpperCase() }))} placeholder='#RRGGBB' className='field min-h-8 min-w-0' />
+                  </Field>
+                  <Swatch hex={filamentForm.color_hex} transparent={filamentForm.color_transparent} label={filamentForm.color} className='mb-2' />
+                </div>
+                <label className='mt-2 flex min-h-8 cursor-pointer items-center gap-2 text-sm text-gray-600'>
+                  <input type='checkbox' checked={filamentForm.color_transparent} onChange={(event) => setFilamentForm((current) => ({ ...current, color_transparent: event.target.checked }))} className='h-5 w-5' />
+                  Transparente
+                </label>
               </div>
               <Field label='Material'><input required list='filament-materials' value={filamentForm.material} onChange={(event) => setFilamentForm({ ...filamentForm, material: event.target.value })} placeholder='PLA' className='field' /><datalist id='filament-materials'>{FILAMENT_MATERIALS.map((material) => <option key={material} value={material} />)}</datalist></Field>
               {!editingFilament && <Field label={`Cantidad recibida (${FILAMENT_UNITS[filamentForm.quantity_unit]})`}><input required type='number' min='0.001' step='0.001' value={filamentForm.quantity} onChange={(event) => setFilamentForm({ ...filamentForm, quantity: event.target.value })} placeholder={filamentForm.quantity_unit === 'spool' ? 'Ej. 2' : 'Ej. 2000'} className='field' /></Field>}
@@ -1098,8 +1180,22 @@ export default function Inventory() {
 
             <section className='space-y-3'>
               <FormStep number='1' title='Artículo existente' description='El stock se actualizará únicamente en este registro.' />
-              <label htmlFor='movement-item' className='block'>
-                <span className='mb-1.5 block text-xs font-medium text-gray-600'>Selecciona el artículo</span>
+              {activeItems.some((item) => item.inventory_kind === 'filament') ? (
+                <fieldset className='min-w-0'>
+                  <legend className='mb-1.5 text-xs font-medium text-gray-600'>Selecciona el artículo</legend>
+                  <div className='max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-200 p-1' aria-describedby='movement-same-item-help'>
+                    {activeItems.map((item) => (
+                      <label key={item.id} className={`flex min-h-10 min-w-0 cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm ${movementForm.inventory_item_id === item.id ? 'bg-sky-50 text-sky-900' : 'hover:bg-gray-50'}`}>
+                        <input type='radio' name='movement-item' required disabled={saving} checked={movementForm.inventory_item_id === item.id} value={item.id} onChange={() => setMovementForm({ ...movementFormInitial, inventory_item_id: item.id, movement_type: movementForm.movement_type, adjustment_direction: movementForm.adjustment_direction, unit_cost: item.unit_cost ?? '', quantity_unit: item.inventory_kind === 'filament' ? 'spool' : 'g' })} className='h-4 w-4 shrink-0' />
+                        {item.inventory_kind === 'filament' && <Swatch {...filamentSwatch(item)} label={item.filament_color} />}
+                        <span className='min-w-0 break-words'><span className='block font-semibold'>{item.name}{item.variant_color ? ` · ${item.variant_color}` : ''}</span><span className='text-xs text-gray-500'>{inventoryAmount(item, item.current_stock)}</span></span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : (
+                <label htmlFor='movement-item' className='block'>
+                  <span className='mb-1.5 block text-xs font-medium text-gray-600'>Selecciona el artículo</span>
                 <select id='movement-item' required disabled={saving} aria-describedby='movement-same-item-help' value={movementForm.inventory_item_id} onChange={(event) => {
                   const item = itemById.get(event.target.value)
                   setMovementForm({
@@ -1114,12 +1210,13 @@ export default function Inventory() {
                   <option value=''>Selecciona un artículo</option>
                   {activeItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.variant_color ? ` · ${item.variant_color}` : ''} · {inventoryAmount(item, item.current_stock)}</option>)}
                 </select>
-              </label>
+                </label>
+              )}
 
               {movementItem && (
                 <div className='rounded-xl border border-gray-200 bg-gray-50 p-3'>
                   <div className='flex items-start gap-3'>
-                    {itemColorName(movementItem) && <span aria-hidden='true' className='mt-0.5 h-8 w-8 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(movementItem)) }} />}
+                    {movementIsFilament ? <Swatch {...filamentSwatch(movementItem)} label={movementItem.filament_color} className='mt-0.5 h-8 w-8' /> : itemColorName(movementItem) && <span aria-hidden='true' className='mt-0.5 h-8 w-8 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: inventoryColor(itemColorName(movementItem)) }} />}
                     <div className='min-w-0 flex-1'>
                       <p className='break-words text-sm font-bold text-gray-800'>{movementItem.name}</p>
                       <p className='mt-0.5 break-words text-xs text-gray-500'>{movementIsFilament ? `${movementItem.filament_material} · Color: ${movementItem.filament_color}` : generalItemDetail(movementItem)}</p>
@@ -1372,7 +1469,7 @@ function ColorPicker({ id, value, onChange, required = false }) {
               onClick={() => onChange(name)}
               className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-all ${selected ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-500' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
             >
-              <span aria-hidden='true' className='h-4 w-4 shrink-0 rounded-full border border-black/15 shadow-inner' style={{ background: color }} />
+              {name === 'Multicolor' ? <span aria-hidden='true' className='h-4 w-4 shrink-0 rounded-full border border-black/15' style={{ background: color }} /> : <Swatch hex={color} transparent={name === 'Transparente'} label={name} className='h-4 w-4' />}
               {name}
             </button>
           )
@@ -1457,7 +1554,7 @@ function Modal({ title, onClose, children }) {
   return (
     <div className='admin-modal-backdrop'>
       <div role='dialog' aria-modal='true' aria-labelledby='inventory-modal-title' className='admin-modal-panel max-w-lg bg-white'>
-        <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'><h2 id='inventory-modal-title' className='text-lg font-bold text-gray-800'>{title}</h2><button type='button' onClick={onClose} className='rounded-lg p-1 text-2xl leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600' aria-label='Cerrar'>×</button></div>
+        <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'><h2 id='inventory-modal-title' className='text-lg font-bold text-gray-800'>{title}</h2><button type='button' onClick={onClose} className='min-h-8 min-w-8 rounded-lg p-1 text-2xl leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-600' aria-label='Cerrar'>×</button></div>
         <div className='admin-modal-body p-5'>{children}</div>
       </div>
     </div>
