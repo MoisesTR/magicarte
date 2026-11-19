@@ -1,9 +1,12 @@
+import OrderItemOptions from '../../components/OrderItemOptions'
+import { catalogOrderItem, orderItemOptions, orderItemDetailLines } from '../../utils/productPresentations'
 import { useEffect, useMemo, useState } from 'react'
 import AdminLogin from '../../components/AdminLogin'
 import { supabase } from '../../config/supabaseClient'
 import { useBusiness } from '../../context/BusinessContext'
 import {
   fetchOrdersForBusiness,
+  fetchOrderProducts,
   createOrder,
   updateOrder,
   deleteOrder as deleteOrderRow,
@@ -53,6 +56,7 @@ export default function HikariOrders() {
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
@@ -72,7 +76,10 @@ export default function HikariOrders() {
 
   // Fetch only once we know the user AND the real business id; refetch on switch.
   useEffect(() => {
-    if (user && currentBusinessId) fetchOrders()
+    if (user && currentBusinessId) {
+      fetchOrders()
+      fetchOrderProducts(currentBusinessId).then(({ data, error }) => { if (error) toast.error('Error al cargar productos: ' + error.message); else setProducts(data || []) })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusinessId, user])
 
@@ -104,6 +111,8 @@ export default function HikariOrders() {
       status: order.status || 'pending',
       items: (order.order_items || []).length
         ? order.order_items.map((i) => ({
+            product_id: i.product_id || null,
+            ...orderItemOptions(i),
             product_name: i.product_name || '',
             material: i.material || '',
             color: i.color || '',
@@ -174,7 +183,8 @@ export default function HikariOrders() {
       const { error: itemsErr } = await insertOrderItems(
         validItems.map((it) => ({
           order_id: orderId,
-          product_id: null,
+          product_id: it.product_id || null,
+          ...orderItemOptions(it),
           product_name: it.product_name.trim(),
           material: it.material || null,
           color: it.color || null,
@@ -184,6 +194,7 @@ export default function HikariOrders() {
           unit_price: num(it.unit_price),
           subtotal: num(it.unit_price) * (num(it.quantity) || 1),
         })),
+        currentBusinessId,
       )
       if (itemsErr) throw itemsErr
 
@@ -300,6 +311,7 @@ export default function HikariOrders() {
                         <p className='truncate text-xs text-gray-400'>
                           {(o.order_items || []).map((i) => i.product_name).join(', ') || '—'}
                         </p>
+                        {(o.order_items || []).map((item, itemIndex) => orderItemDetailLines(item).length > 0 && <div key={item.id || itemIndex} className='mt-1 text-xs text-gray-500'>{orderItemDetailLines(item).map((line, lineIndex) => <p key={lineIndex} className='break-words'>{line}</p>)}</div>)}
                       </div>
                       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${st.bg} ${st.text}`}>
                         {st.label}
@@ -444,7 +456,13 @@ export default function HikariOrders() {
                 </div>
                 <div className='space-y-3'>
                   {formData.items.map((it, idx) => (
-                    <div key={idx} className='rounded-xl border border-gray-200 p-3'>
+                    <div key={idx} className='min-w-0 rounded-xl border border-gray-200 p-3'>
+                      {products.some(product => product.presentations?.length || product.designs?.length || product.id === it.product_id) && <label className='mb-3 block text-xs font-medium text-gray-600'>Producto del catálogo
+                        <select value={it.product_id || ''} onChange={event => setFormData(previous => ({ ...previous, items:previous.items.map((row, i) => i === idx ? catalogOrderItem(products.find(product => product.id === event.target.value), row) : row) }))} className='mt-1 min-h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm'>
+                          <option value=''>Modelo personalizado</option>
+                          {products.filter(product => product.presentations?.length || product.designs?.length || product.id === it.product_id).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                        </select>
+                      </label>}
                       <div className='flex items-start gap-2'>
                         <input
                           type='text'
@@ -509,6 +527,7 @@ export default function HikariOrders() {
                           className='col-span-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs'
                         />
                       </div>
+                      <OrderItemOptions item={it} product={products.find(product => product.id === it.product_id)} onChange={changes => setFormData(previous => ({ ...previous, items:previous.items.map((row, i) => i === idx ? { ...row, ...changes } : row) }))} />
                     </div>
                   ))}
                 </div>

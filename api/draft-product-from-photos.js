@@ -1,37 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
-import { MAX_BODY_BYTES, draftError, validateDraftInput, buildDraftRequest, parseDraftResponse, openAIError } from './_lib/productPhotoDraft.js'
+import { readPhotoBody } from './_lib/photoRequest.js'
+import { validateDraftInput, buildDraftRequest, parseDraftResponse, openAIError } from './_lib/productPhotoDraft.js'
 
 // Accept Vercel-parsed bodies as well as raw Node request streams.
 export const maxDuration = 60
 
-async function readBody(req) {
-  const tooLarge = () => draftError('Las fotos superan el límite de 4 MB. Usa menos fotos o imágenes más pequeñas.', 413)
-  if (Number(req.headers['content-length']) > MAX_BODY_BYTES) throw tooLarge()
-  const invalidJSON = () => draftError('El cuerpo de la solicitud debe ser JSON válido.')
-  let parsed
-  // Vercel's Node helpers can expose a lazy body getter after consuming the stream.
-  try { parsed = req.body } catch { throw invalidJSON() }
-  if (parsed !== undefined) {
-    let serialized
-    try { serialized = typeof parsed === 'string' || Buffer.isBuffer(parsed) ? parsed : JSON.stringify(parsed) } catch { throw invalidJSON() }
-    if (serialized === undefined) throw invalidJSON()
-    if (Buffer.byteLength(serialized, 'utf8') > MAX_BODY_BYTES) throw tooLarge()
-    if (typeof parsed !== 'string' && !Buffer.isBuffer(parsed)) return parsed
-    try { return JSON.parse(serialized.toString()) } catch { throw invalidJSON() }
-  }
-  const chunks = []
-  let size = 0
-  // Early rejection must leave the socket alive long enough to send the 413 JSON.
-  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += buffer.length
-    if (size > MAX_BODY_BYTES) throw tooLarge()
-    chunks.push(buffer)
-  }
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch {
-    throw invalidJSON()
-  }
-}
 
 export function createDraftHandler({ env = process.env, createClient: makeClient = createClient, fetchImpl = fetch } = {}) {
   return async function handler(req, res) {
@@ -54,7 +27,7 @@ export function createDraftHandler({ env = process.env, createClient: makeClient
       const supabase = makeClient(supabaseUrl, env.SUPABASE_SERVICE_ROLE_KEY)
       const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1])
       if (authError || !user) return res.status(401).json({ error: 'La sesión no es válida. Inicia sesión de nuevo.' })
-      const input = validateDraftInput(await readBody(req))
+      const input = validateDraftInput(await readPhotoBody(req))
       const response = await fetchImpl('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY}` },

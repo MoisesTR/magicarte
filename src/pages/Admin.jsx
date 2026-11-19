@@ -1,3 +1,5 @@
+import ProductOptionsEditor from '../components/ProductOptionsEditor'
+import { useProductOptionsEditor } from '../hooks/useProductOptions'
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
@@ -38,6 +40,8 @@ export default function Admin() {
   const [showForm, setShowForm] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const productOptions = useProductOptionsEditor(editingProduct?.id, currentBusinessId, showForm)
+  const resetProductOptions = productOptions.reset
   const [loading, setLoading] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
@@ -86,6 +90,7 @@ export default function Admin() {
       setSourceQuote(null)
       setExistingQuoteProduct(null)
       setEditingProduct(null)
+      productOptions.reset()
       setFromPhotoDraft(true)
       setFormData(result.formData)
       setGallery(fromFiles([result.imageFiles.main, ...result.imageFiles.secondary].filter(Boolean), crypto.randomUUID()))
@@ -122,11 +127,12 @@ export default function Admin() {
     setLoading(true)
 
     try {
+      productOptions.validate()
       const imagePayload = await uploadGallery(gallery, uploadCompressedImage)
 
       const productData = {
         ...formData,
-        price: parseFloat(formData.price),
+        price: productOptions.price(formData.price),
         stock_quantity: parseInt(formData.stock_quantity),
         width: formData.width === '' ? null : parseFloat(formData.width),
         length: formData.length === '' ? null : parseFloat(formData.length),
@@ -150,6 +156,8 @@ export default function Admin() {
           toast.error(`Error al guardar el producto: ${result.error.message}`)
         }
       } else {
+        const savedId = editingProduct?.id || result.data?.[0]?.id
+        await productOptions.save(savedId)
         if (!editingProduct && sourceQuote) {
           const params = new URLSearchParams(location.search)
           params.delete('cotizacion')
@@ -178,6 +186,7 @@ export default function Admin() {
   }
 
   const resetForm = () => {
+    productOptions.reset()
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteProduct(null)
@@ -270,6 +279,7 @@ export default function Admin() {
         if (!isCurrent()) return
         // The duplicate notice is best-effort; it must never block the prefilled form.
         handledQuote.current = key
+        resetProductOptions()
         setFromPhotoDraft(false)
         setFormData(productFormFromQuote(quote))
         setEditingProduct(null)
@@ -286,7 +296,7 @@ export default function Admin() {
     }
     loadQuote()
     return () => { ignore = true }
-  }, [user, currentBusinessId, currentBusiness.slug, quoteId])
+  }, [user, currentBusinessId, currentBusiness.slug, quoteId, resetProductOptions])
 
   const handleLogin = (userData) => {
     setUser(userData)
@@ -593,7 +603,8 @@ export default function Admin() {
                         type='number'
                         required
                         step='0.01'
-                        value={formData.price}
+                        readOnly={productOptions.hasPresentations}
+                        value={productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                         placeholder='250.00'
@@ -740,8 +751,9 @@ export default function Admin() {
                   </div>
 
                   {/* Main Image Upload */}
-                  <ProductGallery items={gallery} onChange={setGallery} prepareFile={prepareFile} resolveUrl={getImageUrl} disabled={loading} />
+                  <ProductGallery items={gallery} onChange={setGallery} prepareFile={prepareFile} resolveUrl={getImageUrl} disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading} />
 
+                  <ProductOptionsEditor mainImage={gallery[0] ? { file: gallery[0].file, url: gallery[0].url ? getImageUrl(gallery[0].url) : null } : null} productName={formData.name} options={productOptions} products={products} productId={editingProduct?.id} businessId={currentBusinessId} disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading} />
                   {/* Submit Buttons */}
                   <div className='flex space-x-4 pt-6'>
                     <button
@@ -753,7 +765,7 @@ export default function Admin() {
                     </button>
                     <button
                       type='submit'
-                      disabled={loading}
+                      disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading}
                       className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 disabled:opacity-50'
                     >
                       {loading ? (

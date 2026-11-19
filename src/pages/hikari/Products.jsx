@@ -1,3 +1,5 @@
+import ProductOptionsEditor from '../../components/ProductOptionsEditor'
+import { useProductOptionsEditor } from '../../hooks/useProductOptions'
 import { useEffect, useState } from 'react'
 import AdminLogin from '../../components/AdminLogin'
 import CategoryManager from '../../components/CategoryManager'
@@ -45,6 +47,7 @@ export default function HikariProducts() {
   const [showForm, setShowForm] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const productOptions = useProductOptionsEditor(editingProduct?.id, currentBusinessId, showForm)
   const [formData, setFormData] = useState(initialForm)
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -78,6 +81,7 @@ export default function HikariProducts() {
   }
 
   const resetForm = () => {
+    productOptions.reset()
     setShowForm(false)
     setEditingProduct(null)
     setFormData(initialForm)
@@ -86,6 +90,7 @@ export default function HikariProducts() {
   }
 
   const openCreate = () => {
+    productOptions.reset()
     setEditingProduct(null)
     setFormData(initialForm)
     setImageFile(null)
@@ -129,12 +134,13 @@ export default function HikariProducts() {
     }
     setSaving(true)
     try {
+      productOptions.validate()
       let imageUrl = editingProduct?.image_url || null
       if (imageFile) imageUrl = await uploadCompressedImage(imageFile, 'products')
 
       const productData = {
         name: formData.name.trim(),
-        price: Number(formData.price) || 0,
+        price: productOptions.price(formData.price),
         description: formData.description || null,
         category_id: formData.category_id || null,
         stock_quantity: Number(formData.stock_quantity) || 0,
@@ -152,6 +158,8 @@ export default function HikariProducts() {
         if (error) throw error
         productId = data[0].id
       }
+
+      await productOptions.save(productId)
 
       const { error: detailsErr } = await upsert3dDetails(productId, {
         material: formData.material || null,
@@ -315,7 +323,8 @@ export default function HikariProducts() {
                   <label className='mb-1.5 block text-xs font-medium text-gray-600'>Precio (C$)</label>
                   <input
                     type='number' step='0.01' min='0'
-                    value={formData.price}
+                    readOnly={productOptions.hasPresentations}
+                    value={productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => setFormData((p) => ({ ...p, price: e.target.value }))}
                     className='w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-[#D4AF37]'
@@ -409,6 +418,7 @@ export default function HikariProducts() {
                   />
                 </div>
               </div>
+              <ProductOptionsEditor mainImage={{ file: imageFile, url: editingProduct?.image_url ? getImageUrl(editingProduct.image_url) : null }} productName={formData.name} options={productOptions} products={products} productId={editingProduct?.id} businessId={currentBusinessId} disabled={saving || productOptions.loading || !!productOptions.error || productOptions.uploading} />
             </div>
 
             <div className='admin-modal-footer flex gap-3 border-t border-gray-100 p-5'>
@@ -417,7 +427,7 @@ export default function HikariProducts() {
               </button>
               <button
                 type='submit'
-                disabled={saving}
+                disabled={saving || productOptions.loading || !!productOptions.error || productOptions.uploading}
                 className='flex-1 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'
                 style={{ backgroundColor: '#D4AF37' }}
               >

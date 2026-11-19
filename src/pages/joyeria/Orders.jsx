@@ -1,3 +1,4 @@
+import { orderItemDetailLines } from '../../utils/productPresentations'
 import { useEffect, useMemo, useState } from 'react'
 import AdminLogin from '../../components/AdminLogin'
 import QuickEngravingForm from '../../components/QuickEngravingForm'
@@ -231,6 +232,7 @@ export default function JoyeriaOrders() {
                         {item?.material || '—'}
                         {item?.engraving_minutes != null && ` · ${item.engraving_minutes} min`}
                       </p>
+                      {(o.order_items || []).map((row, itemIndex) => orderItemDetailLines(row).length > 0 && <div key={row.id || itemIndex} className='mt-1 text-xs text-gray-500'>{orderItemDetailLines(row).map((line, lineIndex) => <p key={lineIndex} className='break-words'>{line}</p>)}</div>)}
                     </div>
                     <div className='shrink-0 text-right'>
                       <p className='font-bold text-gray-800'>{money(o.total_amount)}</p>

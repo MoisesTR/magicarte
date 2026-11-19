@@ -1,3 +1,7 @@
+import ProductPresentationSelector from '../components/ProductPresentationSelector'
+import ProductDesignPicker from '../components/ProductDesignPicker'
+import { usePublicProductOptions, usePublicPresentations } from '../hooks/useProductOptions'
+import { activeOptions, formatPresentationMoney, presentationPriceLabel } from '../utils/productPresentations'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
@@ -21,12 +25,23 @@ export default function ProductDetail() {
   const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const { publicBusinessId } = useBusiness()
+  const { data: options } = usePublicProductOptions(id)
+  const { data: catalogPresentations = [] } = usePublicPresentations(publicBusinessId)
+  const [choice, setChoice] = useState({ productId: id, presentationId: null, packs: 1, designs: [] })
+  const currentChoice = choice.productId === id ? choice : { productId:id, presentationId:null, packs:1, designs:[] }
+  const presentations = activeOptions(options?.presentations || [])
+  const designs = activeOptions(options?.designs || [])
+  const selectedPresentation = presentations.find(row => row.id === currentChoice.presentationId) || presentations[0]
+  const updateChoice = changes => setChoice({ ...currentChoice, ...changes })
 
   // Fetch only this product by ID (scoped to the public business)
   const { data: productArr = [], isLoading, error } = useSupabaseQuery(TABLE.PRODUCT, {
     filters: withBusiness([{ column: 'id', value: id }], publicBusinessId)
   })
   const product = productArr[0] ?? null
+  const displayPrice = presentations.length || designs.length
+    ? formatPresentationMoney((selectedPresentation?.price ?? product?.price ?? 0) * currentChoice.packs)
+    : `C$ ${product?.price}`
 
   // Fetch categories for category name
   const { data: categories = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
@@ -88,7 +103,7 @@ export default function ProductDetail() {
   }, [product])
 
   const handleQuoteClick = () => {
-    const whatsappUrl = generateWhatsAppLinkForSingleProduct(product)
+    const whatsappUrl = generateWhatsAppLinkForSingleProduct(product, undefined, presentations.length || designs.length ? { presentation:selectedPresentation, packs:currentChoice.packs, designs:currentChoice.designs, hasDesigns:designs.length > 0 } : null)
     window.open(whatsappUrl, '_blank')
     setIsQuoteRequested(true)
     trackGenerateLead(product)
@@ -167,7 +182,7 @@ export default function ProductDetail() {
             </span>
           )}
           <h1 className='text-2xl font-bold text-gray-900 leading-tight'>{product.name}</h1>
-          <p className='text-2xl font-bold text-gray-800'>C$ {product.price}</p>
+          <p className='text-2xl font-bold text-gray-800'>{displayPrice}</p>
         </div>
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12'>
@@ -225,8 +240,21 @@ export default function ProductDetail() {
                 </span>
               )}
               <h1 className='text-4xl font-bold text-gray-900 leading-tight'>{product.name}</h1>
-              <p className='text-4xl font-bold text-gray-800'>C$ {product.price}</p>
+              <p className='text-4xl font-bold text-gray-800'>{displayPrice}</p>
             </div>
+
+            {(presentations.length > 0 || designs.length > 0) && <div className='min-w-0 space-y-5 rounded-2xl bg-white p-4 shadow-lg'>
+              {presentations.length > 0 && <ProductPresentationSelector presentations={presentations} selected={selectedPresentation} onChange={row => updateChoice({ presentationId:row.id })} />}
+              <div className='flex flex-wrap items-center justify-between gap-3'>
+                <span className='text-sm font-medium text-gray-700'>{presentations.length ? 'Cantidad de paquetes' : 'Cantidad'}</span>
+                <div className='flex items-center gap-3'>
+                  <button type='button' aria-label='Quitar un paquete' disabled={currentChoice.packs <= 1} className='min-h-10 min-w-10 rounded-lg border border-gray-300 disabled:opacity-40' onClick={() => updateChoice({ packs:Math.max(1, currentChoice.packs - 1) })}>−</button>
+                  <span className='tabular-nums'>{currentChoice.packs}</span>
+                  <button type='button' aria-label='Agregar un paquete' className='min-h-10 min-w-10 rounded-lg border border-gray-300' onClick={() => updateChoice({ packs:currentChoice.packs + 1 })}>+</button>
+                </div>
+              </div>
+              {designs.length > 0 && <ProductDesignPicker mainImageUrl={product.image_url ? getImageUrl(product.image_url) : null} designs={designs} selections={currentChoice.designs} packs={currentChoice.packs} units={selectedPresentation?.units || 1} onChange={rows => updateChoice({ designs:rows })} />}
+            </div>}
 
             {/* Description */}
             <div className='bg-white rounded-2xl p-6 shadow-lg'>
@@ -355,7 +383,7 @@ export default function ProductDetail() {
                       <h3 className='font-semibold text-gray-900 mb-2 line-clamp-2'>
                         {relatedProduct.name}
                       </h3>
-                      <p className='text-lg font-bold text-gray-800'>C$ {relatedProduct.price}</p>
+                      <p className='text-lg font-bold text-gray-800'>{catalogPresentations.some(row => row.product_id === relatedProduct.id) ? presentationPriceLabel(catalogPresentations.filter(row => row.product_id === relatedProduct.id), relatedProduct.price) : `C$ ${relatedProduct.price}`}</p>
                     </div>
                   </div>
                 ))}
@@ -368,7 +396,7 @@ export default function ProductDetail() {
       <div className='lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3'>
         <div className='flex-1 min-w-0'>
           <p className='text-xs text-gray-500 truncate'>{product.name}</p>
-          <p className='text-base font-bold text-gray-900'>C$ {product.price}</p>
+          <p className='text-base font-bold text-gray-900'>{displayPrice}</p>
         </div>
         <button
           onClick={handleQuoteClick}

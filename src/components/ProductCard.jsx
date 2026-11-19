@@ -1,3 +1,6 @@
+import { usePublicPresentations } from '../hooks/useProductOptions'
+import { useBusiness } from '../context/BusinessContext'
+import { presentationPriceLabel } from '../utils/productPresentations'
 import { useNavigate } from 'react-router-dom'
 import { getImageUrl } from '../utils/getImageUrl'
 import LazyImage from './LazyImage'
@@ -5,6 +8,9 @@ import { trackSelectItem } from '../utils/analytics'
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate()
+  const { publicBusinessId } = useBusiness()
+  const { data: presentations = [] } = usePublicPresentations(publicBusinessId)
+  const productPresentations = presentations.filter(row => row.product_id === product.id)
   const handleCardClick = () => {
     trackSelectItem(product)
     navigate(`/product/${product.id}`)
@@ -51,7 +57,7 @@ export default function ProductCard({ product }) {
         <h3 className='text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 leading-snug'>
           {product.name}
         </h3>
-        <p className='text-xl sm:text-2xl font-bold text-[#51c879]'>C$ {product.price}</p>
+        <p className='text-xl sm:text-2xl font-bold text-[#51c879]'>{productPresentations.length ? presentationPriceLabel(productPresentations, product.price) : `C$ ${product.price}`}</p>
       </div>
     </article>
   )

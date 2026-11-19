@@ -1,3 +1,5 @@
+import OrderItemOptions from '../components/OrderItemOptions'
+import { presentationSnapshot, orderItemOptions, orderItemDetailLines, escapePresentationHtml } from '../utils/productPresentations'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../config/supabaseClient'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -271,6 +273,7 @@ export default function Orders() {
     if (field === 'product_query') {
       const query = value?.trim() || ''
       if (query !== newItems[index].product_name) {
+        Object.assign(newItems[index], { presentation_id:null, presentation_label:null, units_per_presentation:null, designs:[] })
         newItems[index].product_id = null
         newItems[index].product_name = ''
         newItems[index].unit_price = 0
@@ -283,7 +286,8 @@ export default function Orders() {
       const product = products.find(p => p.id === value)
       if (product) {
         newItems[index].product_name = product.name
-        newItems[index].unit_price = product.price
+        newItems[index].unit_price = product.presentations?.[0]?.price ?? product.price
+        if (product.presentations?.length) Object.assign(newItems[index], presentationSnapshot(product.presentations[0]))
         newItems[index].product_query = product.name
         newItems[index].product_open = false
         newItems[index].product_active_index = -1
@@ -292,6 +296,7 @@ export default function Orders() {
 
     if (field === 'is_custom') {
       if (value) {
+        Object.assign(newItems[index], { presentation_id:null, presentation_label:null, units_per_presentation:null, designs:[] })
         newItems[index].product_id = null
         newItems[index].product_query = ''
         newItems[index].product_open = false
@@ -307,9 +312,11 @@ export default function Orders() {
 
   const selectProduct = (index, product) => {
     const newItems = [...formData.items]
+    Object.assign(newItems[index], { presentation_id:null, presentation_label:null, units_per_presentation:null, designs:[] })
+    if (product.presentations?.length) Object.assign(newItems[index], presentationSnapshot(product.presentations[0]))
     newItems[index].product_id = product.id
     newItems[index].product_name = product.name
-    newItems[index].unit_price = product.price
+    newItems[index].unit_price = product.presentations?.[0]?.price ?? product.price
     newItems[index].product_query = product.name
     newItems[index].product_open = false
     newItems[index].product_active_index = -1
@@ -489,7 +496,8 @@ export default function Orders() {
         if (error) throw error
         orderId = editingOrder.id
 
-        await deleteOrderItems(orderId)
+        const { error: deleteError } = await deleteOrderItems(orderId)
+        if (deleteError) throw deleteError
       } else {
         if (sourceQuote) orderData.calculator_data = calculatorDataFromQuote(sourceQuote)
         const { data, error } = await createOrder(orderData, currentBusinessId)
@@ -508,7 +516,8 @@ export default function Orders() {
           unit_price: toNumber(item.unit_price),
           hours_needed: item.hours_needed === '' ? null : toNumber(item.hours_needed, 0) || null,
           rush_fee: toNumber(item.rush_fee),
-          subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)
+          subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee),
+          ...orderItemOptions(item)
         }
         // Only engraving (Joyería) writes these columns, so other businesses
         // don't depend on the engraving_item_fields migration.
@@ -521,7 +530,7 @@ export default function Orders() {
         return row
       })
 
-      const { error: itemsError } = await insertOrderItems(items)
+      const { error: itemsError } = await insertOrderItems(items, currentBusinessId)
 
       if (itemsError) throw itemsError
 
@@ -579,6 +588,7 @@ export default function Orders() {
       is_gift: order.is_gift || false,
       items: order.order_items.map(item => ({
         _key: item.id || crypto.randomUUID(),
+        ...orderItemOptions(item),
         product_id: item.product_id,
         product_query: item.product_id ? item.product_name : '',
         product_open: false,
@@ -712,7 +722,7 @@ export default function Orders() {
       ? order.order_items.map(item => {
         const quantity = Number(item.quantity) > 1 ? ` x${item.quantity}` : ''
         const details = item.product_description ? ` (${item.product_description})` : ''
-        return `- ${item.product_name}${quantity}${details}`
+        return [`- ${item.product_name}${quantity}${details}`, ...orderItemDetailLines(item)].join('\n')
       }).join('\n')
       : ''
 
@@ -842,10 +852,12 @@ export default function Orders() {
 
   const fmtPhone = (p) => p?.replace(/\D/g, '').replace(/(.{4})/g, '$1-').replace(/-$/, '') || ''
 
+  const printItemOptions = item => orderItemDetailLines(item).map(line => `<div class="item">${escapePresentationHtml(line)}</div>`).join('')
+
   const printLabels = (ordersToPrint) => {
     const labelHtml = ordersToPrint.map(order => {
       const items = order.order_items.map(i =>
-        `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
+        `<div class="item">- ${escapePresentationHtml(i.product_name)} <span class="qty">×${i.quantity}</span></div>${printItemOptions(i)}`
       ).join('')
       const labelName = order.recipient_name || displayName(order)
       const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
@@ -916,7 +928,7 @@ export default function Orders() {
   const printLabels4x6 = (ordersToPrint) => {
     const labelHtml = ordersToPrint.map(order => {
       const items = order.order_items.map(i =>
-        `<div class="item">- ${i.product_name} <span class="qty">×${i.quantity}</span></div>`
+        `<div class="item">- ${escapePresentationHtml(i.product_name)} <span class="qty">×${i.quantity}</span></div>${printItemOptions(i)}`
       ).join('')
       const labelName = order.recipient_name || displayName(order)
       const labelPhone = order.recipient_name ? (order.recipient_phone || order.customer_phone) : order.customer_phone
@@ -1622,6 +1634,7 @@ export default function Orders() {
                           <div key={idx} className='flex justify-between items-start text-base'>
                             <div className='flex-1 pr-4'>
                               <div className='font-medium text-gray-800'>• {item.product_name}</div>
+                              {orderItemDetailLines(item).map((line, lineIndex) => <div key={lineIndex} className='ml-4 break-words text-sm text-gray-600'>{line}</div>)}
                               {item.product_description && (
                                 <div className='text-gray-500 ml-4 text-sm'>({item.product_description})</div>
                               )}
@@ -2532,7 +2545,7 @@ export default function Orders() {
                             )}
 
                             <div>
-                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Cantidad</label>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>{item.presentation_label ? 'Paquetes' : 'Cantidad'}</label>
 	                              <input
 	                                type='number'
 	                                min='1'
@@ -2543,7 +2556,7 @@ export default function Orders() {
                             </div>
 
                             <div>
-                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>Precio Unitario (C$)</label>
+                              <label className='block text-xs font-medium text-gray-600 mb-1.5'>{item.presentation_label ? 'Precio por paquete (C$)' : 'Precio Unitario (C$)'}</label>
                               <input
                                 type='number'
                                 step='0.01'
@@ -2568,6 +2581,8 @@ export default function Orders() {
 	                              />
                             </div>
                           </div>
+
+                          {!isInPerson && !item.is_custom && <OrderItemOptions item={item} product={products.find(product => product.id === item.product_id)} onChange={changes => setFormData(previous => ({ ...previous, items: previous.items.map((row, i) => i === index ? { ...row, ...changes } : row) }))} />}
 
 	                          <div className='mt-2 text-right'>
 	                            <span className='text-xs font-semibold text-gray-600'>

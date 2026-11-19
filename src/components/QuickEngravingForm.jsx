@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import OrderItemOptions from './OrderItemOptions'
+import { catalogOrderItem, configuredOrderTotal, orderItemInsertSnapshot, orderItemOptions, orderItemDetailLines } from '../utils/productPresentations'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { createOrder, updateOrder, deleteOrderItems, insertOrderItems } from '../data/orders'
+import { createOrder, updateOrder, deleteOrderItems, insertOrderItems, fetchOrderProducts } from '../data/orders'
 import { addPayment, updatePayment } from '../data/payments'
 import { ENGRAVING_MATERIALS } from '../utils/constants'
 
@@ -56,10 +58,20 @@ export default function QuickEngravingForm({
   )
   const [method, setMethod] = useState(existingPayment?.method || 'efectivo')
   const [saving, setSaving] = useState(false)
+  const [products, setProducts] = useState([])
+  const [catalogItem, setCatalogItem] = useState(() => ({ product_id:existingItem?.product_id || null, product_name:existingItem?.product_name || '', quantity:existingItem?.quantity || 1, unit_price:existingItem?.unit_price || 0, rush_fee:existingItem?.rush_fee || 0, ...orderItemOptions(existingItem || {}) }))
+  const [additionalItems, setAdditionalItems] = useState(() => (editingOrder?.order_items || []).slice(1).map(row => ({ ...row, ...orderItemOptions(row) })))
+  useEffect(() => {
+    let current = true
+    fetchOrderProducts(businessId).then(({ data, error }) => { if (!current) return; if (error) toast.error('Error al cargar productos: ' + error.message); else setProducts(data || []) })
+    return () => { current = false }
+  }, [businessId])
+  const configuredItem = !!(catalogItem.product_id || catalogItem.presentation_label || catalogItem.designs?.length)
+  const additionalTotal = additionalItems.reduce((sum, row) => sum + num(row.subtotal), 0)
 
   const partnerShort = partnerName.split(' ')[0] || 'Papá'
 
-  const effectiveTotal = num(total)
+  const effectiveTotal = configuredItem ? configuredOrderTotal(catalogItem, additionalItems) : num(total)
   const effectiveMaterialCost = num(materialCost)
   const effectiveSplitPct = Math.min(100, Math.max(0, num(splitPct)))
   const profit = effectiveTotal - effectiveMaterialCost
@@ -78,6 +90,10 @@ export default function QuickEngravingForm({
   const handleSave = async () => {
     if (effectiveTotal <= 0) {
       toast.error('Escribe el total')
+      return
+    }
+    if (effectiveTotal < additionalTotal) {
+      toast.error('El total no puede ser menor que los otros productos del pedido')
       return
     }
     if (effectiveMaterialCost > effectiveTotal) {
@@ -139,18 +155,20 @@ export default function QuickEngravingForm({
       const { error: itemErr } = await insertOrderItems([
         {
           order_id: orderId,
-          product_id: null,
-          product_name: displayName,
+          product_id: catalogItem.product_id || null,
+          product_name: configuredItem ? catalogItem.product_name || displayName : displayName,
+          ...orderItemOptions(catalogItem),
           product_description: note || null,
-          quantity: 1,
-          unit_price: effectiveTotal,
-          hours_needed: null,
-          rush_fee: 0,
-          subtotal: effectiveTotal,
+          quantity: configuredItem ? num(catalogItem.quantity) || 1 : 1,
+          unit_price: configuredItem ? num(catalogItem.unit_price) : effectiveTotal - additionalTotal,
+          hours_needed: existingItem?.hours_needed ?? null,
+          rush_fee: configuredItem ? num(catalogItem.rush_fee) : 0,
+          subtotal: effectiveTotal - additionalTotal,
           material,
           engraving_minutes: minutes === '' ? null : parseInt(minutes, 10),
         },
-      ])
+        ...additionalItems.map(item => orderItemInsertSnapshot(item, orderId)),
+      ], businessId)
       if (itemErr) throw itemErr
 
       if (existingPayment) {
@@ -214,6 +232,26 @@ export default function QuickEngravingForm({
             />
           </div>
 
+          {products.some(product => product.presentations?.length || product.designs?.length || product.id === catalogItem.product_id) && <label className='block text-xs font-medium text-gray-600'>Producto del catálogo
+            <select value={catalogItem.product_id || ''} onChange={event => { const product = products.find(row => row.id === event.target.value); if (!product) setTotal(String(effectiveTotal)); setCatalogItem(previous => catalogOrderItem(product, previous)) }} className='mt-1 min-h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm'>
+              <option value=''>Grabado personalizado</option>
+              {products.filter(product => product.presentations?.length || product.designs?.length || product.id === catalogItem.product_id).map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+            </select>
+          </label>}
+          {configuredItem && <section className='min-w-0 space-y-3 rounded-xl border border-gray-200 p-3'>
+            <p className='text-sm font-semibold text-gray-700'>{catalogItem.product_name}</p>
+            <div className='grid grid-cols-2 gap-3'>
+              <label className='text-xs text-gray-600'>{catalogItem.presentation_label ? 'Paquetes' : 'Cantidad'}<input type='number' min='1' step='1' value={catalogItem.quantity || 1} onChange={event => setCatalogItem(previous => ({ ...previous, quantity:event.target.value }))} className='mt-1 min-h-10 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm' /></label>
+              <label className='text-xs text-gray-600'>{catalogItem.presentation_label ? 'Precio por paquete (C$)' : 'Precio (C$)'}<input type='number' min='0' step='0.01' value={catalogItem.unit_price} onChange={event => setCatalogItem(previous => ({ ...previous, unit_price:event.target.value }))} className='mt-1 min-h-10 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm' /></label>
+            </div>
+            <OrderItemOptions item={catalogItem} product={products.find(product => product.id === catalogItem.product_id)} onChange={changes => setCatalogItem(previous => ({ ...previous, ...changes }))} />
+          </section>}
+          {additionalItems.map((item, index) => <section key={item.id || index} className='min-w-0 space-y-2 rounded-xl border border-gray-200 p-3'>
+            <p className='text-sm font-semibold text-gray-700'>{item.product_name} ×{item.quantity}</p>
+            {orderItemDetailLines(item).map((line, lineIndex) => <p key={lineIndex} className='break-words text-xs text-gray-500'>{line}</p>)}
+            <OrderItemOptions item={item} product={products.find(product => product.id === item.product_id)} onChange={changes => setAdditionalItems(previous => previous.map((row, i) => i === index ? { ...row, ...changes, subtotal:configuredOrderTotal({ ...row, ...changes }) } : row))} />
+          </section>)}
+
           <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
             <div>
               <label className='mb-1.5 block text-xs font-medium text-gray-600'>Material / pieza</label>
@@ -258,7 +296,8 @@ export default function QuickEngravingForm({
                 type='number'
                 step='0.01'
                 min='0'
-                value={total}
+                readOnly={configuredItem}
+                value={configuredItem ? effectiveTotal : total}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => setTotal(e.target.value)}
                 placeholder='600'

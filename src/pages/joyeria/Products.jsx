@@ -1,3 +1,5 @@
+import ProductOptionsEditor from '../../components/ProductOptionsEditor'
+import { useProductOptionsEditor } from '../../hooks/useProductOptions'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import AdminLogin from '../../components/AdminLogin'
@@ -44,6 +46,7 @@ export default function JoyeriaProducts() {
   const [showForm, setShowForm] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const productOptions = useProductOptionsEditor(editingProduct?.id, currentBusinessId, showForm)
   const [formData, setFormData] = useState(initialForm)
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
@@ -75,6 +78,7 @@ export default function JoyeriaProducts() {
   }
 
   const resetForm = () => {
+    productOptions.reset()
     setShowForm(false)
     setEditingProduct(null)
     setFormData(initialForm)
@@ -83,6 +87,7 @@ export default function JoyeriaProducts() {
   }
 
   const openCreate = () => {
+    productOptions.reset()
     setEditingProduct(null)
     setFormData(initialForm)
     setImageFile(null)
@@ -129,12 +134,13 @@ export default function JoyeriaProducts() {
 
     setSaving(true)
     try {
+      productOptions.validate()
       let imageUrl = editingProduct?.image_url || null
       if (imageFile) imageUrl = await uploadCompressedImage(imageFile, 'products')
 
       const baseProduct = {
         name: formData.name.trim(),
-        price: Number(formData.price) || 0,
+        price: productOptions.price(formData.price),
         description: formData.description.trim() || null,
         category_id: formData.category_id || null,
         stock_quantity: Number(formData.stock_quantity) || 0,
@@ -152,6 +158,8 @@ export default function JoyeriaProducts() {
         if (error) throw error
         productId = data[0].id
       }
+
+      await productOptions.save(productId)
 
       const { error: detailsError } = await upsertEngravingDetails(productId, {
         metal: formData.metal.trim() || null,
@@ -253,7 +261,8 @@ export default function JoyeriaProducts() {
               </div>
               <div className='grid grid-cols-2 gap-3'>
                 <Field className='col-span-2' label='Nombre'><input required value={formData.name} onChange={(event) => setField('name', event.target.value)} className='field' /></Field>
-                <Field label='Precio (C$)'><input type='number' min='0' step='0.01' value={formData.price} onChange={(event) => setField('price', event.target.value)} className='field' /></Field>
+                <Field label='Precio (C$)'><input type='number' min='0' step='0.01' readOnly={productOptions.hasPresentations}
+                    value={productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price} onChange={(event) => setField('price', event.target.value)} className='field' /></Field>
                 <Field label='Categoría'><select value={formData.category_id} onChange={(event) => setField('category_id', event.target.value)} className='field'><option value=''>Sin categoría</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
                 <Field className='col-span-2' label='Descripción'><textarea rows={2} value={formData.description} onChange={(event) => setField('description', event.target.value)} className='field' /></Field>
                 <Field label='Stock'><input type='number' min='0' step='1' value={formData.stock_quantity} onChange={(event) => setField('stock_quantity', event.target.value)} className='field' /></Field>
@@ -268,10 +277,11 @@ export default function JoyeriaProducts() {
                   <input value={formData.engraving_area} onChange={(event) => setField('engraving_area', event.target.value)} placeholder='Área de grabado' className='field' />
                 </div>
               </div>
+              <ProductOptionsEditor mainImage={{ file: imageFile, url: editingProduct?.image_url ? getImageUrl(editingProduct.image_url) : null }} productName={formData.name} options={productOptions} products={products} productId={editingProduct?.id} businessId={currentBusinessId} disabled={saving || productOptions.loading || !!productOptions.error || productOptions.uploading} />
             </div>
             <div className='admin-modal-footer flex gap-3 border-t border-gray-100 p-5'>
               <button type='button' onClick={resetForm} className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50'>Cancelar</button>
-              <button disabled={saving} className='flex-1 rounded-xl bg-[#B08A3C] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'>{saving ? 'Guardando...' : editingProduct ? 'Actualizar producto' : 'Crear producto'}</button>
+              <button disabled={saving || productOptions.loading || !!productOptions.error || productOptions.uploading} className='flex-1 rounded-xl bg-[#B08A3C] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'>{saving ? 'Guardando...' : editingProduct ? 'Actualizar producto' : 'Crear producto'}</button>
             </div>
           </form>
         </div>
