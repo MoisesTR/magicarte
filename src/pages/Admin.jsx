@@ -4,8 +4,10 @@ import { supabase } from '../config/supabaseClient'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
-import { uploadCompressedImage } from '../utils/uploadImage'
-import { generateFacebookMarketplaceListing, generateProductDescription } from '../utils/gemini'
+import { prepareFile, uploadCompressedImage } from '../utils/uploadImage'
+import { createPhotoDraft } from '../utils/productPhotoDraft'
+import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
+import ProductGallery from '../components/ProductGallery'
 import { useBusiness } from '../context/BusinessContext'
 import { businessFilter } from '../data/scope'
 import {
@@ -18,7 +20,6 @@ import {
 import AdminLogin from '../components/AdminLogin'
 import CategoryManager from '../components/CategoryManager'
 import toast from 'react-hot-toast'
-import heic2any from 'heic2any'
 import { fetchCalcQuote, fetchProductForQuote } from '../data/calcQuotes'
 import { newProductForm, productFormFromQuote } from '../utils/quoteForms'
 
@@ -39,38 +40,21 @@ export default function Admin() {
   const [editingProduct, setEditingProduct] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadingProducts, setLoadingProducts] = useState(true)
-  const [dragging, setDragging] = useState(false)
-  const [mainPreviewUrl, setMainPreviewUrl] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [generatingDescription, setGeneratingDescription] = useState(false)
-  const [generatingListing, setGeneratingListing] = useState(false)
-  const [showListingModal, setShowListingModal] = useState(false)
-  const [generatedListing, setGeneratedListing] = useState('')
-
-  const isHeic = (file) => file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
-
-  const setMainImage = async (file) => {
-    setImageFiles(prev => ({ ...prev, main: file }))
-    if (isHeic(file)) {
-      try {
-        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.5 })
-        setMainPreviewUrl(URL.createObjectURL(Array.isArray(blob) ? blob[0] : blob))
-      } catch {
-        setMainPreviewUrl(null)
-      }
-    } else {
-      setMainPreviewUrl(URL.createObjectURL(file))
-    }
-  }
+  const [draftFiles, setDraftFiles] = useState([])
+  const [draftNote, setDraftNote] = useState('')
+  const [generatingDraft, setGeneratingDraft] = useState(false)
+  const [draggingDraft, setDraggingDraft] = useState(false)
+  const [fromPhotoDraft, setFromPhotoDraft] = useState(false)
+  const draftInput = useRef(null)
+  const draftRunning = useRef(false)
+  const activeBusinessId = useRef(currentBusinessId)
+  activeBusinessId.current = currentBusinessId
 
   // Form state
   const [formData, setFormData] = useState(newProductForm)
-
-  const [imageFiles, setImageFiles] = useState({
-    main: null,
-    secondary: []
-  })
+  const [gallery, setGallery] = useState([])
 
   // Fetch data
   const { data: categoriesData = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
@@ -78,110 +62,41 @@ export default function Admin() {
     order: { column: 'order' }
   })
 
-  const getCategoryName = (categoryId) => {
-    if (!categoryId) return ''
-    const category = categoriesData.find((item) => item.id === categoryId)
-    return category?.name || ''
+  const selectDraftPhotos = (files) => {
+    if (draftRunning.current) return
+    const selected = Array.from(files)
+    const photos = selected.filter(file => file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name))
+    if (photos.length !== selected.length) toast.error('Solo se aceptan fotos. Se omitieron otros archivos.')
+    setDraftFiles(photos)
   }
 
-  const formatDimensions = (product) => {
-    const length = product.length ?? ''
-    const width = product.width ?? ''
-    if (length === '' && width === '') return ''
-    if (length !== '' && width !== '') return `${length} x ${width}`
-    return length !== '' ? `${length}` : `${width}`
-  }
-
-  const buildFacebookListing = (product) => {
-    const categoryName = getCategoryName(product.category_id)
-    const dimensions = formatDimensions(product)
-    const lines = [
-      `Titulo: ${product.name || ''}`,
-      `Descripcion: ${product.description || ''}`,
-      `Precio: C$ ${product.price ?? ''}`,
-      `Categoria: ${categoryName}`,
-      `Dimensiones: ${dimensions}`,
-      'Tiempo de entrega: de 7 a 15 dias habiles',
-      'Pago: Se debe dar o cancelar la mitad del producto personalizado 2 dias antes de la entrega como maximo para poder dar inicio.'
-    ]
-
-    return lines.filter(Boolean).join('\n')
-  }
-
-  const getFormProductContext = () => ({
-    ...formData,
-    category: getCategoryName(formData.category_id),
-  })
-
-  const handleGenerateDescription = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Escribe el nombre del producto primero')
-      return
-    }
-
-    setGeneratingDescription(true)
+  const handlePhotoDraft = async () => {
+    if (draftRunning.current || !draftFiles.length) return
+    draftRunning.current = true
+    setGeneratingDraft(true)
+    const request = ++quoteRequest.current
+    const businessId = currentBusinessId
     try {
-      const description = await generateProductDescription(getFormProductContext())
-      setFormData((prev) => ({ ...prev, description }))
-      toast.success('Descripción generada')
-    } catch (error) {
-      toast.error(error.message || 'No se pudo generar la descripción')
+      const result = await createPhotoDraft({ files: draftFiles, note: draftNote, categories: categoriesData }, {
+        prepareFile,
+        getSession: () => supabase.auth.getSession(),
+      })
+      // Do not overwrite a form opened later or carry a draft into another business.
+      if (request !== quoteRequest.current || businessId !== activeBusinessId.current) return
+      setSourceQuote(null)
+      setExistingQuoteProduct(null)
+      setEditingProduct(null)
+      setFromPhotoDraft(true)
+      setFormData(result.formData)
+      setGallery(fromFiles([result.imageFiles.main, ...result.imageFiles.secondary].filter(Boolean), crypto.randomUUID()))
+      setShowForm(true)
+      setDraftFiles([])
+      setDraftNote('')
+      if (result.error) toast.error(result.error)
+      else toast.success('Borrador listo: revise y agregue el precio')
     } finally {
-      setGeneratingDescription(false)
-    }
-  }
-
-  const handleGenerateListing = async () => {
-    if (!formData.name.trim()) {
-      toast.error('Escribe el nombre del producto primero')
-      return
-    }
-
-    setGeneratingListing(true)
-    try {
-      const listing = await generateFacebookMarketplaceListing(getFormProductContext())
-      setGeneratedListing(listing)
-      setShowListingModal(true)
-    } catch (error) {
-      toast.error(error.message || 'No se pudo generar el listing')
-    } finally {
-      setGeneratingListing(false)
-    }
-  }
-
-  const copyGeneratedListing = async () => {
-    if (!generatedListing) return
-
-    try {
-      await navigator.clipboard.writeText(generatedListing)
-      toast.success('Listing copiado al portapapeles')
-    } catch {
-      toast.error('No se pudo copiar el listing')
-    }
-  }
-
-  const copyListing = async (product) => {
-    const text = buildFacebookListing(product)
-    if (!text) return
-
-    try {
-      await navigator.clipboard.writeText(text)
-      toast.success('Listing copiado al portapapeles')
-    } catch {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.style.position = 'fixed'
-      textarea.style.left = '-9999px'
-      document.body.appendChild(textarea)
-      textarea.select()
-      try {
-        document.execCommand('copy')
-        toast.success('Listing copiado al portapapeles')
-      } catch {
-        toast.error('No se pudo copiar el listing')
-      } finally {
-        document.body.removeChild(textarea)
-      }
+      draftRunning.current = false
+      setGeneratingDraft(false)
     }
   }
 
@@ -207,28 +122,15 @@ export default function Admin() {
     setLoading(true)
 
     try {
-      // Upload main image
-      let mainImagePath = formData.image_url
-      if (imageFiles.main) {
-        mainImagePath = await uploadCompressedImage(imageFiles.main)
-      }
-
-      // Upload secondary images
-      let secondaryImagePaths = formData.secondary_images
-      if (imageFiles.secondary.length > 0) {
-        const uploadPromises = imageFiles.secondary.map(file => uploadCompressedImage(file))
-        const uploadedPaths = await Promise.all(uploadPromises)
-        secondaryImagePaths = uploadedPaths.filter(path => path !== null)
-      }
+      const imagePayload = await uploadGallery(gallery, uploadCompressedImage)
 
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
         stock_quantity: parseInt(formData.stock_quantity),
-        width: parseFloat(formData.width),
-        length: parseFloat(formData.length),
-        image_url: mainImagePath,
-        secondary_images: secondaryImagePaths
+        width: formData.width === '' ? null : parseFloat(formData.width),
+        length: formData.length === '' ? null : parseFloat(formData.length),
+        ...imagePayload
       }
 
       let result
@@ -279,19 +181,18 @@ export default function Admin() {
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteProduct(null)
+    setFromPhotoDraft(false)
     setFormData(newProductForm())
-    setImageFiles({ main: null, secondary: [] })
-    setMainPreviewUrl(null)
+    setGallery([])
     setEditingProduct(null)
     setShowForm(false)
-    setGeneratedListing('')
-    setShowListingModal(false)
   }
 
   const editProduct = (product) => {
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteProduct(null)
+    setFromPhotoDraft(false)
     setFormData({
       name: product.name || '',
       price: product.price || '',
@@ -306,6 +207,7 @@ export default function Admin() {
       care_instructions: product.care_instructions || '',
       is_visible: product.is_visible !== false
     })
+    setGallery(fromProduct(product))
     setEditingProduct(product)
     setShowForm(true)
   }
@@ -342,6 +244,12 @@ export default function Admin() {
   }, [currentBusinessId, user])
 
   useEffect(() => {
+    quoteRequest.current += 1
+    setDraftFiles([])
+    setDraftNote('')
+  }, [currentBusinessId])
+
+  useEffect(() => {
     if (!user || !currentBusinessId || currentBusiness.slug !== 'magicarte' || !quoteId) return
     const key = `${currentBusinessId}:${quoteId}`
     if (handledQuote.current === key) return
@@ -362,10 +270,10 @@ export default function Admin() {
         if (!isCurrent()) return
         // The duplicate notice is best-effort; it must never block the prefilled form.
         handledQuote.current = key
+        setFromPhotoDraft(false)
         setFormData(productFormFromQuote(quote))
         setEditingProduct(null)
-        setImageFiles({ main: null, secondary: [] })
-        setMainPreviewUrl(null)
+        setGallery([])
         setSourceQuote(quote)
         setExistingQuoteProduct(productError ? null : product)
         setShowForm(true)
@@ -419,7 +327,7 @@ export default function Admin() {
             </div>
             <div className='flex flex-wrap gap-2'>
               <button
-                onClick={() => { quoteRequest.current += 1; setShowForm(true) }}
+                onClick={() => { resetForm(); setShowForm(true) }}
                 className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm'
               >
                 + Nuevo Producto
@@ -433,6 +341,66 @@ export default function Admin() {
             </div>
           </div>
         </div>
+
+        {/* Photo draft: originals stay local until the existing save flow uploads them. */}
+        <section aria-labelledby='photo-draft-title' className='mb-6 rounded-2xl bg-white p-4 shadow-soft sm:p-6'>
+          <h2 id='photo-draft-title' className='font-semibold text-gray-800'>Crear borrador desde fotos</h2>
+          <p id='photo-draft-help' className='mt-1 text-sm text-gray-500'>
+            Selecciona varias fotos de un solo producto. La IA analiza hasta 6; todas se adjuntan al borrador y se suben solo al guardar.
+          </p>
+          <fieldset disabled={generatingDraft} aria-busy={generatingDraft} className='mt-4 space-y-3 disabled:opacity-60'>
+            <button
+              type='button'
+              aria-describedby='photo-draft-help'
+              className={`w-full rounded-xl border-2 border-dashed p-5 text-sm font-medium transition-colors disabled:cursor-not-allowed ${draggingDraft ? 'border-[#51c879] bg-emerald-50 text-emerald-700' : 'border-gray-300 text-gray-600 hover:border-[#51c879]'}`}
+              onClick={() => draftInput.current?.click()}
+              onDragOver={(event) => { event.preventDefault(); if (!draftRunning.current) setDraggingDraft(true) }}
+              onDragLeave={() => setDraggingDraft(false)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDraggingDraft(false)
+                selectDraftPhotos(event.dataTransfer.files)
+              }}
+            >
+              {draggingDraft ? 'Suelta las fotos aquí' : 'Seleccionar fotos o arrastrarlas aquí'}
+              <span className='mt-1 block text-xs text-gray-400'>JPG, PNG, HEIC y HEIF · varias fotos del mismo producto</span>
+            </button>
+            <input
+              ref={draftInput}
+              type='file'
+              accept='image/*,.heic,.heif'
+              multiple
+              className='hidden'
+              onChange={(event) => { selectDraftPhotos(event.target.files); event.target.value = '' }}
+            />
+            {draftFiles.length > 0 && (
+              <p className='break-words text-sm text-gray-600'>
+                {draftFiles.length} foto{draftFiles.length !== 1 ? 's' : ''}: {draftFiles.map(file => file.name).join(', ')}
+              </p>
+            )}
+            <div>
+              <label htmlFor='photo-draft-note' className='mb-1 block text-sm font-medium text-gray-700'>Notas para la IA (opcional)</label>
+              <input
+                id='photo-draft-note'
+                type='text'
+                value={draftNote}
+                maxLength={1000}
+                onChange={(event) => setDraftNote(event.target.value)}
+                placeholder='Ej.: acrílico 3 mm, corte láser, 20 × 15 cm, se personaliza con nombre'
+                className='w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#51c879]'
+              />
+            </div>
+            <button
+              type='button'
+              onClick={handlePhotoDraft}
+              disabled={generatingDraft || !draftFiles.length}
+              className='rounded-xl bg-gradient-to-r from-[#51c879] to-[#50bfe6] px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60'
+            >
+              {generatingDraft ? 'Analizando fotos...' : 'Crear borrador desde fotos'}
+            </button>
+            {generatingDraft && <p role='status' className='text-sm text-gray-500'>Analizando fotos...</p>}
+          </fieldset>
+        </section>
 
         {/* Search + count */}
         <div className='flex flex-col sm:flex-row sm:items-center gap-3 mb-4'>
@@ -556,12 +524,6 @@ export default function Admin() {
                   <span className='text-base font-bold text-gray-800'>C$ {product.price}</span>
                   <span className='text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full'>Stock: {product.stock_quantity}</span>
                 </div>
-                <button
-                  onClick={() => copyListing(product)}
-                  className='w-full bg-gray-50 border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors'
-                >
-                  Copiar listing (Facebook)
-                </button>
               </div>
             </div>
           ))}
@@ -598,6 +560,12 @@ export default function Admin() {
                       {existingQuoteProduct && (
                         <p className='mt-1'>Esta cotización ya tiene el producto «{existingQuoteProduct.name}»</p>
                       )}
+                    </div>
+                  )}
+
+                  {fromPhotoDraft && (
+                    <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
+                      Revisa el nombre, la descripción y la categoría, y agrega el precio. Se guardará oculto; las medidas son opcionales.
                     </div>
                   )}
 
@@ -640,7 +608,8 @@ export default function Admin() {
                       </label>
                       <input
                         type='number'
-                        required
+                        step='any'
+                        required={!fromPhotoDraft}
                         value={formData.length}
                         onChange={(e) => setFormData({ ...formData, length: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
@@ -653,7 +622,8 @@ export default function Admin() {
                       </label>
                       <input
                         type='number'
-                        required
+                        step='any'
+                        required={!fromPhotoDraft}
                         value={formData.width}
                         onChange={(e) => setFormData({ ...formData, width: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
@@ -667,39 +637,6 @@ export default function Admin() {
                         <label className='text-sm font-medium text-gray-700'>
                           Descripción
                         </label>
-                        <p className='mt-1 text-xs text-gray-400'>
-                          Mejor resultado con nombre, categoría, precio, medidas y notas.
-                        </p>
-                      </div>
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <button
-                          type='button'
-                          onClick={handleGenerateDescription}
-                          disabled={generatingDescription}
-                          className='inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60'
-                        >
-                          {generatingDescription && (
-                            <svg className='h-3.5 w-3.5 animate-spin' viewBox='0 0 24 24'>
-                              <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
-                              <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z' />
-                            </svg>
-                          )}
-                          {generatingDescription ? 'Generando...' : '✨ Generar'}
-                        </button>
-                        <button
-                          type='button'
-                          onClick={handleGenerateListing}
-                          disabled={generatingListing}
-                          className='inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#51c879] to-[#50bfe6] px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60'
-                        >
-                          {generatingListing && (
-                            <svg className='h-3.5 w-3.5 animate-spin' viewBox='0 0 24 24'>
-                              <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
-                              <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z' />
-                            </svg>
-                          )}
-                          {generatingListing ? 'Generando...' : '✨ Listing para Facebook'}
-                        </button>
                       </div>
                     </div>
                     <textarea
@@ -803,130 +740,7 @@ export default function Admin() {
                   </div>
 
                   {/* Main Image Upload */}
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Imagen Principal
-                    </label>
-                    <div
-                      className={`relative border-2 border-dashed rounded-xl overflow-hidden transition-colors cursor-pointer ${
-                        dragging ? 'border-[#51c879] bg-[#51c879]/5' : 'border-gray-300 hover:border-[#51c879]'
-                      }`}
-                      onClick={() => document.getElementById('mainImageInput').click()}
-                      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-                      onDragLeave={() => setDragging(false)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragging(false)
-                        const file = e.dataTransfer.files[0]
-                        if (file && (file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name))) {
-                          setMainImage(file)
-                        }
-                      }}
-                    >
-                      {(imageFiles.main || formData.image_url) ? (
-                        <div className='relative aspect-[4/3]'>
-                          <img
-                            src={imageFiles.main ? (mainPreviewUrl || getImageUrl(null)) : getImageUrl(formData.image_url)}
-                            alt='Preview'
-                            className='w-full h-full object-cover'
-                          />
-                          <div className='absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center'>
-                            <span className='text-white font-medium text-sm'>Cambiar imagen</span>
-                          </div>
-                          <button
-                            type='button'
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setImageFiles({ ...imageFiles, main: null })
-                              setMainPreviewUrl(null)
-                            }}
-                            className='absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm hover:bg-red-600'
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : (
-                        <div className='flex flex-col items-center justify-center py-10 text-gray-400'>
-                          <svg className='w-10 h-10 mb-2' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={1.5} d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' />
-                          </svg>
-                          <span className='text-sm font-medium'>{dragging ? 'Soltar imagen aquí' : 'Click o arrastra una imagen'}</span>
-                          <span className='text-xs mt-1'>JPG, PNG, HEIC</span>
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      id='mainImageInput'
-                      type='file'
-                      accept='image/*'
-                      className='hidden'
-                      onChange={(e) => e.target.files[0] && setMainImage(e.target.files[0])}
-                    />
-                  </div>
-
-                  {/* Secondary Images */}
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Imágenes Adicionales
-                    </label>
-                    <div className='flex flex-wrap gap-3'>
-                      {/* Existing images */}
-                      {formData.secondary_images?.map((img, index) => (
-                        <div key={`existing-${index}`} className='relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200'>
-                          <img src={getImageUrl(img)} alt={`Imagen ${index + 1}`} className='w-full h-full object-cover' />
-                          <button
-                            type='button'
-                            onClick={() => setFormData({
-                              ...formData,
-                              secondary_images: formData.secondary_images.filter((_, i) => i !== index)
-                            })}
-                            className='absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs hover:bg-red-600'
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                      {/* New file previews */}
-                      {imageFiles.secondary.map((file, index) => (
-                        <div key={`new-${index}`} className='relative w-24 h-24 rounded-lg overflow-hidden border-2 border-[#51c879]'>
-                          <img src={URL.createObjectURL(file)} alt={`Nueva ${index + 1}`} className='w-full h-full object-cover' />
-                          <button
-                            type='button'
-                            onClick={() => setImageFiles({
-                              ...imageFiles,
-                              secondary: imageFiles.secondary.filter((_, i) => i !== index)
-                            })}
-                            className='absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs hover:bg-red-600'
-                          >
-                            ×
-                          </button>
-                          <span className='absolute bottom-0 left-0 right-0 bg-[#51c879] text-white text-[10px] text-center'>Nueva</span>
-                        </div>
-                      ))}
-                      {/* Add button */}
-                      <button
-                        type='button'
-                        onClick={() => document.getElementById('secondaryImageInput').click()}
-                        className='w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 hover:border-[#51c879] hover:text-[#51c879] transition-colors'
-                      >
-                        <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 4v16m8-8H4' />
-                        </svg>
-                        <span className='text-xs mt-1'>Agregar</span>
-                      </button>
-                    </div>
-                    <input
-                      id='secondaryImageInput'
-                      type='file'
-                      accept='image/*'
-                      multiple
-                      className='hidden'
-                      onChange={(e) => setImageFiles({
-                        ...imageFiles,
-                        secondary: [...imageFiles.secondary, ...Array.from(e.target.files)]
-                      })}
-                    />
-                  </div>
+                  <ProductGallery items={gallery} onChange={setGallery} prepareFile={prepareFile} resolveUrl={getImageUrl} disabled={loading} />
 
                   {/* Submit Buttons */}
                   <div className='flex space-x-4 pt-6'>
@@ -954,49 +768,6 @@ export default function Admin() {
                     </button>
                   </div>
                 </form>
-              </div>
-            </div>
-          </div>
-        )}
-        {showListingModal && (
-          <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4'>
-            <div className='bg-white rounded-2xl max-w-lg w-full shadow-xl'>
-              <div className='p-6'>
-                <div className='mb-4 flex items-start justify-between gap-4'>
-                  <div>
-                    <h3 className='text-xl font-bold text-gray-800'>Listing para Facebook</h3>
-                    <p className='mt-1 text-sm text-gray-500'>Revisa el texto antes de publicarlo.</p>
-                  </div>
-                  <button
-                    type='button'
-                    onClick={() => setShowListingModal(false)}
-                    className='text-2xl leading-none text-gray-400 transition-colors hover:text-gray-600'
-                  >
-                    ×
-                  </button>
-                </div>
-                <textarea
-                  readOnly
-                  rows={12}
-                  value={generatedListing}
-                  className='w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-gray-700 focus:outline-none'
-                />
-                <div className='mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
-                  <button
-                    type='button'
-                    onClick={() => setShowListingModal(false)}
-                    className='rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50'
-                  >
-                    Cerrar
-                  </button>
-                  <button
-                    type='button'
-                    onClick={copyGeneratedListing}
-                    className='rounded-xl bg-gradient-to-r from-[#51c879] to-[#50bfe6] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90'
-                  >
-                    Copiar
-                  </button>
-                </div>
               </div>
             </div>
           </div>

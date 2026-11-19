@@ -19,7 +19,7 @@ async function convertHeicToJpeg(file) {
 /**
  * Prepare file — converts HEIC to JPEG so sharp can process it
  */
-async function prepareFile(file) {
+export async function prepareFile(file) {
   const isHeic = file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
   if (isHeic) {
     console.log('Converting HEIC to JPEG...')
