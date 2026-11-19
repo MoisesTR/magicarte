@@ -92,7 +92,7 @@ export default function FilamentDetail({ item, businessId, onClose, onEdit, onRe
     <Dialog open onClose={() => !saving && onClose()} className='filament-drawer relative z-50'>
       <DialogBackdrop className='fixed inset-0 bg-slate-950/45 backdrop-blur-sm' />
       <div className='fixed inset-0 flex justify-end'>
-        <DialogPanel className='relative h-full w-full max-w-lg overflow-y-auto overscroll-contain bg-[#fffefa] p-5 shadow-2xl sm:p-7'>
+        <DialogPanel className='filament-drawer-panel relative h-full w-full max-w-lg overflow-y-auto overscroll-contain bg-[#fffefa] p-5 shadow-2xl sm:p-7'>
           <div className='flex items-start justify-between gap-4'>
             <div className='min-w-0'>
               <p className='text-xs font-semibold uppercase tracking-widest text-gray-500'>{details.materialLabel}</p>
@@ -101,7 +101,11 @@ export default function FilamentDetail({ item, businessId, onClose, onEdit, onRe
             </div>
             <button type='button' disabled={saving} onClick={onClose} aria-label='Cerrar detalle' className='filament-action min-w-10 shrink-0 text-lg'>×</button>
           </div>
-          <div className='flex justify-center py-3'><SpoolIllustration item={item} large /></div>
+          {item.product_image_url ? <figure className='my-4'>
+            <img src={item.product_image_url} loading='lazy' alt={`Foto oficial de Bambu: ${item.filament_material || ''} ${details.englishName}`} className='h-56 w-full rounded-2xl bg-white object-contain' />
+            <figcaption className='mt-2 text-center text-xs text-gray-500'>Foto oficial de Bambu Lab</figcaption>
+          </figure> : <div className='flex justify-center py-3'><SpoolIllustration item={item} large /></div>}
+          {item.product_url && <a href={item.product_url} target='_blank' rel='noopener noreferrer' className='filament-action filament-action-primary my-4 flex w-full items-center justify-center'>Ver en Bambu</a>}
           <dl className='filament-detail-grid'>
             <div><dt>Existencia</dt><dd>{formatAmount(stock.kg)} kg · {stock.rolls} {stock.rolls === 1 ? 'rollo' : 'rollos'}</dd></div>
             <div><dt>Peso por rollo</dt><dd>{formatAmount(stock.gramsPerSpool)} g</dd></div>

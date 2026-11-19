@@ -55,3 +55,23 @@ button.filament-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30p
 @media (min-width: 760px) { .filament-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .filament-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { button.filament-card { transition: none; } button.filament-card:hover { transform: none; } }
+
+/* Dark brands (Hikari, Joyería): the admin wall follows the business theme tokens set by BusinessContext. */
+[data-theme='dark'] .filament-wall, [data-theme='dark'] .filament-drawer { --filament-ink: var(--color-text); color: var(--color-text); }
+[data-theme='dark'] .filament-wall-header { border-color: var(--color-border); background: radial-gradient(circle at 88% 15%, color-mix(in srgb, var(--filament-accent) 30%, transparent), transparent 58%), linear-gradient(135deg, var(--color-surface-2), var(--color-surface)); }
+[data-theme='dark'] .filament-wall-title { color: var(--color-text); }
+[data-theme='dark'] .filament-wall-header > p:first-child { color: var(--filament-accent) !important; }
+[data-theme='dark'] .filament-wall-count { border-color: var(--color-border); background: color-mix(in srgb, var(--color-background) 60%, transparent); color: var(--color-text) !important; }
+[data-theme='dark'] .filament-card { border-color: var(--color-border); background: var(--color-surface); box-shadow: none; color: var(--color-text); }
+[data-theme='dark'] button.filament-card:hover { border-color: var(--filament-accent); box-shadow: 0 14px 30px #00000066; }
+[data-theme='dark'] .filament-card-art { background: radial-gradient(ellipse at 50% 45%, #ffffff10, transparent 72%); }
+[data-theme='dark'] .filament-spool { filter: drop-shadow(0 12px 10px #00000080); }
+[data-theme='dark'] .filament-card-material, [data-theme='dark'] .filament-card-english, [data-theme='dark'] .filament-group-heading > span, [data-theme='dark'] .filament-detail-grid dt { color: var(--color-muted); }
+[data-theme='dark'] .filament-stock-bar { background: var(--color-surface-3); }
+[data-theme='dark'] .filament-pill, [data-theme='dark'] .filament-action { border-color: var(--color-border); background: var(--color-surface); color: var(--color-text); }
+[data-theme='dark'] .filament-pill[aria-pressed='true'], [data-theme='dark'] .filament-action-primary { border-color: var(--filament-accent); background: var(--filament-accent); color: var(--color-background); }
+[data-theme='dark'] .filament-badge { border-color: color-mix(in srgb, var(--filament-accent) 55%, transparent); background: color-mix(in srgb, var(--filament-accent) 22%, var(--color-background)); color: var(--filament-accent); }
+[data-theme='dark'] .filament-badge-muted { border-color: var(--color-border); background: var(--color-surface-2); color: var(--color-muted); }
+[data-theme='dark'] .filament-drawer-panel { background: var(--color-background); }
+[data-theme='dark'] .filament-detail-grid { background: var(--color-surface); }
+[data-theme='dark'] .filament-card-empty .filament-spool { filter: grayscale(.85) opacity(.4); }

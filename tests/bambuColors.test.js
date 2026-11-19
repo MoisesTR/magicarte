@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { findByCode, suggest, isTransparent } from '../src/utils/bambuColors.js'
+import { findByCode, storeLinkByCode, suggest, isTransparent } from '../src/utils/bambuColors.js'
 import { applyBambuCode, colorFields, filamentSwatch, normalizeColorHex } from '../src/utils/filamentColors.js'
 
 test('finds exact five-digit Bambu codes and rejects unknown or incomplete codes', () => {
@@ -33,8 +33,8 @@ test('the prepared catalog is copied byte-for-byte and every code remains availa
 
 test('known codes fill the form without losing other fields; unknown codes only change the code', () => {
   const current = { material: 'PLA', color: 'Custom', color_hex: '#123456', color_transparent: false, notes: 'keep', quantity: '2' }
-  assert.deepEqual(applyBambuCode(current, '60103'), { ...current, bambu_code: '60103', material: 'PC', color: 'Transparent', color_hex: '#000000', color_transparent: true })
-  assert.deepEqual(applyBambuCode(current, '11100'), { ...current, bambu_code: '11100', material: 'PLA Matte', color: 'Ivory White', color_hex: '#FFFFFF', color_transparent: false })
+  assert.deepEqual(applyBambuCode(current, '60103'), { ...current, bambu_code: '60103', material: 'PC', color: 'Transparent', color_hex: '#000000', color_transparent: true, product_url: '', product_image_url: '' })
+  assert.deepEqual(applyBambuCode(current, '11100'), { ...current, bambu_code: '11100', material: 'PLA Matte', color: 'Ivory White', color_hex: '#FFFFFF', color_transparent: false, product_url: storeLinkByCode('11100').url, product_image_url: storeLinkByCode('11100').image })
   assert.deepEqual(applyBambuCode(current, '1110'), { ...current, bambu_code: '1110' })
 })
 

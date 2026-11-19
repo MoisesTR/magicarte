@@ -18,7 +18,7 @@ export default function FilamentWall({ items, businessId, preferences, onPrefere
         <p className='mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500'>Cada idea tiene su color</p>
         <div className='flex flex-wrap items-end justify-between gap-3'>
           <div><h2 id='filament-wall-title' className='filament-wall-title'>Muro de filamentos</h2><p className='mt-2 text-sm text-gray-500'>Elige un rollo. Mira lo que queda. Crea algo increíble.</p></div>
-          <span className='rounded-full border border-white bg-white/70 px-3 py-2 text-xs font-semibold text-gray-600'>{filtered.length} {filtered.length === 1 ? 'color' : 'colores'}</span>
+          <span className='filament-wall-count rounded-full border border-white bg-white/70 px-3 py-2 text-xs font-semibold text-gray-600'>{filtered.length} {filtered.length === 1 ? 'color' : 'colores'}</span>
         </div>
       </div>
       <div className='my-5 space-y-3'>

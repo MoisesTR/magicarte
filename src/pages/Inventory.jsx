@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import AdminLogin from '../components/AdminLogin'
 import Swatch from '../components/Swatch'
 import FilamentWall from '../components/FilamentWall'
-import { applyBambuCode, colorFields, filamentSwatch } from '../utils/filamentColors'
+import { applyBambuCode, colorFields, productFields, filamentSwatch } from '../utils/filamentColors'
 import { readWallPreferences, saveWallPreferences } from '../utils/filamentWall'
 import { copyColorLink } from '../utils/shareColors'
 import { supabase } from '../config/supabaseClient'
@@ -212,6 +212,8 @@ const movementFormInitial = {
 const filamentFormInitial = {
   color: '',
   bambu_code: '',
+  product_url: '',
+  product_image_url: '',
   color_hex: '',
   color_transparent: false,
   material: 'PLA',
@@ -517,6 +519,8 @@ export default function Inventory() {
     setFilamentForm({
       ...filamentFormInitial,
       color: item.filament_color || '',
+      product_url: item.product_url || '',
+      product_image_url: item.product_image_url || '',
       color_hex: filamentSwatch(item).hex || '',
       color_transparent: filamentSwatch(item).transparent,
       material: item.filament_material || 'PLA',
@@ -692,9 +696,10 @@ export default function Inventory() {
     const lowStockGrams = filamentForm.quantity_unit === 'spool' ? lowStockQuantity * gramsPerSpool : lowStockQuantity
     const hasPurchaseCost = filamentForm.purchase_cost !== ''
     const costError = purchaseCostError(filamentForm)
-    let colors
+    let colors, product
     try {
       colors = colorFields(filamentForm)
+      product = productFields(filamentForm)
     } catch (error) {
       toast.error(error.message)
       return
@@ -730,6 +735,7 @@ export default function Inventory() {
         inventory_kind: 'filament',
         filament_color: color,
         ...colors,
+        ...product,
         filament_material: material,
         grams_per_spool: gramsPerSpool,
         low_stock_threshold: lowStockGrams,
@@ -1064,7 +1070,10 @@ export default function Inventory() {
             <div className='grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2'>
               <Field className='min-w-0 sm:col-span-2' label='Código Bambu (opcional)'>
                 <input inputMode='numeric' maxLength={5} value={filamentForm.bambu_code} onChange={(event) => setFilamentForm((current) => applyBambuCode(current, event.target.value))} placeholder='Ej. 11100' className='field min-h-8 min-w-0' />
-                <span className='mt-1 block text-[11px] text-gray-400'>Un código conocido completa el material, el nombre y la muestra de color. Puedes ajustarlos después.</span>
+                <span className='mt-1 block text-[11px] text-gray-400'>Un código conocido completa el material, el nombre, la muestra de color y el enlace de Bambu. Puedes ajustarlos después.</span>
+              </Field>
+              <Field className='min-w-0 sm:col-span-2' label='Enlace de Bambu'>
+                <input type='url' pattern='https://.*' value={filamentForm.product_url} onChange={(event) => setFilamentForm((current) => ({ ...current, product_url: event.target.value, ...(!event.target.value.trim() ? { product_image_url: '' } : {}) }))} placeholder='https://us.store.bambulab.com/products/…' className='field min-h-8 min-w-0' />
               </Field>
               <div className='sm:col-span-2'>
                 <label htmlFor='filament-color' className='mb-1.5 block text-xs font-medium text-gray-600'>Color</label>

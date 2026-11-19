@@ -93,3 +93,46 @@ test('create and update persist color metadata and read all returned item fields
   assert.equal(client.requests[0].columns, '*')
   assert.equal(client.requests[1].columns, '*')
 })
+
+for (const error of [
+  { code: '42703', message: 'column inventory_stock.product_url does not exist' },
+  { code: '42703', message: 'column inventory_stock.product_image_url does not exist' },
+  { code: 'PGRST204', message: "Could not find the 'product_url' column of 'inventory_stock' in the schema cache" },
+]) {
+  test(`stock retries once without product fields while retaining available color fields: ${error.message}`, async () => {
+    const result = { data: [{ id: 'old', color_hex: '#123456' }], error: null }
+    const client = mockClient([{ data: null, error }, result])
+    const { fetchInventoryStock } = await inventoryWithClient(client)
+    assert.deepEqual(await fetchInventoryStock(2), result)
+    assert.equal(client.requests.length, 2)
+    assert.match(client.requests[0].columns, /product_url,product_image_url/)
+    assert.doesNotMatch(client.requests[1].columns, /product_url|product_image_url|\*/)
+    assert.match(client.requests[1].columns, /color_hex,color_transparent/)
+    assert.deepEqual(client.requests[1].filters, client.requests[0].filters)
+    assert.deepEqual(client.requests[1].orders, client.requests[0].orders)
+  })
+}
+
+test('product fallback cannot retry again or hide unrelated product errors', async () => {
+  for (const error of [
+    { code: '42703', message: 'column inventory_stock.product_url does not exist' },
+    { code: '42501', message: 'permission denied for product_url' },
+    { code: '500', message: 'product_image_url request failed' },
+  ]) {
+    const failed = { data: null, error }
+    const client = mockClient([failed, failed])
+    const { fetchInventoryStock } = await inventoryWithClient(client)
+    assert.deepEqual(await fetchInventoryStock(null), failed)
+    assert.equal(client.requests.length, error.code === '42703' ? 2 : 1)
+    assert.deepEqual(client.requests[0].filters, [])
+  }
+})
+
+test('pending color and store migrations omit all unsupported fields in the single fallback', async () => {
+  const result = { data: [], error: null }
+  const client = mockClient([{ data: null, error: missingHex }, result])
+  const { fetchInventoryStock } = await inventoryWithClient(client)
+  assert.deepEqual(await fetchInventoryStock(2), result)
+  assert.equal(client.requests.length, 2)
+  assert.doesNotMatch(client.requests[1].columns, /color_hex|color_transparent|product_url|product_image_url/)
+})

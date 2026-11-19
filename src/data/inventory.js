@@ -2,12 +2,16 @@ import { supabase } from '../config/supabaseClient'
 
 const STOCK_COLUMNS = 'id,business_id,name,sku,item_type,unit,low_stock_threshold,unit_cost,supplier_name,notes,is_active,created_at,updated_at,current_stock,is_low_stock,inventory_kind,filament_color,filament_material,grams_per_spool,variant_color'
 
-function isMissingColorColumn(error) {
-  return ['42703', 'PGRST204'].includes(error?.code)
-    && /\bcolor_(?:hex|transparent)\b/.test(error.message || '')
+const COLOR_COLUMNS = `${STOCK_COLUMNS},color_hex,color_transparent`
+
+function missingOptionalColumns(error) {
+  if (!['42703', 'PGRST204'].includes(error?.code)) return null
+  if (/\bcolor_(?:hex|transparent)\b/.test(error.message || '')) return STOCK_COLUMNS
+  if (/\bproduct_(?:url|image_url)\b/.test(error.message || '')) return COLOR_COLUMNS
+  return null
 }
 
-/** Retry only the read, once, while the additive color migration is pending. */
+/** Retry only the read, once, while an additive inventory migration is pending. */
 export async function fetchInventoryStock(businessId) {
   const read = (columns) => {
     let query = supabase
@@ -18,8 +22,9 @@ export async function fetchInventoryStock(businessId) {
     if (businessId != null) query = query.eq('business_id', businessId)
     return query
   }
-  const result = await read(`${STOCK_COLUMNS},color_hex,color_transparent`)
-  return isMissingColorColumn(result.error) ? read(STOCK_COLUMNS) : result
+  const result = await read(`${COLOR_COLUMNS},product_url,product_image_url`)
+  const fallback = missingOptionalColumns(result.error)
+  return fallback ? read(fallback) : result
 }
 
 /** Most recent ledger entries for one business. Movements are append-only. */

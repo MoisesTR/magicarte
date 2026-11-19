@@ -141,3 +141,34 @@ test('a changed total invalidates confirmation instead of sending a stale adjust
   assert.equal(calls.length, 0)
   assert.match(text(h.render(props)), /La existencia cambió/)
 })
+
+test('detail renders official product photo and a prominent safe reorder link', async () => {
+  const h = await harness('components/FilamentDetail.jsx')
+  const item = { ...filament, product_url: 'https://us.store.bambulab.com/products/pla-matte?id=40489681780872', product_image_url: 'https://store.bblcdn.com/white.jpg' }
+  const tree = h.render({ item, businessId: 2, onClose() {}, onEdit() {}, onRefresh() {} })
+  const image = elements(tree, x => x.type === 'img')[0]
+  assert.equal(image?.props.src, item.product_image_url)
+  assert.equal(image.props.loading, 'lazy')
+  assert.equal(image.props.alt, 'Foto oficial de Bambu: PLA Matte Ivory White')
+  assert.match(image.props.className, /object-contain/)
+  const link = elements(tree, x => x.type === 'a' && x.props.children === 'Ver en Bambu')[0]
+  assert.equal(link?.props.href, item.product_url)
+  assert.equal(link.props.target, '_blank')
+  assert.equal(link.props.rel, 'noopener noreferrer')
+  assert.match(link.props.className, /filament-action-primary/)
+  assert.match(text(tree), /Foto oficial de Bambu Lab/)
+})
+
+test('detail independently hides missing product links and official photos', async () => {
+  const h = await harness('components/FilamentDetail.jsx')
+  const props = { item: filament, businessId: 2, onClose() {}, onEdit() {}, onRefresh() {} }
+  const html = text(h.render(props))
+  assert.doesNotMatch(html, /Ver en Bambu|Foto oficial|<img/)
+  assert.match(html, /data-spool/)
+  const linkOnly = text(h.render({ ...props, item: { ...filament, product_url: 'https://example.test' } }))
+  assert.match(linkOnly, /Ver en Bambu/)
+  assert.doesNotMatch(linkOnly, /Foto oficial|<img/)
+  const photoOnly = text(h.render({ ...props, item: { ...filament, product_image_url: 'https://example.test/photo.jpg' } }))
+  assert.match(photoOnly, /Foto oficial de Bambu Lab/)
+  assert.doesNotMatch(photoOnly, /Ver en Bambu/)
+})

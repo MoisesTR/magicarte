@@ -1,4 +1,5 @@
 import colors from '../data/bambuColors.json' with { type: 'json' }
+import storeLinks from '../data/bambuStoreLinks.json' with { type: 'json' }
 
 const normalize = (value) => String(value ?? '').trim().toLowerCase()
 const normalizeName = (value) => normalize(value).replace(/^matte\s+/, '')
@@ -7,6 +8,11 @@ const normalizeName = (value) => normalize(value).replace(/^matte\s+/, '')
 export function findByCode(code) {
   const value = String(code ?? '')
   return /^\d{5}$/.test(value) ? colors.find((entry) => entry.code === value) : undefined
+}
+
+export function storeLinkByCode(code) {
+  const value = String(code ?? '')
+  return /^\d{5}$/.test(value) ? storeLinks[value] : undefined
 }
 
 export function suggest(material, colorName) {
