@@ -8,6 +8,7 @@ import { TABLE } from '../utils/constants'
 import { getImageUrl } from '../utils/getImageUrl'
 import { prepareFile, uploadCompressedImage } from '../utils/uploadImage'
 import { createPhotoDraft } from '../utils/productPhotoDraft'
+import { formatPresentationMoney } from '../utils/productPresentations'
 import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
 import ProductGallery from '../components/ProductGallery'
 import { useBusiness } from '../context/BusinessContext'
@@ -606,9 +607,15 @@ export default function Admin() {
                         readOnly={productOptions.hasPresentations}
                         value={productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
+                        aria-describedby={productOptions.hasPresentations ? 'price-from-presentations' : undefined}
+                        className={`w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent ${productOptions.hasPresentations ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
                         placeholder='250.00'
                       />
+                      {productOptions.hasPresentations && (
+                        <p id='price-from-presentations' className='mt-1 text-xs text-gray-500'>
+                          Se calcula de las presentaciones: desde {formatPresentationMoney(productOptions.price(formData.price))}. Cambia los precios en «Presentaciones».
+                        </p>
+                      )}
                     </div>
                   </div>
 
