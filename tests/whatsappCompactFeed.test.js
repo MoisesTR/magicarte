@@ -315,3 +315,20 @@ for (const status of ['won', 'lost', 'done']) {
     })
   })
 }
+
+test('AI tags decide the tab for quotes, payments and waiting conversations', () => {
+  const day = '2026-11-19' // Managua "today" for `now`
+  const groups = feed.groupThreads([
+    open({ id: 'brithany', status: 'to_quote', ai_tag: 'needs_quote', follow_up_date: day }),
+    open({ id: 'pay', status: 'sent', ai_tag: 'awaiting_payment' }),
+    open({ id: 'lead', status: 'to_quote', ai_tag: 'new_lead' }),
+    open({ id: 'deciding', status: 'to_quote', ai_tag: 'customer_deciding' }),
+    open({ id: 'promise', status: 'to_quote', ai_tag: 'promised', promised_date: day }),
+    open({ id: 'untagged', status: 'to_quote' }),
+  ], now)
+  const ids = (key) => groups.find((group) => group.key === key).threads.map((thread) => thread.id).sort()
+  assert.deepEqual(ids('toQuote'), ['brithany', 'untagged'])
+  assert.deepEqual(ids('payments'), ['pay'])
+  assert.deepEqual(ids('waiting'), ['deciding', 'lead'])
+  assert.deepEqual(ids('today'), ['promise'])
+})

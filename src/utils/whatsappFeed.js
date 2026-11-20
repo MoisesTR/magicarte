@@ -327,6 +327,9 @@ export function feedKPIs(threads, now = new Date()) {
   )
 }
 
+// Tags meaning the next move is the customer's, whatever the stored status says.
+const WAITING_TAGS = ['new_lead', 'customer_deciding', 'follow_up']
+
 /** Exclusive priority grouping: confirmed agreements and payment tasks precede replies. */
 export function groupThreads(threads, now = new Date()) {
   const today = managuaDay(now)
@@ -362,7 +365,7 @@ export function groupThreads(threads, now = new Date()) {
         continue
       // Won chats already live in Pedidos; lost and non-customer chats are discarded.
       index = thread.status === 'won' || thread.order_id ? 5 : 6
-    } else if (thread.kind === 'payment') {
+    } else if (thread.kind === 'payment' || thread.ai_tag === 'awaiting_payment') {
       index = 3
       if (thread.follow_up_date <= today) timeHint = rowChip(thread, now).text
     } else if (thread.awaiting_reply) {
@@ -376,10 +379,17 @@ export function groupThreads(threads, now = new Date()) {
     ) {
       index = 0
       timeHint = rowChip(thread, now).text
+    } else if (thread.ai_tag === 'needs_quote') {
+      // The AI tag wins over an internal follow-up reminder.
+      index = 2
     } else if (isDue(dueCalendarDay(thread.follow_up_date), today)) {
       index = 4
       timeHint = rowChip(thread, now).text
-    } else if (thread.status === 'to_quote') index = 2
+    } else if (
+      thread.status === 'to_quote' &&
+      !WAITING_TAGS.includes(thread.ai_tag)
+    )
+      index = 2
     else {
       index = 4
       if (thread.last_our_message_at)
