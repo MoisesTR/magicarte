@@ -247,6 +247,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   })
   const module = { exports: {} }
   const imports = {
+    '../../hooks/useOrderDeepLink': { __esModule: true, default() {} },
     react,
     'react-hot-toast': {
       __esModule: true,

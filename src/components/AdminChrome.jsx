@@ -5,6 +5,7 @@ import { useBusiness } from '../context/BusinessContext'
 import BusinessSwitcher from './BusinessSwitcher'
 
 const TABS = [
+  { tab: 'hoy', label: 'Hoy', icon: 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zm4 10h2v3H9z' },
   { tab: 'orders', label: 'Pedidos', icon: 'M7 3h10a2 2 0 012 2v14l-3-2-4 2-4-2-3 2V5a2 2 0 012-2zm2 5h6m-6 4h4' },
   { tab: 'products', label: 'Productos', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
   { tab: 'inventory', label: 'Inventario', icon: 'M4 7.5L12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5m8-4.5L12 12m0 9v-9' },
@@ -78,7 +79,7 @@ export default function AdminChrome() {
                   : `/admin/${tabBusinessSlug}/${t.tab}`
               }
               className={({ isActive }) =>
-                `flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+                `flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
                   isActive ? 'text-white shadow-sm' : 'opacity-70 hover:bg-black/5 hover:opacity-100'
                 }`
               }

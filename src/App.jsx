@@ -25,6 +25,7 @@ const HikariOrders = lazy(() => import('./pages/hikari/Orders'))
 const HikariProducts = lazy(() => import('./pages/hikari/Products'))
 const JoyeriaOrders = lazy(() => import('./pages/joyeria/Orders'))
 const JoyeriaProducts = lazy(() => import('./pages/joyeria/Products'))
+const Today = lazy(() => import('./pages/Today'))
 const Inventory = lazy(() => import('./pages/Inventory'))
 const PublicFilamentColors = lazy(() => import('./pages/PublicFilamentColors'))
 const Notes = lazy(() => import('./pages/Notes'))
@@ -57,11 +58,11 @@ function BusinessScopedPage({ page: Page }) {
   return <Page key={business} />
 }
 
-// Bare /admin → last-used business (or Magic Arte), Orders tab.
+// Bare /admin → last-used business (or Magic Arte), daily panel.
 function AdminIndexRedirect() {
   const savedSlug = localStorage.getItem('hq.currentBusinessSlug')
   const slug = savedSlug && savedSlug !== 'all' ? savedSlug : 'magicarte'
-  return <Navigate to={`/admin/${slug}/orders`} replace />
+  return <Navigate to={`/admin/${slug}/hoy`} replace />
 }
 
 initializeGoogleAnalytics()
@@ -108,6 +109,7 @@ export default function App() {
                 <Route path='/:business/colores' element={<PublicFilamentColors />} />
                 {/* Admin: the active business lives in the URL. */}
                 <Route path='/admin' element={<AdminIndexRedirect />} />
+                <Route path='/admin/:business/hoy' element={<BusinessScopedPage page={Today} />} />
                 <Route path='/admin/:business/orders' element={<BusinessOrders />} />
                 <Route path='/admin/:business/products' element={<BusinessProducts />} />
                 <Route path='/admin/:business/inventory' element={<BusinessScopedPage page={Inventory} />} />

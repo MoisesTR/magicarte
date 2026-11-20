@@ -1,3 +1,4 @@
+import useOrderDeepLink from '../../hooks/useOrderDeepLink'
 import OrderItemOptions from '../../components/OrderItemOptions'
 import { catalogOrderItem, orderItemOptions, orderItemDetailLines } from '../../utils/productPresentations'
 import { useEffect, useMemo, useState } from 'react'
@@ -125,6 +126,8 @@ export default function HikariOrders() {
     })
     setShowForm(true)
   }
+
+  useOrderDeepLink(orders, openEdit, currentBusinessId, Boolean(user && currentBusinessId))
 
   const updateItem = (idx, field, value) => {
     setFormData((prev) => ({

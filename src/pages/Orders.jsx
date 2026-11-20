@@ -1,3 +1,5 @@
+import useOrderDeepLink from '../hooks/useOrderDeepLink'
+import { getOrderChargeTotal, getPaymentSummary } from '../utils/orderPayments'
 import OrderItemOptions from '../components/OrderItemOptions'
 import { presentationSnapshot, orderItemOptions, orderItemDetailLines, escapePresentationHtml } from '../utils/productPresentations'
 import { useState, useEffect, useRef } from 'react'
@@ -76,7 +78,6 @@ export default function Orders() {
     note: ''
   })
   const ITEMS_PER_PAGE = 10
-  const COMMISSION_RATE = 0.0675
   // Temporary UI toggles. Flip to true to bring these back.
   const SHOW_SOCIAL_MEDIA = false
   const SHOW_WHATSAPP_REMINDER = false
@@ -367,25 +368,6 @@ export default function Orders() {
 
   const displayName = (order) => order.clients?.name || order.customer_name
 
-  const getOrderChargeTotal = (order) => toNumber(order.total_amount) + toNumber(order.delivery_fee)
-
-  const getPaymentSummary = (payments, total) => {
-    const list = payments || []
-    const paid = list.reduce((s, p) => s + toNumber(p.amount), 0)
-    const paidCard = list
-      .filter(p => p.method === 'tarjeta')
-      .reduce((s, p) => s + toNumber(p.amount), 0)
-    const commission = paidCard * COMMISSION_RATE
-    const net = paid - commission
-    const balance = Math.max(0, toNumber(total) - paid)
-
-    let status = 'unpaid'
-    if (paid > 0.009 && paid + 0.009 >= toNumber(total)) status = 'paid'
-    else if (paid > 0.009) status = 'partial'
-
-    return { payments: list, paid, paidCard, commission, net, balance, status }
-  }
-
   const selectClient = (client) => {
     setFormData(prev => ({
       ...prev,
@@ -614,6 +596,8 @@ export default function Orders() {
     setEditingOrder(order)
     setShowForm(true)
   }
+
+  useOrderDeepLink(orders, editOrder, currentBusinessId, Boolean(user && currentBusinessId))
 
   const deleteOrder = async (id) => {
     const { error } = await deleteOrderRow(id)

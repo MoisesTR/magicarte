@@ -1,3 +1,4 @@
+import useOrderDeepLink from '../../hooks/useOrderDeepLink'
 import { orderItemDetailLines } from '../../utils/productPresentations'
 import { useEffect, useMemo, useState } from 'react'
 import AdminLogin from '../../components/AdminLogin'
@@ -93,6 +94,8 @@ export default function JoyeriaOrders() {
     else setOrders(data || [])
     setLoading(false)
   }
+
+  useOrderDeepLink(orders, order => { setEditingOrder(order); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   const handleDelete = async (id) => {
     const { error } = await deleteOrder(id)

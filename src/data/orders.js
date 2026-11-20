@@ -16,17 +16,36 @@ const ORDER_SELECT = `
   clients (id, name)
 `
 
-/** Full orders list for a business (with items, payments, client). */
-export async function fetchOrdersForBusiness(businessId) {
-  let query = supabase.from(TABLE.ORDERS).select(ORDER_SELECT).order('created_at', { ascending: false })
-  if (businessId != null) query = query.eq('business_id', businessId)
-  const result = await query
+/** Shared editor enrichment: never drop saved presentation/design snapshots. */
+async function enrichOrderRows(result, businessId) {
   if (result.error || !result.data?.length) return result
   const ids = result.data.flatMap(order => order.order_items.map(item => item.id))
   const designs = await fetchOrderItemDesigns(ids, businessId)
   if (designs.error) return { ...result, error: designs.error }
   if (designs.available === false) return result
   return { ...result, data: result.data.map(order => ({ ...order, order_items: order.order_items.map(item => ({ ...item, order_item_designs: (designs.data || []).filter(row => row.order_item_id === item.id) })) })) }
+}
+
+/** Full orders list for a business (with items, payments, client). */
+export async function fetchOrdersForBusiness(businessId) {
+  let query = supabase.from(TABLE.ORDERS).select(ORDER_SELECT).order('created_at', { ascending: false })
+  if (businessId != null) query = query.eq('business_id', businessId)
+  return enrichOrderRows(await query, businessId)
+}
+
+/** Full editor detail for deep links beyond the capped list; scope is mandatory. */
+export async function fetchOrderForBusiness(orderId, businessId) {
+  if (orderId == null || orderId === '' || businessId == null || businessId === '') {
+    return { data: null, error: new Error('Order and business ids are required') }
+  }
+  const result = await supabase.from(TABLE.ORDERS).select(ORDER_SELECT)
+    .eq('id', orderId).eq('business_id', businessId).maybeSingle()
+  if (result.error || !result.data) return result
+  if (String(result.data.id) !== String(orderId) || String(result.data.business_id) !== String(businessId)) {
+    return { ...result, data: null, error: new Error('Order scope mismatch') }
+  }
+  const enriched = await enrichOrderRows({ ...result, data: [result.data] }, businessId)
+  return { ...enriched, data: enriched.error ? null : enriched.data[0] }
 }
 
 /** Create an order, stamping the owning business. Returns inserted row(s). */
