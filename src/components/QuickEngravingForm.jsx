@@ -1,3 +1,4 @@
+import { getOrderChargeTotal, getPaymentSummary } from '../utils/orderPayments'
 import { nicaraguaToday } from '../utils/finance'
 import { replaceOrderItems } from '../utils/orderItemsSave'
 import { resolveOrderClient } from '../utils/orderClientLink'
@@ -42,9 +43,14 @@ export default function QuickEngravingForm({
 }) {
   const existingItem = editingOrder?.order_items?.[0]
   const existingPayment = editingOrder?.order_payments?.[0]
-  // Reopened imported orders have no transient import props. Their persisted
-  // lifecycle, not the open form, decides whether this is a paid quick-job log.
-  const logsFullPayment = !initialThreadForm && (!editingOrder || (editingOrder.status === 'completed' && editingOrder.payment_status === 'paid'))
+  // Only a single exact quick-log receipt follows edits to the job total.
+  // Multiple receipts and overpayments are independent cash records, never rewritten.
+  const existingCharge = editingOrder ? getOrderChargeTotal(editingOrder) : 0
+  const existingSummary = getPaymentSummary(editingOrder?.order_payments, existingCharge)
+  const logsFullPayment = !initialThreadForm && (!editingOrder || (
+    editingOrder.status === 'completed' && existingSummary.status === 'paid' &&
+    existingSummary.payments.length === 1 && existingSummary.paid === existingCharge
+  ))
 
   // Legacy jobs (created before the Cliente/Nota split) never had a
   // product_description — their customer_name is actually old note text, not a
@@ -190,7 +196,6 @@ export default function QuickEngravingForm({
             order_date: date,
             status: initialThreadForm ? 'pending' : 'completed',
             priority: 'normal',
-            payment_status: initialThreadForm ? 'unpaid' : 'paid',
             delivery_method: 'pickup',
             delivery_fee: 0,
             is_gift: false,
@@ -250,7 +255,7 @@ export default function QuickEngravingForm({
 
       if (logsFullPayment && existingPayment) {
         const { error: payErr } = await updatePayment(existingPayment.id, {
-          amount: effectiveTotal,
+          amount: getOrderChargeTotal({ ...editingOrder, total_amount: effectiveTotal }),
           method,
           paid_at: date,
         })

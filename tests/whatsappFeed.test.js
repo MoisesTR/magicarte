@@ -277,7 +277,7 @@ test('thread order mapping preserves identity and notes and uses a custom unpaid
   assert.equal(form.notes, '20 llaveros\n\nAzules')
   assert.equal(form.items[0].unit_price, 450.5)
   assert.equal(form.items[0].is_custom, true)
-  assert.equal(form.payment_status, 'unpaid')
+  assert.equal(Object.hasOwn(form, 'payment_status'), false)
   assert.equal(form.status, 'pending')
   assert.equal(form.estimated_delivery_date, '2026-11-20')
   assert.equal(

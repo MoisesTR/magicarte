@@ -38,7 +38,7 @@ for (const method of ['Retiro en El Edén', 'Lo recoge']) test(`prefill recogniz
 test('prefill retains paid chat amount as a verification note, never an actual payment', () => {
   const form = threadOrderPrefill({ summary: 'Vitral', notes: 'Azul', paid_amount: 2700 })
   assert.match(form.notes, /Anticipo recibido por WhatsApp: C\$2700 \(verificar comprobante\)/)
-  assert.equal(form.payment_status, 'unpaid')
+  assert.equal(Object.hasOwn(form, 'payment_status'), false)
   assert.equal(Object.hasOwn(form, 'paid_amount'), false)
 })
 

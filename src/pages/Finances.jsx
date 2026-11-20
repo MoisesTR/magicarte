@@ -1,3 +1,4 @@
+import { getOrderChargeTotal, getPaymentSummary, isBillableOrder, summarizeReceivables } from '../utils/orderPayments'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
@@ -217,18 +218,18 @@ export default function Finances() {
   const monthPayments = payments.filter(p => nicaraguaMonth(p.paid_at) === selectedMonth)
   const monthSummary = summarise(monthPayments)
 
-  // outstanding balance — exclude gifts (nothing to collect from them)
-  const pendingOrders = orders.map(o => {
-    const paid = (o.order_payments || []).reduce((s, p) => s + Number(p.amount), 0)
-    const balance = Math.max(0, Number(o.total_amount || 0) + Number(o.delivery_fee || 0) - paid)
+  // Gifts are not collected; status eligibility and debt math share one contract.
+  const receivableOrders = orders.filter(o => !o.is_gift && isBillableOrder(o))
+  const pendingOrders = receivableOrders.map(o => {
+    const { paid, balance } = getPaymentSummary(o.order_payments, getOrderChargeTotal(o))
     return { ...o, paid, balance }
-  }).filter(o => o.balance > 0.009 && !o.is_gift)
-  const totalPending = pendingOrders.reduce((s, o) => s + o.balance, 0)
+  }).filter(o => o.balance > 0)
+  const { pending: totalPending } = summarizeReceivables(receivableOrders)
   const currentSettlement = partnerSettlements.find((settlement) => settlement.business_id === currentBusinessId)
 
   // method breakdown for selected month
   const byMethod = ['efectivo', 'transferencia', 'tarjeta'].map(m => {
-    const amount = monthPayments.filter(p => p.method === m).reduce((s, p) => s + Number(p.amount), 0)
+    const amount = summarise(monthPayments.filter(p => p.method === m)).paid
     const pct = monthSummary.paid > 0 ? (amount / monthSummary.paid) * 100 : 0
     return { method: m, amount, pct }
   }).filter(m => m.amount > 0)
@@ -254,7 +255,7 @@ export default function Finances() {
         order_id: p.order_id,
         order_number: p.orders?.order_number,
         name: orderDisplayName(p),
-        total_amount: Number(p.orders?.total_amount || 0) + Number(p.orders?.delivery_fee || 0),
+        total_amount: getOrderChargeTotal(p.orders || {}),
         payments: []
       }
       acc[key].payments.push(p)
@@ -484,7 +485,7 @@ export default function Finances() {
                         </div>
                         <div className='text-right flex-shrink-0'>
                           <p className='text-sm font-bold text-red-600'>C$ {o.balance.toFixed(0)}</p>
-                          <p className='text-xs text-gray-400'>de C$ {(Number(o.total_amount || 0) + Number(o.delivery_fee || 0)).toFixed(0)}</p>
+                          <p className='text-xs text-gray-400'>de C$ {getOrderChargeTotal(o).toFixed(0)}</p>
                         </div>
                         <button
                           onClick={() => navigate(`/admin/${currentBusiness.slug}/orders`, o.client_id ? { state: { clientId: o.client_id, clientName: o.customer_name } } : { state: { search: o.customer_name } })}

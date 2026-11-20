@@ -1,13 +1,14 @@
+import { filterBillableOrders } from '../utils/orderPayments'
 // Data-access layer for orders + order items. Business scoping and stamping
 // live here so pages don't touch supabase.from('orders') directly.
 
 import { supabase } from '../config/supabaseClient'
 import { fetchProductOptions, fetchOrderItemDesigns, insertOrderItemsWithDesigns } from './productPresentations'
 import { activeOptions } from '../utils/productPresentations'
-import { TABLE } from '../utils/constants'
+import { TABLE, COLUMNS } from '../utils/constants'
 
 const ORDER_SELECT = `
-  *,
+  ${COLUMNS[TABLE.ORDERS]},
   order_items (
     *,
     products (name, image_url, width, length)
@@ -50,7 +51,7 @@ export async function fetchOrderForBusiness(orderId, businessId) {
 
 /** Create an order, stamping the owning business. Returns inserted row(s). */
 export function createOrder(orderData, businessId) {
-  return supabase.from(TABLE.ORDERS).insert([{ ...orderData, business_id: businessId }]).select()
+  return supabase.from(TABLE.ORDERS).insert([{ ...orderData, business_id: businessId }]).select(COLUMNS[TABLE.ORDERS])
 }
 
 /** Update an order's fields (business_id is left unchanged). */
@@ -100,14 +101,13 @@ export async function fetchOrderProducts(businessId) {
   return { ...result, data: (result.data || []).map(product => ({ ...product, presentations: activeOptions(options.presentations.filter(row => row.product_id === product.id)), designs: activeOptions(options.designs.filter(row => row.product_id === product.id)) })) }
 }
 
-/** Orders summary for Finances (excludes canceled), scoped to a business. */
+/** Billable orders summary for Finances, scoped to a business. */
 export function fetchFinanceOrders(businessId) {
-  let query = supabase
+  let query = filterBillableOrders(supabase
     .from(TABLE.ORDERS)
     .select(
       'id, order_number, customer_name, total_amount, delivery_fee, order_date, status, is_gift, client_id, order_payments(amount, method, paid_at)',
-    )
-    .not('status', 'in', '("canceled")')
+    ))
   if (businessId != null) query = query.eq('business_id', businessId)
   return query
 }

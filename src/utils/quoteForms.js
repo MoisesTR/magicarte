@@ -28,8 +28,6 @@ export function newOrderForm(orderDate = '') {
     order_date: orderDate,
     status: 'pending',
     priority: 'normal',
-    payment_status: 'unpaid',
-    payment_method: 'not_specified',
     follow_up_reason: '',
     follow_up_date: '',
     notes: '',

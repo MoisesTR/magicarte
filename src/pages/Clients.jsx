@@ -1,3 +1,4 @@
+import { isBillableOrder, summarizeReceivables } from '../utils/orderPayments'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLogin from '../components/AdminLogin'
@@ -101,21 +102,17 @@ export default function Clients() {
     const ordersForRanking = linkedOrders.filter((order) =>
       !order.is_gift && (rankingFilter === 'completed'
         ? order.status === 'completed'
-        : !['backlog', 'canceled'].includes(order.status))
+        : isBillableOrder(order))
     )
     const statsByClient = new Map()
 
     ordersForRanking.forEach((order) => {
       if (!order.client_id) return
       const current = statsByClient.get(order.client_id) || {
-        totalSpent: 0,
-        orderCount: 0,
+        orders: [],
         lastOrder: null,
       }
-
-      const orderTotal = Number(order.total_amount || 0) + Number(order.delivery_fee || 0)
-      current.totalSpent += orderTotal
-      current.orderCount += 1
+      current.orders.push(order)
 
       const currentDate = order.order_date || order.created_at
       const lastDate = current.lastOrder?.order_date || current.lastOrder?.created_at
@@ -125,6 +122,11 @@ export default function Clients() {
 
       statsByClient.set(order.client_id, current)
     })
+
+    for (const [clientId, stats] of statsByClient) {
+      const summary = summarizeReceivables(stats.orders)
+      statsByClient.set(clientId, { ...summary, totalSpent: summary.totalCharged, orderCount: summary.count, lastOrder: stats.lastOrder })
+    }
 
     return clients
       .map((client) => ({

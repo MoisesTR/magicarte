@@ -1,7 +1,8 @@
 // Shared finance primitives so the dashboard and the machine goals always agree
 // on what "net" means and on which calendar day a payment belongs to.
 
-export const COMMISSION_RATE = 0.0675
+import { getPaymentSummary } from './orderPayments.js'
+export { COMMISSION_RATE } from './orderPayments.js'
 export const TZ = 'America/Managua'
 
 /** Today in Nicaragua as 'YYYY-MM-DD'. */
@@ -36,14 +37,10 @@ export function nicaraguaDay(value) {
   return nicaraguaToday(raw)
 }
 
-/** Gross, card total, commission and net for a list of payments. */
+// Cash flow uses date-filtered receipts (including non-billable orders), not order debt.
 export function summarisePayments(payments) {
-  const paid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const paidCard = payments
-    .filter((p) => p.method === 'tarjeta')
-    .reduce((sum, p) => sum + Number(p.amount), 0)
-  const commission = paidCard * COMMISSION_RATE
-  return { paid, paidCard, commission, net: paid - commission }
+  const { paid, paidCard, commission, net } = getPaymentSummary(payments, 0)
+  return { paid, paidCard, commission, net }
 }
 
 /** Whole days from one 'YYYY-MM-DD' to another (b - a). */

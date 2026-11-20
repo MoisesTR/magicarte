@@ -1,3 +1,4 @@
+import { COLUMNS } from '../src/utils/constants.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
@@ -86,7 +87,7 @@ async function dataHarness({ order = { id: 'order' }, scopeError = null, deleteE
     }
   } }
   const source = (await readFile('src/data/orders.js', 'utf8')).replace(/^import .*$/gm, '').replaceAll('export ', '')
-  const api = new Function('supabase', 'TABLE', `${source}; return { deleteOrderItemsByIds }`)(client, { ORDERS: 'orders', ORDER_ITEMS: 'order_items' })
+  const api = new Function('supabase', 'TABLE', 'COLUMNS', `${source}; return { deleteOrderItemsByIds }`)(client, { ORDERS: 'orders', ORDER_ITEMS: 'order_items' }, COLUMNS)
   return { ...api, requests }
 }
 

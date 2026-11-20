@@ -1,3 +1,4 @@
+import { filterBillableOrders } from '../utils/orderPayments'
 // Data-access layer for clients. Business scoping and stamping live here.
 
 import { supabase } from '../config/supabaseClient'
@@ -110,9 +111,9 @@ export function deleteClient(id) {
 
 /** Orders linked to clients, for the clients ranking view. */
 export function fetchLinkedOrdersForBusiness(businessId) {
-  let query = supabase
+  let query = filterBillableOrders(supabase
     .from(TABLE.ORDERS)
-    .select('id, client_id, order_number, status, total_amount, delivery_fee, order_date, created_at, is_gift')
+    .select('id, client_id, order_number, status, total_amount, delivery_fee, order_date, created_at, is_gift, order_payments(amount, method, paid_at)'))
     .not('client_id', 'is', null)
     .order('created_at', { ascending: false })
   if (businessId != null) query = query.eq('business_id', businessId)

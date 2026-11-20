@@ -17,7 +17,7 @@ function find(tree, predicate) {
   return predicate(tree) ? tree : find(tree.props?.children, predicate)
 }
 
-async function editor(file, { creating = false, insertError = null, deleteError = null } = {}) {
+async function editor(file, { creating = false, insertError = null, deleteError = null, savedOrder = order, state = {} } = {}) {
   const source = await readFile(file, 'utf8')
   const stateNames = [...source.matchAll(/const \[(\w+),\s*\w+\] = useState/g)].map(match => match[1])
   let cursor = 0
@@ -27,7 +27,7 @@ async function editor(file, { creating = false, insertError = null, deleteError 
     useEffect() {}, useMemo: fn => fn(), useRef: current => ({ current }),
     useState(initial) {
       const name = stateNames[cursor++]
-      const overrides = { user: { id: 'owner' }, checkingAuth: false, showForm: true, editingOrder: creating ? null : order }
+      const overrides = { user: { id: 'owner' }, checkingAuth: false, showForm: true, editingOrder: creating ? null : savedOrder, ...state }
       return [name in overrides ? overrides[name] : typeof initial === 'function' ? initial() : initial, () => {}]
     },
   }
@@ -54,7 +54,7 @@ async function editor(file, { creating = false, insertError = null, deleteError 
     if (name.includes('/components/') || name.startsWith('./')) return { __esModule: true, default: () => null }
     return require(name)
   }, module, module.exports, { getItem: () => null })
-  const props = { businessId: 2, editingOrder: creating ? null : order, initialThreadForm: creating ? form : null, onSaved: () => calls.push(['refresh']), onClose: () => calls.push(['close']) }
+  const props = { businessId: 2, editingOrder: creating ? null : savedOrder, initialThreadForm: creating ? form : null, onSaved: () => calls.push(['refresh']), onClose: () => calls.push(['close']) }
   const tree = file.includes('QuickEngraving') ? module.exports.default(props) : module.exports.default()
   await find(tree, node => node.type === 'form').props.onSubmit({ preventDefault() {} })
   await new Promise(resolve => setImmediate(resolve))
@@ -92,5 +92,54 @@ for (const file of editors) {
     assert.equal(calls.filter(([name]) => name === 'insertOrderItems').length, 1)
     assert.equal(calls.some(([name]) => name.startsWith('deleteOrderItems')), false)
     assert.ok(calls.some(([name]) => name === 'success'))
+  })
+}
+
+
+for (const file of editors) {
+  for (const creating of [true, false]) {
+    test(`${file}: ${creating ? 'create' : 'update'} payload omits both legacy payment columns`, async () => {
+      const calls = await editor(file, { creating })
+      const saved = calls.find(([name]) => name === (creating ? 'createOrder' : 'updateOrder'))
+      assert.ok(saved, 'must reach the real form save handler')
+      const payload = saved[creating ? 1 : 2]
+      assert.equal(Object.hasOwn(payload, 'payment_status'), false)
+      assert.equal(Object.hasOwn(payload, 'payment_method'), false)
+    })
+  }
+}
+
+test('engraving edit derives paid lifecycle from real payments, not stale legacy status', async () => {
+  const paidOrder = { ...order, status: 'completed', payment_status: 'unpaid', order_payments: [{ id: 'payment', amount: 100, method: 'efectivo' }] }
+  const paidCalls = await editor(editors[2], { savedOrder: paidOrder })
+  assert.ok(paidCalls.some(([name]) => name === 'updatePayment'))
+  const unpaidCalls = await editor(editors[2], { savedOrder: { ...paidOrder, payment_status: 'paid', order_payments: [] } })
+  assert.equal(unpaidCalls.some(([name]) => name === 'addPayment' || name === 'updatePayment'), false)
+})
+
+
+test('unchanged completed engraving edit preserves multiple receipts without inventing extra cash', async () => {
+  const savedOrder = { ...order, status: 'completed', order_payments: [{ id: 'first', amount: 40 }, { id: 'second', amount: 60 }] }
+  const calls = await editor(editors[2], { savedOrder })
+  assert.equal(calls.some(([name]) => name === 'addPayment' || name === 'updatePayment'), false)
+  assert.equal(savedOrder.order_payments.reduce((sum, payment) => sum + payment.amount, 0), 100)
+})
+
+test('unchanged overpaid engraving edit preserves the extra actual receipt', async () => {
+  const calls = await editor(editors[2], { savedOrder: { ...order, status: 'completed', order_payments: [{ id: 'receipt', amount: 120 }] } })
+  assert.equal(calls.some(([name]) => name === 'addPayment' || name === 'updatePayment'), false)
+})
+
+test('single fully paid quick-log receipt still follows an edited job total', async () => {
+  const calls = await editor(editors[2], { savedOrder: { ...order, status: 'completed', order_payments: [{ id: 'receipt', amount: 100 }] }, state: { baseTotal: '150' } })
+  assert.equal(calls.find(([name]) => name === 'updatePayment')?.[2].amount, 150)
+})
+
+for (const productTotal of [100, 150]) {
+  test(`completed engraving edit keeps delivery in the receipt when product total is ${productTotal}`, async () => {
+    const savedOrder = { ...order, status: 'completed', delivery_fee: 10, order_payments: [{ id: 'receipt', amount: 110 }] }
+    const calls = await editor(editors[2], { savedOrder, state: { baseTotal: String(productTotal) } })
+    assert.equal(calls.find(([name]) => name === 'updateOrder')?.[2].total_amount, productTotal)
+    assert.equal(calls.find(([name]) => name === 'updatePayment')?.[2].amount, productTotal + 10)
   })
 }

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { COLUMNS } from '../src/utils/constants.js'
 import { readFile } from 'node:fs/promises'
 
 async function api({ row, error = null, designs = { data: [], error: null, available: true } } = {}) {
@@ -15,7 +16,7 @@ async function api({ row, error = null, designs = { data: [], error: null, avail
     }
   } }
   const source = (await readFile(new URL('../src/data/orders.js', import.meta.url), 'utf8')).replace(/^import .*$/gm, '').replaceAll('export ', '')
-  const methods = new Function('supabase', 'TABLE', 'fetchOrderItemDesigns', `${source}; return { fetchOrderForBusiness, fetchOrdersForBusiness }`)(client, { ORDERS: 'orders' }, async (...args) => { designReads.push(args); return designs })
+  const methods = new Function('supabase', 'TABLE', 'COLUMNS', 'fetchOrderItemDesigns', `${source}; return { fetchOrderForBusiness, fetchOrdersForBusiness }`)(client, { ORDERS: 'orders' }, COLUMNS, async (...args) => { designReads.push(args); return designs })
   return { ...methods, requests, designReads }
 }
 test('detail lookup refuses missing ids or scope without any read', async () => {

@@ -253,7 +253,7 @@ test('order date comes from agreed delivery, not response promise; unsupported n
     paid_amount: 700,
   })
   assert.equal(form.estimated_delivery_date, '2026-11-22')
-  assert.equal(form.payment_status, 'unpaid')
+  assert.equal(Object.hasOwn(form, 'payment_status'), false)
   assert.equal(Object.hasOwn(form, 'paid_amount'), false)
   assert.equal(
     feed.threadOrderPrefill({

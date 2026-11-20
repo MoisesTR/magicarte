@@ -1,3 +1,4 @@
+import { getOrderChargeTotal, getPaymentSummary } from '../../utils/orderPayments'
 import { nicaraguaToday } from '../../utils/finance'
 import { replaceOrderItems } from '../../utils/orderItemsSave'
 import { resolveOrderClient } from '../../utils/orderClientLink'
@@ -45,13 +46,6 @@ const money = (v) =>
   new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'NIO', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Number(v || 0))
 
 const fmtDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('es-NI', { day: '2-digit', month: 'short' }) : '—')
-
-function paymentStatusOf(totalAmount, payments) {
-  const paid = (payments || []).reduce((s, p) => s + num(p.amount), 0)
-  if (paid > 0.009 && paid + 0.009 >= num(totalAmount)) return 'paid'
-  if (paid > 0.009) return 'partial'
-  return 'unpaid'
-}
 
 const initialForm = () => ({ customer_phone: '', client_id: null, notes: '', customer_name: '', order_date: nicaraguaToday(), status: 'pending', items: [emptyItem()] })
 
@@ -220,7 +214,7 @@ export default function HikariOrders() {
         orderId = editingOrder.id
       } else {
         const { data, error } = await createOrder(
-          { ...orderData, payment_status: 'unpaid', priority: 'normal', is_gift: false, delivery_method: 'pickup', delivery_fee: 0, ...importedDelivery },
+          { ...orderData, priority: 'normal', is_gift: false, delivery_method: 'pickup', delivery_fee: 0, ...importedDelivery },
           currentBusinessId,
         )
         if (error) throw error
@@ -297,10 +291,6 @@ export default function HikariOrders() {
         currentBusinessId,
       )
       if (error) throw error
-      const nextPayments = [...(order.order_payments || []), { amount, method: payMethod }]
-      const nextStatus = paymentStatusOf(order.total_amount, nextPayments)
-      const { error: updErr } = await updateOrder(order.id, { payment_status: nextStatus })
-      if (updErr) throw updErr
       toast.success('Pago registrado')
       setPayingOrderId(null)
       fetchOrders()
@@ -309,13 +299,10 @@ export default function HikariOrders() {
     }
   }
 
-  const handleDeletePayment = async (order, paymentId) => {
+  const handleDeletePayment = async (paymentId) => {
     try {
       const { error } = await deletePaymentRow(paymentId)
       if (error) throw error
-      const nextPayments = (order.order_payments || []).filter((p) => p.id !== paymentId)
-      const nextStatus = paymentStatusOf(order.total_amount, nextPayments)
-      await updateOrder(order.id, { payment_status: nextStatus })
       fetchOrders()
     } catch (err) {
       toast.error('Error al eliminar pago: ' + err.message)
@@ -360,8 +347,7 @@ export default function HikariOrders() {
             <ul className='divide-y divide-gray-100'>
               {orders.map((o) => {
                 const st = STATUSES.find((s) => s.key === o.status) || STATUSES[0]
-                const paid = (o.order_payments || []).reduce((s, p) => s + num(p.amount), 0)
-                const balance = Math.max(0, num(o.total_amount) - paid)
+                const { balance } = getPaymentSummary(o.order_payments, getOrderChargeTotal(o))
                 return (
                   <li key={o.id} className='px-4 py-3'>
                     <div className='flex items-center gap-3 text-sm'>
@@ -379,7 +365,7 @@ export default function HikariOrders() {
                         {st.label}
                       </span>
                       <div className='shrink-0 text-right'>
-                        <p className='font-bold text-gray-800'>{money(o.total_amount)}</p>
+                        <p className='font-bold text-gray-800'>{money(getOrderChargeTotal(o))}</p>
                         {balance > 0.009 ? (
                           <p className='text-[11px] text-red-500'>debe {money(balance)}</p>
                         ) : (
@@ -420,7 +406,7 @@ export default function HikariOrders() {
                             {o.order_payments.map((p) => (
                               <span key={p.id} className='inline-flex items-center gap-1 rounded-lg bg-white border border-gray-200 px-2 py-1 text-[11px] text-gray-600'>
                                 {money(p.amount)} ({p.method})
-                                <button onClick={() => handleDeletePayment(o, p.id)} className='text-gray-300 hover:text-red-500'>×</button>
+                                <button onClick={() => handleDeletePayment(p.id)} className='text-gray-300 hover:text-red-500'>×</button>
                               </span>
                             ))}
                           </div>

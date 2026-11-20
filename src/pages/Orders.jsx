@@ -484,8 +484,6 @@ export default function Orders() {
         order_date: formData.order_date,
         status: formData.status,
         priority: formData.priority,
-        payment_status: formData.payment_status,
-        payment_method: formData.payment_method,
         follow_up_reason: formData.follow_up_reason || null,
         follow_up_date: formData.follow_up_date || null,
         notes: formData.notes || null,
@@ -600,8 +598,6 @@ export default function Orders() {
       order_date: order.order_date || nicaraguaToday(),
       status: order.status,
       priority: order.priority,
-      payment_status: order.payment_status || 'unpaid',
-      payment_method: order.payment_method || 'not_specified',
       follow_up_reason: order.follow_up_reason || '',
       follow_up_date: order.follow_up_date || '',
       notes: order.notes || '',
@@ -1611,7 +1607,7 @@ export default function Orders() {
                           <p className='text-xs text-gray-500'>+ Delivery: C$ {parseFloat(order.delivery_fee).toFixed(2)}</p>
                         )}
                         {order.delivery_fee > 0 && (
-                          <p className='text-sm font-semibold text-gray-700'>Total cliente: C$ {(parseFloat(order.total_amount) + parseFloat(order.delivery_fee)).toFixed(2)}</p>
+                          <p className='text-sm font-semibold text-gray-700'>Total cliente: C$ {getOrderChargeTotal(order).toFixed(2)}</p>
                         )}
                         {paySummary.commission > 0.009 && (
                           <p className='text-xs text-gray-500'>

@@ -6,6 +6,7 @@ import { transform } from 'esbuild'
 import * as helpers from '../src/utils/productPresentations.js'
 import * as clientLink from '../src/utils/orderClientLink.js'
 import * as finance from '../src/utils/finance.js'
+import * as payments from '../src/utils/orderPayments.js'
 import * as itemSave from '../src/utils/orderItemsSave.js'
 const clients = {
   findClientByNormalizedPhone: async () => ({ data: null, error: null }),
@@ -50,6 +51,7 @@ async function engravingFormWithClient(calls, overrides = {}) {
     },
     '../utils/orderClientLink': clientLink,
     '../utils/finance': finance,
+    '../utils/orderPayments': payments,
     '../utils/orderItemsSave': itemSave,
     '../data/clients': clients,
     '../data/orders': Object.fromEntries(
@@ -296,6 +298,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
     '../../config/supabaseClient': {},
     '../../utils/orderClientLink': clientLink,
     '../../utils/finance': finance,
+    '../../utils/orderPayments': payments,
     '../../utils/orderItemsSave': itemSave,
     '../../data/clients': clients,
     '../../data/orders': Object.fromEntries(
@@ -355,7 +358,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   })
   assert.equal(calls.find(([name]) => name === 'error'), undefined)
   const [,order,business] = calls.find(([name]) => name === 'createOrder')
-  assert.equal(business,3); assert.equal(order.status,'pending'); assert.equal(order.payment_status,'unpaid'); assert.equal(order.completed_at,null)
+  assert.equal(business,3); assert.equal(order.status,'pending'); assert.equal(Object.hasOwn(order, 'payment_status'), false); assert.equal(order.completed_at,null)
   assert.equal(order.customer_name,'Carlos'); assert.equal(order.customer_phone,'82888070'); assert.equal(order.client_id,'client'); assert.equal(order.notes,'Placa\n\nAzul')
   assert.equal(calls.some(([name]) => name === 'addPayment'),false)
   const [,items] = calls.find(([name]) => name === 'insertOrderItems')
@@ -427,7 +430,7 @@ test('legacy quick-job creation still records a completed paid job and its recei
   await submit(Form, { businessId: 3 })
   const [, order] = calls.find(([name]) => name === 'createOrder')
   assert.equal(order.status, 'completed')
-  assert.equal(order.payment_status, 'paid')
+  assert.equal(Object.hasOwn(order, 'payment_status'), false)
   assert.ok(order.completed_at)
   assert.equal(calls.find(([name]) => name === 'addPayment')[1].amount, 450)
 })
