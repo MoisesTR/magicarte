@@ -948,7 +948,7 @@ export default function Inventory() {
           <Panel>Cargando inventario...</Panel>
         ) : visibleItems.length === 0 ? (
           <Panel>
-            {filter === 'low' ? 'No hay artículos con alerta de bajo stock.' : 'Aún no hay artículos. Registra materiales, piezas terminadas o insumos para este negocio.'}
+            {filter === 'low' ? 'No hay artículos con alerta de bajo stock.' : 'Aún no hay artículos. Registre materiales, piezas terminadas o insumos para este negocio.'}
           </Panel>
         ) : (
           <div className='overflow-hidden rounded-2xl bg-white shadow-soft'>
