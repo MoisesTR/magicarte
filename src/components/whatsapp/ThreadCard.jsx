@@ -11,10 +11,12 @@ import {
   isConfirmedThread,
   isNotCustomer,
   deliveryDateLabel,
+  hasOrderLines,
 } from '../../utils/whatsappFeed'
 
 const button =
   'min-h-10 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50'
+const moneyLabel = value => Number(value).toLocaleString('es-NI', { maximumFractionDigits: 2 })
 const dateLabel = (date) =>
   date ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : ''
 
@@ -41,6 +43,7 @@ function ThreadDetail({
   const tag = aiTagChip(thread, now)
   const phone = chatPhone(thread)
   const open = OPEN_STATUSES.includes(thread.status)
+  const structured = open && hasOrderLines(thread)
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(phone)
@@ -68,12 +71,12 @@ function ThreadDetail({
       </div>
       <div className='mt-2 flex flex-wrap gap-1.5 text-xs text-gray-700'>
         {tag && <AITag chip={tag} />}
-        <span className='rounded-full bg-gray-100 px-2 py-1'>
-          {KIND_LABELS[thread.kind]}
-        </span>
-        <span className='rounded-full border border-gray-200 px-2 py-1'>
-          {STATUS_LABELS[thread.status]}
-        </span>
+        {(!open || !tag) && (
+          <>
+            <span className='rounded-full bg-gray-100 px-2 py-1'>{KIND_LABELS[thread.kind]}</span>
+            <span className='rounded-full border border-gray-200 px-2 py-1'>{STATUS_LABELS[thread.status]}</span>
+          </>
+        )}
         {(thread.labels || []).map((label) => (
           <span
             key={label}
@@ -94,6 +97,22 @@ function ThreadDetail({
       <p className='mt-3 text-sm whitespace-pre-wrap text-gray-800'>
         {thread.summary}
       </p>
+      {open && (structured || thread.delivery_address || thread.recipient_name || thread.recipient_phone) && (
+        <section aria-label='Detalle del pedido' className='mt-3 min-w-0 space-y-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-800'>
+          {structured && (
+            <>
+              <ul className='space-y-1'>
+                {thread.order_lines.map((line, index) => (
+                  <li key={index}>{`${line.quantity} × ${line.name} — C$${moneyLabel(line.unit_price)}${line.detail ? ` · «${line.detail}»` : ''}`}</li>
+                ))}
+              </ul>
+              <p className='font-bold'>Total C${moneyLabel(thread.order_lines.reduce((total, line) => total + line.quantity * line.unit_price, 0))}</p>
+            </>
+          )}
+          {thread.delivery_address && <p>Dirección: {thread.delivery_address}</p>}
+          {(thread.recipient_name || thread.recipient_phone) && <p>Recibe: {[thread.recipient_name, thread.recipient_phone].filter(Boolean).join(' · ')}</p>}
+        </section>
+      )}
       {thread.next_action && (
         <p className='mt-1 rounded-xl border-l-4 border-[var(--color-primary,#51c879)] bg-gray-50 p-3 text-sm font-semibold text-gray-800'>
           {thread.next_action}
@@ -115,7 +134,7 @@ function ThreadDetail({
           {thread.timeHint}
         </p>
       )}
-      {thread.quoted_amount != null && (
+      {!structured && thread.quoted_amount != null && (
         <p className='mt-3 font-bold text-gray-800'>
           C${' '}
           {Number(thread.quoted_amount).toLocaleString('es-NI', {
@@ -398,6 +417,8 @@ export default function ThreadCard({
   const notCustomer = isNotCustomer(thread)
   const tag = aiTagChip(thread, now)
   const chip = rowChip(thread, now)
+  const open = OPEN_STATUSES.includes(thread.status)
+  const showRowChip = !open || !tag || chip.text !== STATUS_LABELS[thread.status]
   const tone = ROW_TONES[chip.tone]
   const name =
     thread.customer_name ||
@@ -431,11 +452,12 @@ export default function ThreadCard({
           </span>
           <span className='flex min-w-0 flex-wrap items-center gap-1.5'>
             {tag && <AITag chip={tag} />}
-            <span
+            {showRowChip && <span
               className={`${confirmed || notCustomer ? 'w-fit max-w-full [overflow-wrap:anywhere] whitespace-normal' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
             >
               {chip.text}
-            </span>
+            </span>}
+            {!open && tag && !notCustomer && chip.text !== STATUS_LABELS[thread.status] && <span className='rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600'>{STATUS_LABELS[thread.status]}</span>}
           </span>
         </span>
         {confirmed ? (
@@ -477,6 +499,9 @@ export default function ThreadCard({
           >
             Pedido #{matchedOrder.order_number} ✓
           </Link>
+          {(matchedOrder.estimated_delivery_date || thread.delivery_date) && (
+            <span className='text-xs text-gray-500'>Entrega {dateLabel(matchedOrder.estimated_delivery_date || thread.delivery_date)}</span>
+          )}
           {autoLinked && (
             <span className='text-xs text-gray-500'>
               Vinculado por teléfono

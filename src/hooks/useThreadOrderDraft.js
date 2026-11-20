@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createDraftSession, editDraftSession, mergeDraftSession, restoreDraftSession, requestOrderDraft } from '../utils/orderDraftFromThread'
+import { createDraftSession, editDraftSession, mergeDraftSession, restoreDraftSession, requestOrderDraft, hasOrderLines, mergeStructuredDraftSession } from '../utils/orderDraftFromThread'
 
 /** One draft per import; edited rows are indivisible when AI splits the item list. */
 export default function useThreadOrderDraft(initialForm, { businessId, products, catalogBusinessId, getSession }) {
@@ -38,7 +38,7 @@ export default function useThreadOrderDraft(initialForm, { businessId, products,
     importedBusiness.current = businessId
     session.current = { state: createDraftSession(original), thread, businessId, started: false }
     apply(structuredClone(original))
-    setNotice({ status: 'loading', error: '' })
+    setNotice({ status: hasOrderLines(thread) ? 'idle' : 'loading', error: '' })
   }
   const cancelPending = () => {
     session.current = null
@@ -60,6 +60,11 @@ export default function useThreadOrderDraft(initialForm, { businessId, products,
     const pending = session.current
     if (!pending || pending.started || pending.businessId !== businessId || catalogBusinessId !== businessId) return
     pending.started = true
+    if (hasOrderLines(pending.thread)) {
+      pending.state = mergeStructuredDraftSession(pending.state, pending.thread, products)
+      apply(pending.state.form)
+      return
+    }
     const isCurrent = () => mounted.current && session.current === pending && currentBusiness.current === pending.businessId
     requestOrderDraft(pending.thread, products, { getSession }).then(draft => {
       if (!isCurrent()) return

@@ -713,3 +713,45 @@ test('manual creation classifies exactly once after successful save; edits/failu
     assert.deepEqual(calls, scenario === 'create' ? ['created'] : [])
   }
 })
+
+test('open structured detail renders per-item prices, personalization, computed total and delivery recipient', async () => {
+  const { card, render } = await renderedComponents
+  const thread = { id: 'structured', status: 'sent', kind: 'order', summary: 'Free text', quoted_amount: 999, order_lines: [{ name: 'Decoración estilo vitral', quantity: 18, unit_price: 300, detail: 'Feliz Navidad' }, { name: 'Extra', quantity: 2, unit_price: 50, detail: null }], delivery_address: 'Casa azul, Estelí', recipient_name: 'Alma Medina', recipient_phone: '88887777' }
+  const html = render(card, { thread, expanded: true })
+  for (const text of ['18 × Decoración estilo vitral — C$300 · «Feliz Navidad»', 'Total C$5,500', 'Casa azul, Estelí', 'Alma Medina', '88887777']) assert.ok(html.includes(text), text)
+  assert.doesNotMatch(html.slice(html.indexOf('role="region"')), /999/)
+  assert.doesNotMatch(render(card, { thread, expanded: false }), /Casa azul|Total C/)
+})
+
+test('open tagged rows/detail hide redundant manual labels without removing status actions; closed and untagged keep status', async () => {
+  const { card, render } = await renderedComponents
+  const thread = { id: 't', status: 'sent', kind: 'other', summary: 'Resumen', ai_tag: 'follow_up' }
+  const row = render(card, { thread })
+  assert.match(row, /Dar seguimiento/)
+  assert.doesNotMatch(row, /Cotización enviada|>Otro</)
+  const detail = render(card, { thread, expanded: true })
+  assert.doesNotMatch(detail, />Otro<|>Cotización enviada</)
+  assert.match(detail, /Marcar ganada/)
+  const untagged = render(card, { thread: { ...thread, ai_tag: null }, expanded: true })
+  assert.match(untagged, />Cotización enviada</)
+  assert.match(untagged, />Otro</)
+  const closed = render(card, { thread: { ...thread, status: 'won' }, expanded: true })
+  assert.match(closed, />Ganada</)
+})
+
+test('linked row uses existing matched order delivery date ahead of the thread date with a small fallback', async () => {
+  const { card, render } = await renderedComponents
+  const thread = { id: 't', status: 'won', order_id: 'o', delivery_date: '2026-11-21', summary: 'Resumen' }
+  const props = { thread, matchedOrder: { id: 'o', order_number: 42, estimated_delivery_date: '2026-11-25' } }
+  const html = render(card, props)
+  assert.match(html, /Pedido #42 ✓/)
+  assert.match(html, /Entrega 25\/11/)
+  assert.doesNotMatch(html, /Entrega 21\/11/)
+  assert.match(render(card, { ...props, matchedOrder: { id: 'o', order_number: 42 } }), /Entrega 21\/11/)
+})
+
+test('editor provides collapsed compact order details with accessible inline errors and mobile touch targets', async () => {
+  const source = await readFile('src/components/whatsapp/ThreadEditor.jsx', 'utf8')
+  for (const text of ['Detalle del pedido', 'Cantidad', 'Precio c/u', 'Detalle', 'Agregar línea', 'Quitar línea', 'Dirección de entrega', 'Quién recibe', 'Teléfono de quien recibe', 'buildOrderLines', 'aria-invalid', 'aria-describedby', 'role=\'alert\'']) assert.ok(source.includes(text), text)
+  assert.match(source, /<details[^>]*>[\s\S]*?Detalle del pedido/)
+})

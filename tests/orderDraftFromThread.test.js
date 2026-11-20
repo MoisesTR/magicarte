@@ -167,3 +167,22 @@ test('draft privacy preserves valid ISO dates and narrative dates without exposi
   assert.match(value.thread.notes, /Entrega 2026-11-20/)
   assert.doesNotMatch(value.thread.notes, /8421|6792|72545734/)
 })
+
+test('structured lines bypass session and draft endpoint altogether, preserving exact catalog matches', async () => {
+  let calls = 0
+  const result = await requestOrderDraft({ order_lines: [{ name: 'Decoración estilo vitral', quantity: 18, unit_price: 275, detail: 'Feliz Navidad' }], delivery_address: 'Estelí', recipient_name: 'Ana' }, catalog, {
+    getSession() { calls += 1; assert.fail('structured imports need no AI session') },
+    fetchImpl() { calls += 1; assert.fail('structured imports must not call the endpoint') },
+  })
+  assert.equal(calls, 0)
+  assert.equal(result.items[0].product_id, 'vitral')
+  assert.equal(result.items[0].unit_price, 275)
+  assert.equal(result.items[0].quantity, 18)
+  assert.equal(result.items[0].description, 'Feliz Navidad')
+  assert.equal(result.delivery_address, 'Estelí')
+})
+
+test('invalid nonempty lines cannot fall through to AI; only absent or empty arrays may request a draft', async () => {
+  const adapters = { getSession() { assert.fail('invalid structured lines cannot call AI') }, fetchImpl() { assert.fail('network forbidden') } }
+  for (const order_lines of [[{ name: 'Bad', quantity: 0, unit_price: 300, detail: null }], {}]) await assert.rejects(requestOrderDraft({ order_lines }, catalog, adapters), /detalle del pedido/i)
+})

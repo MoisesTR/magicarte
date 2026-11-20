@@ -546,3 +546,54 @@ test('classifier skips already tagged rows, rejects missing scope and invalid AI
   assert.match(failed.error.message, /migración/)
   assert.equal(missing.requests.length, 1)
 })
+
+test('structured fields roundtrip and absent columns normalize to null without changing feed availability', async () => {
+  const fields = { order_lines: [{ name: 'Vitral', quantity: 18, unit_price: 300, detail: 'Navidad' }], delivery_address: 'Estelí', recipient_name: 'Ana', recipient_phone: '88887777' }
+  const c = mock([{ data: { id: 't', ...fields } }, { data: { id: 't', ...fields } }, { data: [{ id: 'legacy' }] }, { data: [] }])
+  const api = await dataWith(c)
+  await api.createWhatsAppThread(fields, 2)
+  assert.deepEqual(c.requests[0].insert[0], { ...fields, business_id: 2 })
+  assert.deepEqual((await api.updateWhatsAppThread('t', fields, 2)).data.order_lines, fields.order_lines)
+  const feed = await api.fetchWhatsAppFeed(2)
+  for (const field of Object.keys(fields)) assert.equal(feed.threads[0][field], null)
+  assert.equal(feed.available, true)
+})
+
+for (const code of ['42703', 'PGRST204']) test(`structured optional columns ${code} retry mixed writes without erasing unrelated AI fields`, async () => {
+  const error = { code, message: "column 'order_lines' of 'whatsapp_threads' does not exist" }
+  const fields = { summary: 'Keep', ai_tag: 'paid', order_lines: [], delivery_address: 'Estelí', recipient_name: 'Ana', recipient_phone: '88887777' }
+  const c = mock([{ error }, { data: { id: 't', summary: 'Keep' } }, { error }, { data: { id: 't', summary: 'Keep' } }])
+  const api = await dataWith(c)
+  assert.equal((await api.createWhatsAppThread(fields, 2)).orderDetailsAvailable, false)
+  assert.deepEqual(c.requests[1].insert[0], { summary: 'Keep', ai_tag: 'paid', business_id: 2 })
+  assert.equal((await api.updateWhatsAppThread('t', fields, 2)).orderDetailsAvailable, false)
+  assert.deepEqual(c.requests[3].update, { summary: 'Keep', ai_tag: 'paid' })
+  assert.deepEqual(c.requests[3].filters, [['id', 't'], ['business_id', 2]])
+})
+
+test('optional-only details never retry empty updates; unrelated column errors remain visible', async () => {
+  const error = { code: 'PGRST204', message: "column 'recipient_name' of 'whatsapp_threads' does not exist" }
+  const c = mock([{ error }])
+  const result = await (await dataWith(c)).updateWhatsAppThread('t', { recipient_name: 'Ana' }, 2)
+  assert.match(result.error.message, /migración/i)
+  assert.equal(result.orderDetailsAvailable, false)
+  assert.equal(c.requests.length, 1)
+  const denied = { code: '42501', message: 'order_lines denied' }
+  const d = mock([{ error: denied }])
+  assert.equal((await (await dataWith(d)).updateWhatsAppThread('t', { summary: 'Keep', order_lines: [] }, 2)).error, denied)
+  assert.equal(d.requests.length, 1)
+})
+
+test('independently unapplied optional migrations each fall back once in either order', async () => {
+  const ai = { code: '42703', message: 'column ai_tag of whatsapp_threads does not exist' }
+  const details = { code: 'PGRST204', message: "column 'delivery_address' of 'whatsapp_threads' does not exist" }
+  for (const errors of [[ai, details], [details, ai]]) {
+    const c = mock([...errors.map(error => ({ error })), { data: { id: 't', summary: 'Keep' } }])
+    const result = await (await dataWith(c)).updateWhatsAppThread('t', { summary: 'Keep', ai_tag: 'paid', delivery_address: 'Estelí' }, 2)
+    assert.equal(result.aiTagsAvailable, false)
+    assert.equal(result.orderDetailsAvailable, false)
+    assert.equal(c.requests.length, 3)
+    assert.deepEqual(c.requests[2].update, { summary: 'Keep' })
+    assert.deepEqual(c.requests[2].filters, [['id', 't'], ['business_id', 2]])
+  }
+})

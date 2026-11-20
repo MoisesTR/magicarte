@@ -7,6 +7,7 @@ import {
   loadOurSenders,
   saveOurSenders,
   buildThreadPayload,
+  buildOrderLines,
 } from '../../utils/whatsappFeed'
 import { prepareFile, uploadCompressedImage } from '../../utils/uploadImage'
 import { getImageUrl } from '../../utils/getImageUrl'
@@ -28,6 +29,10 @@ const EMPTY = {
   quoted_amount: '',
   delivery_date: '',
   delivery_method: '',
+  delivery_address: '',
+  recipient_name: '',
+  recipient_phone: '',
+  order_lines: [],
   paid_amount: 0,
   promised_date: '',
   promise_source: '',
@@ -79,10 +84,12 @@ export default function ThreadEditor({
     ...thread,
     quoted_amount: thread?.quoted_amount ?? '',
     paid_amount: thread?.paid_amount ?? 0,
+    order_lines: Array.isArray(thread?.order_lines) ? thread.order_lines.map(line => ({ ...line })) : [],
   }))
   const [pasted, setPasted] = useState(''),
     [ourSenders, setOurSenders] = useState(loadOurSenders),
     [clients, setClients] = useState([])
+  const [lineErrors, setLineErrors] = useState([])
   const [saving, setSaving] = useState(false),
     [uploading, setUploading] = useState(false),
     [confirmDelete, setConfirmDelete] = useState(false)
@@ -165,9 +172,12 @@ export default function ThreadEditor({
     event.preventDefault()
     let payload
     try {
+      buildOrderLines(form)
+      setLineErrors([])
       payload = buildThreadPayload(form)
     } catch (error) {
-      toast.error(error.message)
+      if (error.errors) setLineErrors(error.errors)
+      else toast.error(error.message)
       return
     }
     setSaving(true)
@@ -221,7 +231,7 @@ export default function ThreadEditor({
             Cerrar
           </button>
         </div>
-        <form onSubmit={submit} className='min-w-0 space-y-4'>
+        <form noValidate onSubmit={submit} className='min-w-0 space-y-4'>
           {!thread && (
             <details
               className='rounded-xl border border-gray-200 p-3'
@@ -409,6 +419,62 @@ export default function ThreadEditor({
               className={inputClass}
             />
           </label>
+          <details open={lineErrors.length ? true : undefined} className='min-w-0 rounded-xl border border-gray-200 p-3'>
+            <summary className='min-h-10 cursor-pointer text-sm font-semibold'>
+              Detalle del pedido
+            </summary>
+            <div className='mt-2 space-y-3'>
+              {form.order_lines.map((line, index) => (
+                <fieldset key={index} className='min-w-0 rounded-lg border border-gray-200 p-3'>
+                  <legend className='px-1 text-xs font-semibold'>Línea {index + 1}</legend>
+                  <div className='grid min-w-0 grid-cols-2 gap-2'>
+                    {[
+                      ['name', 'Nombre', 'text'],
+                      ['quantity', 'Cantidad', 'number'],
+                      ['unit_price', 'Precio c/u (C$)', 'number'],
+                      ['detail', 'Detalle (grabado, diseño o personalización)', 'text'],
+                    ].map(([field, label, type]) => {
+                      const error = lineErrors[index]?.[field]
+                      const errorId = `thread-line-${index}-${field}-error`
+                      return (
+                        <label key={field} className={`min-w-0 text-sm ${field === 'name' || field === 'detail' ? 'col-span-2' : ''}`}>
+                          {label}
+                          <input
+                            type={type}
+                            inputMode={type === 'number' ? field === 'quantity' ? 'numeric' : 'decimal' : undefined}
+                            min={field === 'quantity' ? '1' : field === 'unit_price' ? '0' : undefined}
+                            step={field === 'quantity' ? '1' : 'any'}
+                            value={line[field] ?? ''}
+                            aria-invalid={Boolean(error)}
+                            aria-describedby={error ? errorId : undefined}
+                            className={inputClass}
+                            onChange={event => update('order_lines', form.order_lines.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: event.target.value } : row))}
+                          />
+                          {error && <span id={errorId} role='alert' className='mt-1 block text-xs text-red-700'>{error}</span>}
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <button type='button' className={`${button} mt-2`} onClick={() => { update('order_lines', form.order_lines.filter((_, rowIndex) => rowIndex !== index)); setLineErrors([]) }}>
+                    Quitar línea
+                  </button>
+                </fieldset>
+              ))}
+              <button type='button' className={button} onClick={() => update('order_lines', [...form.order_lines, { name: '', quantity: 1, unit_price: '', detail: '' }])}>
+                Agregar línea
+              </button>
+              {[
+                ['delivery_address', 'Dirección de entrega'],
+                ['recipient_name', 'Quién recibe'],
+                ['recipient_phone', 'Teléfono de quien recibe'],
+              ].map(([field, label]) => (
+                <label key={field} className='block min-w-0 text-sm'>
+                  {label}
+                  <input type={field === 'recipient_phone' ? 'tel' : 'text'} className={inputClass} value={form[field] || ''} onChange={event => update(field, event.target.value)} />
+                </label>
+              ))}
+            </div>
+          </details>
           <label className='block text-sm font-medium'>
             Notas privadas
             <textarea

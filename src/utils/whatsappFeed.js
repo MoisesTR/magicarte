@@ -747,14 +747,58 @@ function threadItemPricing(summary, perPiece, quotedAmount) {
   }
 }
 
+/** Validate editor rows without silently dropping incomplete lines. Errors are indexed by row/field. */
+export function buildOrderLines(form) {
+  const rows = form.order_lines
+  if (rows == null || (Array.isArray(rows) && !rows.length)) return null
+  if (!Array.isArray(rows)) throw new Error('Revise el detalle del pedido: debe ser una lista de líneas.')
+  const errors = []
+  const lines = rows.map((row, index) => {
+    const error = {}
+    const numeric = value => (typeof value === 'number' || typeof value === 'string') && String(value).trim() !== ''
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      errors[index] = { name: 'Indique el nombre del producto.' }
+      return null
+    }
+    if (typeof row.name !== 'string' || !row.name.trim()) error.name = 'Indique el nombre del producto.'
+    const quantity = Number(row.quantity), unit_price = Number(row.unit_price)
+    if (!numeric(row.quantity) || !Number.isSafeInteger(quantity) || quantity < 1) error.quantity = 'Indique una cantidad entera de al menos 1.'
+    if (!numeric(row.unit_price) || !Number.isFinite(unit_price) || unit_price < 0) error.unit_price = 'Indique un precio no negativo.'
+    if (row.detail != null && typeof row.detail !== 'string') error.detail = 'Indique un detalle de texto.'
+    if (Object.keys(error).length) errors[index] = error
+    return { name: typeof row.name === 'string' ? row.name.trim() : '', quantity, unit_price, detail: typeof row.detail === 'string' ? row.detail.trim() || null : null }
+  })
+  if (errors.some(Boolean)) {
+    const error = new Error('Revise el detalle del pedido antes de guardar.')
+    error.errors = errors
+    throw error
+  }
+  return lines
+}
+
+/** SQL-authored JSON must already have the complete typed shape; never coerce persisted facts. */
+export function hasOrderLines(thread) {
+  return Array.isArray(thread.order_lines) && thread.order_lines.length > 0 && thread.order_lines.every(line =>
+    line && typeof line === 'object' && !Array.isArray(line) &&
+    typeof line.name === 'string' && line.name.trim() &&
+    Number.isSafeInteger(line.quantity) && line.quantity >= 1 &&
+    typeof line.unit_price === 'number' && Number.isFinite(line.unit_price) && line.unit_price >= 0 &&
+    (line.detail === null || typeof line.detail === 'string')
+  )
+}
+
 /** Adapter shared by all three business order forms; never invent a payment. */
-export function threadOrderPrefill(thread, orderDate = managuaDay()) {
+export function threadOrderPrefill(thread, orderDate = managuaDay(), products = []) {
+  const structured = hasOrderLines(thread)
+  if (thread.order_lines != null && (!Array.isArray(thread.order_lines) || thread.order_lines.length > 0) && !structured)
+    throw new Error('Revise el detalle del pedido: contiene líneas inválidas.')
   const phone = chatPhone({ ...thread, customer_phone: (thread.customer_phone || '').trim() })
   const summary = (thread.summary || '').trim()
   const perPiece = summary.match(/(?:^|\s)(\d+)\s+[^;\n]*?\s+a\s+C\$\s*([\d,]+(?:\.\d+)?)\s*c\s*\/\s*u\b/i)
   const pricing = threadItemPricing(summary, perPiece, thread.quoted_amount)
   const method = (thread.delivery_method || '').trim()
-  const delivery = /delivery|motorizado|cargotrans|env[ií]o|encomienda/i.test(method)
+  const address = (thread.delivery_address || '').trim()
+  const delivery = Boolean(address) || /delivery|motorizado|cargotrans|env[ií]o|encomienda/i.test(method)
   const pickup = /retiro|recoge/i.test(method)
   const notes = [thread.summary, thread.notes].filter(Boolean)
   const paid = Number(thread.paid_amount)
@@ -767,8 +811,18 @@ export function threadOrderPrefill(thread, orderDate = managuaDay()) {
     notes: notes.join('\n\n'),
     estimated_delivery_date: thread.delivery_date || '',
     delivery_method: pickup || !delivery ? 'pickup' : 'delivery',
-    delivery_address: !pickup && delivery ? [method, thread.delivery_address].filter(Boolean).join(' — ') : '',
-    items: [
+    delivery_address: address || (!pickup && delivery ? method : ''),
+    recipient_name: (thread.recipient_name || '').trim(),
+    recipient_phone: normalizePhone(thread.recipient_phone),
+    items: structured ? thread.order_lines.map((line, index) => {
+      const product = products.find(product => typeof product.name === 'string' && product.name.trim().toLocaleLowerCase('es-NI') === line.name.trim().toLocaleLowerCase('es-NI'))
+      return {
+        _key: `thread-line-${index}`, product_id: product?.id ?? null, product_name: line.name.trim(),
+        product_query: product ? product.name : '', product_open: false, product_active_index: -1,
+        product_description: line.detail || '', quantity: line.quantity, unit_price: line.unit_price,
+        hours_needed: '', rush_fee: 0, is_custom: !product?.id, material: '', engraving_minutes: '', weight_grams: '', color: '',
+      }
+    }) : [
       {
         product_id: null,
         product_name: threadItemLabel(summary),
@@ -865,6 +919,10 @@ export function buildThreadPayload(form) {
     quoted_amount,
     paid_amount,
     delivery_method: (form.delivery_method || '').trim() || null,
+    delivery_address: (form.delivery_address || '').trim() || null,
+    recipient_name: (form.recipient_name || '').trim() || null,
+    recipient_phone: (form.recipient_phone || '').trim() || null,
+    order_lines: buildOrderLines(form),
     unread_count,
     reference_images,
     labels: [

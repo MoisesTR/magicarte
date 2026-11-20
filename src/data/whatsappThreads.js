@@ -32,41 +32,46 @@ const FIELDS = [
   'notes',
   'source',
   'last_reviewed_at',
+  'delivery_address',
+  'recipient_name',
+  'recipient_phone',
+  'order_lines',
   'ai_tag',
   'ai_tag_reason',
   'ai_tagged_at',
 ]
 const AI_FIELDS = ['ai_tag', 'ai_tag_reason', 'ai_tagged_at']
-const withAITags = (thread) =>
+const ORDER_FIELDS = ['delivery_address', 'recipient_name', 'recipient_phone', 'order_lines']
+const withOptionalFields = (thread) =>
   thread && {
     ...thread,
-    ...Object.fromEntries(AI_FIELDS.map((key) => [key, thread[key] ?? null])),
+    ...Object.fromEntries([...AI_FIELDS, ...ORDER_FIELDS].map((key) => [key, thread[key] ?? null])),
   }
 const missingAITags = (error) =>
   ['42703', 'PGRST204'].includes(error?.code) &&
   /whatsapp_threads/i.test(error.message || '') &&
   /\bai_tag(?:_reason|ged_at)?\b/i.test(error.message || '')
-const withoutAITags = (payload) =>
-  Object.fromEntries(
-    Object.entries(payload).filter(([key]) => !AI_FIELDS.includes(key))
-  )
-const tagUnavailable = () => ({
-  data: null,
-  aiTagsAvailable: false,
-  error: new Error(
-    'Falta aplicar la migración de etiquetas AI. La conversación se conserva sin clasificar.'
-  ),
-})
-async function writeWithAITags(payload, operation) {
-  const result = await readResult(operation(payload))
-  if (
-    !missingAITags(result.error) ||
-    !AI_FIELDS.some((key) => Object.hasOwn(payload, key))
-  )
-    return result
-  const legacy = withoutAITags(payload)
-  if (!Object.keys(legacy).length) return tagUnavailable()
-  return { ...(await readResult(operation(legacy))), aiTagsAvailable: false }
+const missingOrderDetails = (error) =>
+  ['42703', 'PGRST204'].includes(error?.code) &&
+  /whatsapp_threads/i.test(error.message || '') &&
+  /\b(?:delivery_address|recipient_name|recipient_phone|order_lines)\b/i.test(error.message || '')
+
+/** Retry each independently deployed optional group at most once; never send an empty write. */
+async function writeWithOptionalFields(payload, operation) {
+  let candidate = payload
+  const availability = {}
+  while (true) {
+    const result = await readResult(operation(candidate))
+    const group = missingAITags(result.error) ? { fields: AI_FIELDS, flag: 'aiTagsAvailable', label: 'etiquetas AI' }
+      : missingOrderDetails(result.error) ? { fields: ORDER_FIELDS, flag: 'orderDetailsAvailable', label: 'detalle del pedido' } : null
+    if (!group || !group.fields.some(key => Object.hasOwn(candidate, key))) return { ...result, ...availability }
+    availability[group.flag] = false
+    candidate = Object.fromEntries(Object.entries(candidate).filter(([key]) => !group.fields.includes(key)))
+    if (!Object.keys(candidate).length) return {
+      data: null, ...availability,
+      error: new Error(`Falta aplicar la migración de ${group.label}. La conversación se conserva sin estos cambios.`),
+    }
+  }
 }
 const editable = (value) =>
   Object.fromEntries(
@@ -110,7 +115,7 @@ export async function fetchWhatsAppFeed(businessId) {
       break
     }
     if (result.error) throw new Error(result.error.message)
-    threads.push(...(result.data || []).map(withAITags))
+    threads.push(...(result.data || []).map(withOptionalFields))
     if ((result.data || []).length < 500) break
     offset += 500
   }
@@ -139,11 +144,11 @@ export async function fetchWhatsAppThread(id, businessId) {
       .eq('business_id', businessId)
       .maybeSingle()
   )
-  return { ...result, data: withAITags(result.data) }
+  return { ...result, data: withOptionalFields(result.data) }
 }
 export async function createWhatsAppThread(thread, businessId) {
   if (!required(businessId)) return invalid()
-  return writeWithAITags(editable(thread), (payload) =>
+  return writeWithOptionalFields(editable(thread), (payload) =>
     supabase
       .from('whatsapp_threads')
       .insert([{ ...payload, business_id: businessId }])
@@ -153,7 +158,7 @@ export async function createWhatsAppThread(thread, businessId) {
 }
 export async function updateWhatsAppThread(id, thread, businessId) {
   if (!required(businessId, id)) return invalid()
-  return writeWithAITags(editable(thread), (payload) =>
+  return writeWithOptionalFields(editable(thread), (payload) =>
     supabase
       .from('whatsapp_threads')
       .update(payload)

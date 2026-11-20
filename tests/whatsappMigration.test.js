@@ -98,3 +98,15 @@ test('one newer additive AI tag migration constrains nullable tags and documents
     assert.match(text, new RegExp(`${field} = excluded\\.${field}`))
   assert.doesNotMatch(text, /create table|security definer|update public\./i)
 })
+
+test('one newer structured order migration adds four nullable fields, array check and non-erasing assistant contract', async () => {
+  const files = (await readdir('supabase/migrations')).filter(name => name.endsWith('_add_whatsapp_order_details.sql'))
+  assert.equal(files.length, 1)
+  assert.ok(files[0].slice(0, 14) > '20261120174613')
+  const text = await readFile(`supabase/migrations/${files[0]}`, 'utf8')
+  for (const field of ['delivery_address', 'recipient_name', 'recipient_phone']) assert.match(text, new RegExp(`add column ${field} text null`, 'i'))
+  assert.match(text, /add column order_lines jsonb null/i)
+  assert.match(text, /check \(order_lines is null or jsonb_typeof\(order_lines\) = 'array'\)/i)
+  for (const field of ['delivery_address', 'recipient_name', 'recipient_phone', 'order_lines']) assert.match(text, new RegExp(`${field} = coalesce\\(excluded\\.${field}, whatsapp_threads\\.${field}\\)`))
+  assert.doesNotMatch(text, /create table|security definer|update public\./i)
+})

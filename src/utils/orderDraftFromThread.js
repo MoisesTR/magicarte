@@ -1,3 +1,5 @@
+import { threadOrderPrefill } from './whatsappFeed.js'
+export { hasOrderLines } from './whatsappFeed.js'
 import { validateOrderDraftInput, validateOrderDraft } from '../../api/_lib/orderDraftFromThread.js'
 
 const clone = value => structuredClone(value)
@@ -60,11 +62,22 @@ export function mergeDraftSession(state, draft, catalog) {
   return { ...state, form }
 }
 
+/** Catalog arrival only resolves identities; structured prices and owner edits stay authoritative. */
+export function mergeStructuredDraftSession(state, thread, products) {
+  if (state.edited.includes('items')) return state
+  const items = threadOrderPrefill(thread, state.original.order_date, products).items.map((item, index) => ({ ...item, _key: state.original.items[index]?._key || item._key }))
+  return { ...state, form: { ...clone(state.form), items } }
+}
+
 export function restoreDraftSession(state) {
   return createDraftSession(state.original)
 }
 
 export async function requestOrderDraft(thread, products, { getSession, fetchImpl = fetch }) {
+  if (thread.order_lines != null && (!Array.isArray(thread.order_lines) || thread.order_lines.length > 0)) {
+    const form = threadOrderPrefill(thread, undefined, products)
+    return { customer_name: form.customer_name, items: form.items.map(item => ({ product_id: item.product_id, product_name: item.product_name, quantity: item.quantity, unit_price: item.unit_price, description: item.product_description })), delivery_method: form.delivery_method, delivery_address: form.delivery_address, recipient_name: form.recipient_name, deposit_amount: null, notes: null }
+  }
   const catalog = products.slice(0, 200).map(product => ({ id: product.id, name: product.name, price: Number(product.price) }))
   const normalizedThread = { ...thread }
   for (const field of ['quoted_amount', 'paid_amount']) {
