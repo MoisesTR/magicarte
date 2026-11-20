@@ -27,11 +27,16 @@ export default function QuickEngravingForm({
   partnerName = 'Papá',
   partnerSplitPct = 50,
   editingOrder = null,
+  initialThreadForm = null,
+  threadConversion = null,
   onClose,
   onSaved,
 }) {
   const existingItem = editingOrder?.order_items?.[0]
   const existingPayment = editingOrder?.order_payments?.[0]
+  // Reopened imported orders have no transient import props. Their persisted
+  // lifecycle, not the open form, decides whether this is a paid quick-job log.
+  const logsFullPayment = !initialThreadForm && (!editingOrder || (editingOrder.status === 'completed' && editingOrder.payment_status === 'paid'))
 
   // Legacy jobs (created before the Cliente/Nota split) never had a
   // product_description — their customer_name is actually old note text, not a
@@ -40,10 +45,10 @@ export default function QuickEngravingForm({
   const isLegacyJob = Boolean(editingOrder) && !existingItem?.product_description
   const legacyNote = isLegacyJob ? editingOrder?.customer_name || '' : ''
 
-  const [date, setDate] = useState(editingOrder?.order_date || today())
-  const [clientName, setClientName] = useState(isLegacyJob ? '' : editingOrder?.customer_name || '')
-  const [description, setDescription] = useState(existingItem?.product_description || legacyNote)
-  const [total, setTotal] = useState(editingOrder ? String(editingOrder.total_amount ?? '') : '')
+  const [date, setDate] = useState(editingOrder?.order_date || initialThreadForm?.order_date || today())
+  const [clientName, setClientName] = useState(isLegacyJob ? '' : editingOrder?.customer_name || initialThreadForm?.customer_name || '')
+  const [description, setDescription] = useState(existingItem?.product_description || initialThreadForm?.items?.[0]?.product_description || legacyNote)
+  const [total, setTotal] = useState(editingOrder ? String(editingOrder.total_amount ?? '') : String(initialThreadForm?.items?.[0]?.unit_price ?? ''))
   const [material, setMaterial] = useState(existingItem?.material || ENGRAVING_MATERIALS[0])
   const [minutes, setMinutes] = useState(existingItem?.engraving_minutes ?? '')
   const [materialCost, setMaterialCost] = useState(editingOrder ? String(editingOrder.material_cost ?? 0) : '')
@@ -132,9 +137,9 @@ export default function QuickEngravingForm({
           {
             customer_name: displayName,
             order_date: date,
-            status: 'completed',
+            status: initialThreadForm ? 'pending' : 'completed',
             priority: 'normal',
-            payment_status: 'paid',
+            payment_status: initialThreadForm ? 'unpaid' : 'paid',
             delivery_method: 'pickup',
             delivery_fee: 0,
             is_gift: false,
@@ -144,7 +149,8 @@ export default function QuickEngravingForm({
             partner_split_pct: effectiveSplitPct,
             partner_share_amount: allocationMode === 'amount' ? exactPartnerTake : null,
             your_share_amount: allocationMode === 'amount' ? exactMyTake : null,
-            completed_at: new Date().toISOString(),
+            completed_at: initialThreadForm ? null : new Date().toISOString(),
+            ...(initialThreadForm ? { customer_phone:initialThreadForm.customer_phone || null, client_id:initialThreadForm.client_id || null, notes:initialThreadForm.notes || null } : {}),
           },
           businessId,
         )
@@ -156,7 +162,7 @@ export default function QuickEngravingForm({
         {
           order_id: orderId,
           product_id: catalogItem.product_id || null,
-          product_name: configuredItem ? catalogItem.product_name || displayName : displayName,
+          product_name: configuredItem ? catalogItem.product_name || displayName : initialThreadForm?.items?.[0]?.product_name || existingItem?.product_name || displayName,
           ...orderItemOptions(catalogItem),
           product_description: note || null,
           quantity: configuredItem ? num(catalogItem.quantity) || 1 : 1,
@@ -171,14 +177,14 @@ export default function QuickEngravingForm({
       ], businessId)
       if (itemErr) throw itemErr
 
-      if (existingPayment) {
+      if (logsFullPayment && existingPayment) {
         const { error: payErr } = await updatePayment(existingPayment.id, {
           amount: effectiveTotal,
           method,
           paid_at: date,
         })
         if (payErr) throw payErr
-      } else {
+      } else if (logsFullPayment) {
         const { error: payErr } = await addPayment(
           { order_id: orderId, amount: effectiveTotal, method, paid_at: date, note: null },
           businessId,
@@ -186,8 +192,9 @@ export default function QuickEngravingForm({
         if (payErr) throw payErr
       }
 
-      toast.success(editingOrder ? 'Grabado actualizado' : 'Grabado registrado')
-      onSaved?.()
+      if (initialThreadForm && threadConversion) await threadConversion.completeConversion(orderId)
+      toast.success(initialThreadForm ? 'Pedido creado sin registrar pago' : editingOrder ? 'Grabado actualizado' : 'Grabado registrado')
+      onSaved?.(orderId)
       onClose?.()
     } catch (e) {
       toast.error('Error al guardar: ' + e.message)
@@ -199,9 +206,10 @@ export default function QuickEngravingForm({
   return (
     <div className='admin-modal-backdrop'>
       <form onSubmit={(event) => { event.preventDefault(); handleSave() }} role='dialog' aria-modal='true' aria-labelledby='engraving-form-title' className='admin-modal-panel max-w-md bg-white'>
-        <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'>
-          <h2 id='engraving-form-title' className='text-lg font-bold text-gray-800'>{editingOrder ? 'Editar grabado' : 'Registro rápido de grabado'}</h2>
-          <button type='button' onClick={onClose} aria-label='Cerrar' className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600'>
+        <div className='admin-modal-header flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5'>
+          <h2 id='engraving-form-title' className='text-lg font-bold text-gray-800'>{initialThreadForm ? 'Nuevo pedido de WhatsApp' : editingOrder ? 'Editar grabado' : 'Registro rápido de grabado'}</h2>
+          {initialThreadForm && <p className='order-3 w-full text-xs text-gray-500'>Desde WhatsApp: se guardará pendiente y sin pago. {initialThreadForm.customer_phone}</p>}
+          <button type='button' onClick={onClose} aria-label='Cerrar' className='min-h-10 min-w-10 rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600'>
             <svg className='h-6 w-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
               <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
             </svg>
@@ -374,7 +382,7 @@ export default function QuickEngravingForm({
             <p className='mt-2 text-[11px] text-amber-800/80'>{allocationMode === 'percentage' ? `Utilidad a repartir: C$ ${Math.max(0, profit).toFixed(2)}. El material se reembolsa a quien lo pagó.` : 'Los montos exactos serán los que aparezcan en Finanzas para este grabado.'}</p>
           </div>
 
-          <div>
+          {logsFullPayment && <div>
             <label className='mb-1.5 block text-xs font-medium text-gray-600'>Método de pago</label>
             <select
               value={method}
@@ -385,7 +393,7 @@ export default function QuickEngravingForm({
               <option value='transferencia'>Transferencia</option>
               <option value='tarjeta'>Tarjeta</option>
             </select>
-          </div>
+          </div>}
         </div>
 
         <div className='admin-modal-footer flex gap-3 border-t border-gray-100 p-5'>
@@ -402,7 +410,7 @@ export default function QuickEngravingForm({
             className='flex-1 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50'
             style={{ backgroundColor: '#B08A3C' }}
           >
-            {saving ? 'Guardando...' : editingOrder ? 'Actualizar grabado' : 'Registrar grabado'}
+            {saving ? 'Guardando...' : initialThreadForm ? 'Crear pedido sin pago' : editingOrder ? 'Actualizar grabado' : 'Registrar grabado'}
           </button>
         </div>
       </form>

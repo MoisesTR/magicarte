@@ -44,7 +44,7 @@ export default function useOrderDeepLink(orders, onOpen, businessId, enabled = f
         consume()
       } catch {
         if (!active) return
-        toast.error('No se pudo abrir el pedido. Intente de nuevo desde Hoy.')
+        toast.error('No se pudo abrir el pedido. Intente de nuevo desde WhatsApp.')
         consume()
       }
     }

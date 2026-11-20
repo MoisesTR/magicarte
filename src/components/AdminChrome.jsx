@@ -5,7 +5,7 @@ import { useBusiness } from '../context/BusinessContext'
 import BusinessSwitcher from './BusinessSwitcher'
 
 const TABS = [
-  { tab: 'hoy', label: 'Hoy', icon: 'M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zm4 10h2v3H9z' },
+  { tab: 'whatsapp', label: 'WhatsApp', icon: 'M21 11.5a8.5 8.5 0 01-12.6 7.4L3 21l2.1-5.4A8.5 8.5 0 1121 11.5zM8 8c1 4 3 6 7 7l1-2-2-1-1 1-2-2 1-1-1-2z' },
   { tab: 'orders', label: 'Pedidos', icon: 'M7 3h10a2 2 0 012 2v14l-3-2-4 2-4-2-3 2V5a2 2 0 012-2zm2 5h6m-6 4h4' },
   { tab: 'products', label: 'Productos', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
   { tab: 'inventory', label: 'Inventario', icon: 'M4 7.5L12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5m8-4.5L12 12m0 9v-9' },

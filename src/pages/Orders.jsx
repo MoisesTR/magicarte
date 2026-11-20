@@ -1,3 +1,5 @@
+import useThreadOrderImport from '../hooks/useThreadOrderImport'
+import ThreadConversionNotice from '../components/ThreadConversionNotice'
 import useOrderDeepLink from '../hooks/useOrderDeepLink'
 import { getOrderChargeTotal, getPaymentSummary } from '../utils/orderPayments'
 import OrderItemOptions from '../components/OrderItemOptions'
@@ -82,6 +84,18 @@ export default function Orders() {
   const SHOW_SOCIAL_MEDIA = false
   const SHOW_WHATSAPP_REMINDER = false
   const [formData, setFormData] = useState(() => newOrderForm(new Date().toISOString().split('T')[0]))
+  const threadImport = useThreadOrderImport(prefilled => {
+    quoteRequest.current += 1
+    setSourceQuote(null)
+    setExistingQuoteOrder(null)
+    prefilled.items[0]._key = crypto.randomUUID()
+    setFormData(prefilled)
+    setEditingOrder(null)
+    setEditPayments([])
+    setClientMatches([])
+    setClientSearchOpen(false)
+    setShowForm(true)
+  }, currentBusinessId, Boolean(user && currentBusinessId))
 
   useEffect(() => {
     const checkUser = async () => {
@@ -522,6 +536,7 @@ export default function Orders() {
         params.delete('entrega')
         navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true })
       }
+      if (!editingOrder) await threadImport.completeConversion(orderId)
       toast.success(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
       resetForm()
       fetchOrders()
@@ -533,6 +548,7 @@ export default function Orders() {
   }
 
   const resetForm = () => {
+    threadImport.clearImport()
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
@@ -545,6 +561,7 @@ export default function Orders() {
   }
 
   const editOrder = (order) => {
+    threadImport.clearImport()
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
@@ -1126,6 +1143,7 @@ export default function Orders() {
 
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
+      <ThreadConversionNotice conversion={threadImport} />
       <div className='max-w-7xl mx-auto px-4'>
         {/* Header */}
         <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5'>
@@ -1210,7 +1228,7 @@ export default function Orders() {
               {/* Row 1: Action + Search */}
               <div className='flex flex-wrap items-center gap-3'>
                 <button
-                  onClick={() => { quoteRequest.current += 1; setShowForm(true) }}
+                  onClick={() => { threadImport.clearImport(); quoteRequest.current += 1; setShowForm(true) }}
                   className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all shadow-lg'
                 >
                   + Nuevo Pedido

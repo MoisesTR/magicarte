@@ -1,3 +1,5 @@
+import useThreadOrderImport from '../../hooks/useThreadOrderImport'
+import ThreadConversionNotice from '../../components/ThreadConversionNotice'
 import useOrderDeepLink from '../../hooks/useOrderDeepLink'
 import { orderItemDetailLines } from '../../utils/productPresentations'
 import { useEffect, useMemo, useState } from 'react'
@@ -68,6 +70,8 @@ export default function JoyeriaOrders() {
   const [partnerConfig, setPartnerConfig] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
+  const [threadForm, setThreadForm] = useState(null)
+  const threadImport = useThreadOrderImport(prefilled => { setEditingOrder(null); setThreadForm(prefilled); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
@@ -95,7 +99,7 @@ export default function JoyeriaOrders() {
     setLoading(false)
   }
 
-  useOrderDeepLink(orders, order => { setEditingOrder(order); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
+  useOrderDeepLink(orders, order => { threadImport.clearImport(); setThreadForm(null); setEditingOrder(order); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   const handleDelete = async (id) => {
     const { error } = await deleteOrder(id)
@@ -147,6 +151,7 @@ export default function JoyeriaOrders() {
 
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
+      <ThreadConversionNotice conversion={threadImport} />
       <div className='max-w-4xl mx-auto px-4'>
         {/* header */}
         <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
@@ -158,6 +163,8 @@ export default function JoyeriaOrders() {
           </div>
           <button
             onClick={() => {
+              threadImport.clearImport()
+              setThreadForm(null)
               setEditingOrder(null)
               setShowForm(true)
             }}
@@ -292,7 +299,11 @@ export default function JoyeriaOrders() {
           partnerName={partnerConfig?.partner_name || 'Papá'}
           partnerSplitPct={partnerConfig?.partner_split_pct ?? 50}
           editingOrder={editingOrder}
+          initialThreadForm={threadForm}
+          threadConversion={threadImport}
           onClose={() => {
+            threadImport.clearImport()
+            setThreadForm(null)
             setShowForm(false)
             setEditingOrder(null)
           }}

@@ -1,3 +1,5 @@
+import useThreadOrderImport from '../../hooks/useThreadOrderImport'
+import ThreadConversionNotice from '../../components/ThreadConversionNotice'
 import useOrderDeepLink from '../../hooks/useOrderDeepLink'
 import OrderItemOptions from '../../components/OrderItemOptions'
 import { catalogOrderItem, orderItemOptions, orderItemDetailLines } from '../../utils/productPresentations'
@@ -45,7 +47,7 @@ function paymentStatusOf(totalAmount, payments) {
   return 'unpaid'
 }
 
-const initialForm = { customer_name: '', order_date: today(), status: 'pending', items: [emptyItem()] }
+const initialForm = { customer_phone: '', client_id: null, notes: '', customer_name: '', order_date: today(), status: 'pending', items: [emptyItem()] }
 
 /**
  * Hikari Studio (3D printing) order log. Lighter than Magic Arte's order form —
@@ -67,6 +69,7 @@ export default function HikariOrders() {
   const [payingOrderId, setPayingOrderId] = useState(null)
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('efectivo')
+  const threadImport = useThreadOrderImport(prefilled => { setEditingOrder(null); setFormData(prefilled); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
@@ -93,21 +96,27 @@ export default function HikariOrders() {
   }
 
   const resetForm = () => {
+    threadImport.clearImport()
     setShowForm(false)
     setEditingOrder(null)
     setFormData(initialForm)
   }
 
   const openCreate = () => {
+    threadImport.clearImport()
     setEditingOrder(null)
     setFormData(initialForm)
     setShowForm(true)
   }
 
   const openEdit = (order) => {
+    threadImport.clearImport()
     setEditingOrder(order)
     setFormData({
       customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      client_id: order.client_id || null,
+      notes: order.notes || '',
       order_date: order.order_date || today(),
       status: order.status || 'pending',
       items: (order.order_items || []).length
@@ -162,6 +171,9 @@ export default function HikariOrders() {
     try {
       const orderData = {
         customer_name: formData.customer_name.trim(),
+        customer_phone: formData.customer_phone || null,
+        client_id: formData.client_id || null,
+        notes: formData.notes || null,
         order_date: formData.order_date,
         status: formData.status,
         total_amount: total,
@@ -201,6 +213,7 @@ export default function HikariOrders() {
       )
       if (itemsErr) throw itemsErr
 
+      if (!editingOrder) await threadImport.completeConversion(orderId)
       toast.success(editingOrder ? 'Pedido actualizado' : 'Pedido creado')
       resetForm()
       fetchOrders()
@@ -275,6 +288,7 @@ export default function HikariOrders() {
 
   return (
     <div className='min-h-screen bg-gray-50 py-6'>
+      <ThreadConversionNotice conversion={threadImport} />
       <div className='max-w-4xl mx-auto px-4'>
         <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
           <div>
@@ -400,6 +414,8 @@ export default function HikariOrders() {
       {showForm && (
         <div className='admin-modal-backdrop'>
           <form onSubmit={handleSave} role='dialog' aria-modal='true' aria-labelledby='hikari-order-form-title' className='admin-modal-panel max-w-2xl bg-white'>
+
+
             <div className='admin-modal-header flex items-center justify-between border-b border-gray-100 p-5'>
               <h2 id='hikari-order-form-title' className='text-lg font-bold text-gray-800'>{editingOrder ? 'Editar pedido' : 'Nuevo pedido'}</h2>
               <button type='button' onClick={resetForm} aria-label='Cerrar' className='rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600'>
@@ -410,6 +426,10 @@ export default function HikariOrders() {
             </div>
 
             <div className='admin-modal-body space-y-4 p-5'>
+                <div className='space-y-3'>
+                  <label className='block text-xs font-medium text-gray-500'>Teléfono<input type='tel' value={formData.customer_phone || ''} onChange={e => setFormData(p => ({ ...p, customer_phone:e.target.value }))} className='mt-1 min-h-10 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm' /></label>
+                  <label className='block text-xs font-medium text-gray-500'>Notas<textarea value={formData.notes || ''} onChange={e => setFormData(p => ({ ...p, notes:e.target.value }))} className='mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm' rows={3} /></label>
+                </div>
               <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
                 <div className='sm:col-span-2'>
                   <label className='mb-1.5 block text-xs font-medium text-gray-600'>Cliente</label>

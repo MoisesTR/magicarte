@@ -94,7 +94,7 @@ export function BusinessProvider({ children }) {
   // remembers the last business so a bare /admin can redirect back to it.
   const segments = location.pathname.split('/')
   const urlSlug = isAdmin ? segments[2] || null : null
-  const currentTab = isAdmin ? segments[3] || 'hoy' : 'orders'
+  const currentTab = isAdmin ? segments[3] || 'whatsapp' : 'orders'
   const slug = urlSlug || localStorage.getItem(STORAGE_KEY) || DEFAULT_BUSINESS.slug
   const isAllBusinesses = isAdmin && urlSlug === 'all' && currentTab === 'finances'
 

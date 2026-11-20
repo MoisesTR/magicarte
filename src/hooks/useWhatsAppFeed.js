@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../config/supabaseClient'
-import { fetchTodayPanel } from '../data/today'
+import { fetchWhatsAppFeed } from '../data/whatsappThreads'
 
-export default function useTodayPanel(businessId) {
+export default function useWhatsAppFeed(businessId) {
   const [auth, setAuth] = useState({ user: null, checking: true })
   const [now, setNow] = useState(() => new Date())
 
@@ -14,19 +14,29 @@ export default function useTodayPanel(businessId) {
       authChanged = true
       if (active) setAuth({ user: session?.user || null, checking: false })
     })
-    supabase.auth.getUser().then(({ data }) => {
-      if (active && !authChanged) setAuth({ user: data.user, checking: false })
-    }).catch(() => {
-      if (active && !authChanged) setAuth({ user: null, checking: false })
-    })
-    return () => { active = false; data.subscription.unsubscribe() }
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (active && !authChanged)
+          setAuth({ user: data.user, checking: false })
+      })
+      .catch(() => {
+        if (active && !authChanged) setAuth({ user: null, checking: false })
+      })
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
   }, [])
 
   const enabled = Boolean(auth.user && businessId)
   const query = useQuery({
-    queryKey: ['today-panel', businessId, auth.user?.id],
-    queryFn: () => fetchTodayPanel(businessId),
-    enabled, retry: false, staleTime: 0, gcTime: 0,
+    queryKey: ['whatsapp-feed', businessId, auth.user?.id],
+    queryFn: () => fetchWhatsAppFeed(businessId),
+    enabled,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: false,
   })
   const { refetch } = query
@@ -52,9 +62,16 @@ export default function useTodayPanel(businessId) {
   }, [])
 
   return {
-    ...query, user: auth.user, checkingAuth: auth.checking, now,
-    onLogin: user => setAuth({ user, checking: false }),
-    refresh: () => { setNow(new Date()); return refetch({ cancelRefetch: false }) },
-    loading: auth.checking || Boolean(auth.user && (!businessId || query.isPending)),
+    ...query,
+    user: auth.user,
+    checkingAuth: auth.checking,
+    now,
+    onLogin: (user) => setAuth({ user, checking: false }),
+    refresh: () => {
+      setNow(new Date())
+      return refetch({ cancelRefetch: false })
+    },
+    loading:
+      auth.checking || Boolean(auth.user && (!businessId || query.isPending)),
   }
 }

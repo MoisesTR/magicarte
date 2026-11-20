@@ -5,7 +5,8 @@ import { createRequire } from 'node:module'
 import { transform } from 'esbuild'
 import * as helpers from '../src/utils/productPresentations.js'
 const require = createRequire(import.meta.url)
-async function engravingFormWithClient(calls) {
+async function engravingFormWithClient(calls, overrides = {}) {
+  let stateSlot = 0
   const source = await readFile(
     new URL('../src/components/QuickEngravingForm.jsx', import.meta.url),
     'utf8'
@@ -26,10 +27,11 @@ async function engravingFormWithClient(calls) {
     }
   const imports = {
     react: {
-      useState: (initial) => [
-        typeof initial === 'function' ? initial() : initial,
-        () => {},
-      ],
+      useState: (initial) => {
+        const slot = stateSlot++
+        const override = slot === 2 ? overrides.description : slot === 3 ? overrides.total : undefined
+        return [override === undefined ? (typeof initial === 'function' ? initial() : initial) : override, () => {}]
+      },
       useEffect() {},
     },
     'react-hot-toast': {
@@ -248,6 +250,8 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   const module = { exports: {} }
   const imports = {
     '../../hooks/useOrderDeepLink': { __esModule: true, default() {} },
+    '../../hooks/useThreadOrderImport': { __esModule: true, default: () => ({ clearImport() {}, completeConversion: async () => true }) },
+    '../../components/ThreadConversionNotice': { __esModule: true, default: () => null },
     react,
     'react-hot-toast': {
       __esModule: true,
@@ -314,4 +318,90 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   assert.equal(rows[0].unit_price, 690)
   assert.equal(rows[0].designs[0].design_name, 'Pikachu')
   assert.equal(rows[0].designs[0].note, 'Ana')
+})
+
+ test('Joyería WhatsApp import creates a pending unpaid custom order and completes only after items', async () => {
+  const calls = [], Form = await engravingFormWithClient(calls)
+  await submit(Form, {
+    businessId: 3,
+    initialThreadForm: {customer_name:'Carlos',customer_phone:'82888070',client_id:'client',notes:'Placa\n\nAzul',order_date:'2026-11-19',items:[{product_name:'Placa personalizada',product_description:'Placa personalizada',unit_price:450}]},
+    threadConversion: {completeConversion: async id => { calls.push(['completeConversion',id]); return true }},
+  })
+  assert.equal(calls.find(([name]) => name === 'error'), undefined)
+  const [,order,business] = calls.find(([name]) => name === 'createOrder')
+  assert.equal(business,3); assert.equal(order.status,'pending'); assert.equal(order.payment_status,'unpaid'); assert.equal(order.completed_at,null)
+  assert.equal(order.customer_name,'Carlos'); assert.equal(order.customer_phone,'82888070'); assert.equal(order.client_id,'client'); assert.equal(order.notes,'Placa\n\nAzul')
+  assert.equal(calls.some(([name]) => name === 'addPayment'),false)
+  const [,items] = calls.find(([name]) => name === 'insertOrderItems')
+  assert.equal(items[0].product_name,'Placa personalizada'); assert.equal(items[0].product_id,null); assert.equal(items[0].unit_price,450)
+  assert.ok(calls.findIndex(([name]) => name === 'completeConversion') > calls.findIndex(([name]) => name === 'insertOrderItems'))
+ })
+
+const convertedEngravingOrder = (fields = {}) => ({
+  id: 'converted-order',
+  customer_name: 'Carlos',
+  customer_phone: '82888070',
+  client_id: 'client',
+  notes: 'Placa\n\nAzul',
+  order_date: '2026-11-19',
+  status: 'pending',
+  payment_status: 'unpaid',
+  completed_at: null,
+  total_amount: 450,
+  order_items: [{
+    product_id: null,
+    product_name: 'Placa personalizada',
+    product_description: 'Placa personalizada',
+    quantity: 1,
+    unit_price: 450,
+    subtotal: 450,
+    material: 'Acero inoxidable',
+  }],
+  order_payments: [],
+  ...fields,
+})
+
+test('reopening an unpaid pending WhatsApp order never invents a payment', async () => {
+  const calls = [], Form = await engravingFormWithClient(calls)
+  await submit(Form, { businessId: 3, editingOrder: convertedEngravingOrder() })
+  assert.equal(calls.some(([name]) => name === 'error'), false)
+  assert.equal(calls.some(([name]) => ['addPayment', 'updatePayment'].includes(name)), false)
+  const [, id, patch] = calls.find(([name]) => name === 'updateOrder')
+  assert.equal(id, 'converted-order')
+  assert.equal(patch.status, undefined)
+  assert.equal(patch.payment_status, undefined)
+  assert.equal(patch.completed_at, undefined)
+  assert.equal(patch.total_amount, 450)
+  assert.equal(calls.some(([name]) => name === 'createOrder'), false)
+})
+
+test('reopening a converted custom order preserves its product name separately from the customer', async () => {
+  const calls = [], Form = await engravingFormWithClient(calls)
+  await submit(Form, { businessId: 3, editingOrder: convertedEngravingOrder() })
+  const [, rows] = calls.find(([name]) => name === 'insertOrderItems')
+  assert.equal(rows[0].product_name, 'Placa personalizada')
+  assert.equal(rows[0].product_description, 'Placa personalizada')
+  assert.equal(rows[0].product_id, null)
+  assert.equal(rows[0].unit_price, 450)
+})
+
+test('editing a partially paid imported order preserves the existing actual receipt', async () => {
+  const calls = [], Form = await engravingFormWithClient(calls)
+  await submit(Form, { businessId: 3, editingOrder: convertedEngravingOrder({
+    status: 'in_progress', payment_status: 'partial',
+    order_payments: [{ id: 'deposit', amount: 100, method: 'transferencia', paid_at: '2026-11-19' }],
+  }) })
+  assert.equal(calls.some(([name]) => ['addPayment', 'updatePayment'].includes(name)), false)
+})
+
+test('legacy quick-job creation still records a completed paid job and its receipt', async () => {
+  const calls = []
+  // The harness keeps all actual form logic and supplies a filled legacy total.
+  const Form = await engravingFormWithClient(calls, { total: '450', description: 'Grabado' })
+  await submit(Form, { businessId: 3 })
+  const [, order] = calls.find(([name]) => name === 'createOrder')
+  assert.equal(order.status, 'completed')
+  assert.equal(order.payment_status, 'paid')
+  assert.ok(order.completed_at)
+  assert.equal(calls.find(([name]) => name === 'addPayment')[1].amount, 450)
 })
