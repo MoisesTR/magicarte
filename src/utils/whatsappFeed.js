@@ -50,6 +50,93 @@ export function hoursAgo(at, now = new Date()) {
     ? Math.max(0, Math.floor(elapsed / 3600000))
     : null
 }
+
+function timestampAt(value) {
+  if (value == null || value === '' || typeof value === 'boolean') return null
+  if (typeof value === 'string') {
+    const date = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/)
+    if (date && !validDate(Number(date[1]), Number(date[2]), Number(date[3])))
+      return null
+  }
+  const at = new Date(value).getTime()
+  return Number.isFinite(at) ? at : null
+}
+
+/** Latest valid activity as epoch milliseconds, or null when no timestamp exists. */
+export function threadActivityAt(thread) {
+  const timestamps = [
+    thread.last_customer_message_at,
+    thread.last_our_message_at,
+    thread.requested_at,
+    thread.last_reviewed_at,
+    thread.updated_at,
+    thread.created_at,
+  ]
+    .map(timestampAt)
+    .filter((at) => at !== null)
+  return timestamps.length ? Math.max(...timestamps) : null
+}
+
+function dueCalendarDay(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number)
+    return validDate(year, month, day)
+  }
+  const at = timestampAt(value)
+  return at === null ? null : managuaDay(at)
+}
+
+/** Managua calendar ranges; due-today/overdue rows always pass. All preserves identity. */
+export function filterThreadsByDate(threads, range, now = new Date()) {
+  if (range !== 'today' && range !== 'week') return threads
+  const today = managuaDay(now)
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
+  const monday = addDays(today, -((weekday + 6) % 7))
+  return threads.filter((thread) => {
+    if (
+      [thread.promised_date, thread.follow_up_date].some((value) => {
+        const day = dueCalendarDay(value)
+        return day !== null && day <= today
+      })
+    )
+      return true
+    const at = threadActivityAt(thread)
+    if (at === null) return false
+    const day = managuaDay(at)
+    return range === 'today'
+      ? day === today
+      : day >= monday && at <= new Date(now).getTime()
+  })
+}
+
+const DATE_RANGES = ['today', 'week', 'all']
+
+export function loadFeedDateRange(businessId, storage) {
+  if (businessId) {
+    try {
+      const range = (storage || globalThis.localStorage).getItem(
+        `whatsapp.feedDateRange.${businessId}`
+      )
+      if (DATE_RANGES.includes(range)) return range
+    } catch {
+      /* Private browsing may deny storage; show all conversations by default. */
+    }
+  }
+  return 'all'
+}
+
+export function saveFeedDateRange(businessId, range, storage) {
+  if (!businessId || !DATE_RANGES.includes(range)) return
+  try {
+    ;(storage || globalThis.localStorage).setItem(
+      `whatsapp.feedDateRange.${businessId}`,
+      range
+    )
+  } catch {
+    /* The selected range still works for this session. */
+  }
+}
+
 const dueDate = (thread) =>
   [thread.promised_date, thread.follow_up_date].filter(Boolean).sort()[0]
 export function feedKPIs(threads, now = new Date()) {

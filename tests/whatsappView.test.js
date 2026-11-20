@@ -131,7 +131,8 @@ async function renderComponents() {
         `from "${specifier === '../../utils/whatsappFeed' ? utilsUrl : import.meta.resolve(specifier)}"`
     )
     const url = `data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`
-    return { url, component: (await import(url)).default }
+    const module = await import(url)
+    return { url, component: module.default, content: module.DateFilteredFeed }
   }
   const card = await compile(
     await readFile('src/components/whatsapp/ThreadCard.jsx', 'utf8'),
@@ -143,9 +144,12 @@ async function renderComponents() {
     `
     import { useEffect, useState } from 'react'
     import ThreadCard from '${card.url}'
-    import { loadFeedTab, saveFeedTab, feedTabKey, visibleFeedThreads } from '${utilsUrl}'
+    import * as feed from '${utilsUrl}'
+    const { loadFeedTab, saveFeedTab, feedTabKey, visibleFeedThreads,
+      groupThreads, filterThreadsByDate, loadFeedDateRange, saveFeedDateRange } = feed
     ${page.slice(page.indexOf('const TAB_LABELS'), page.indexOf('export default function WhatsAppFeed'))}
     export default FeedGroups
+    export const DateFilteredFeed = typeof FeedContent === 'undefined' ? null : FeedContent
   `,
     'FeedGroups.jsx'
   )
@@ -157,7 +161,12 @@ async function renderComponents() {
         React.createElement(component, props)
       )
     )
-  return { card: card.component, groups: groups.component, render }
+  return {
+    card: card.component,
+    groups: groups.component,
+    content: groups.content,
+    render,
+  }
 }
 const renderedComponents = renderComponents()
 
@@ -282,4 +291,84 @@ test('rendered waiting tab initially shows eight rows and the exact remaining co
   assert.match(html, /Ver 22 más/)
   assert.match(html, /aria-labelledby="whatsapp-tab-waiting"/)
   assert.doesNotMatch(html, /Sin conversaciones en este grupo/)
+})
+
+test('date controls precede tabs with accessible selections, mobile targets, and theme-aware colors', async () => {
+  const { content, render } = await renderedComponents
+  assert.equal(typeof content, 'function')
+  const html = render(content, {
+    businessId: 'new-business',
+    threads: [],
+    now: '2026-11-20T04:00:00Z',
+  })
+  assert.match(html, /role="group" aria-label="Filtrar por fecha"/)
+  assert.ok(html.indexOf('Filtrar por fecha') < html.indexOf('role="tablist"'))
+  assert.match(html, /aria-pressed="false"[^>]*>Hoy<\/button>/)
+  assert.match(html, /aria-pressed="false"[^>]*>Esta semana<\/button>/)
+  assert.match(html, /aria-pressed="true"[^>]*>Todo<\/button>/)
+  assert.match(html, /grid w-full min-w-0 grid-cols-3/)
+  assert.equal((html.match(/min-h-10/g) || []).length, 3)
+  assert.match(html, /bg-white/)
+  assert.match(html, /text-gray-800/)
+  assert.doesNotMatch(html, /Mostrando/)
+})
+
+test('rendered date filtering restores business choice before grouping, counts, and default selection', async () => {
+  const { content, render } = await renderedComponents
+  assert.equal(typeof content, 'function')
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) =>
+        key === 'whatsapp.feedDateRange.filtered-business' ? 'today' : null,
+      setItem() {
+        assert.fail('render must not overwrite preferences')
+      },
+    },
+  })
+  try {
+    const props = {
+      now: '2026-11-20T04:00:00Z',
+      threads: [
+        {
+          id: 'old',
+          customer_name: 'Cliente antiguo',
+          status: 'to_quote',
+          awaiting_reply: true,
+          created_at: '2025-01-01T12:00:00Z',
+        },
+        {
+          id: 'new',
+          customer_name: 'Cliente reciente',
+          status: 'follow_up',
+          kind: 'payment',
+          updated_at: '2026-11-20T03:00:00Z',
+        },
+      ],
+    }
+    const filtered = render(content, {
+      ...props,
+      businessId: 'filtered-business',
+    })
+    assert.match(filtered, /Mostrando 1 de 2 conversaciones/)
+    assert.match(filtered, /aria-labelledby="whatsapp-tab-payments"/)
+    assert.match(filtered, /Cliente reciente/)
+    assert.doesNotMatch(filtered, /Cliente antiguo/)
+    assert.match(filtered, /Sin responder <span[^>]*>0<\/span>/)
+    const other = render(content, { ...props, businessId: 'other-business' })
+    assert.match(other, /Cliente antiguo/)
+    assert.doesNotMatch(other, /Mostrando/)
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original)
+    else delete globalThis.localStorage
+  }
+})
+
+test('date selection saves only explicit changes and resets tab state against filtered groups', async () => {
+  const page = await readFile('src/pages/WhatsAppFeed.jsx', 'utf8')
+  assert.match(page, /useState\(\(\) =>\s*loadFeedDateRange\(businessId\)\s*\)/)
+  assert.match(page, /saveFeedDateRange\(businessId, (?:range|key)\)/)
+  assert.match(page, /<FeedGroups\s+key=\{(?:dateRange|range)\}/)
+  assert.match(page, /<FeedContent[\s\S]*?key=\{currentBusinessId\}/)
 })

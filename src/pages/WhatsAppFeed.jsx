@@ -10,6 +10,9 @@ import {
   saveFeedTab,
   feedTabKey,
   visibleFeedThreads,
+  filterThreadsByDate,
+  loadFeedDateRange,
+  saveFeedDateRange,
 } from '../utils/whatsappFeed'
 import {
   createWhatsAppThread,
@@ -27,6 +30,55 @@ const TAB_LABELS = {
   payments: 'Pagos',
   waiting: 'Esperando cliente',
   closed: 'Cerrados',
+}
+
+function FeedContent({ businessId, threads, now, ...props }) {
+  const [dateRange, setDateRange] = useState(() =>
+    loadFeedDateRange(businessId)
+  )
+  const filteredThreads = filterThreadsByDate(threads, dateRange, now)
+  const groups = groupThreads(filteredThreads, now)
+  const selectRange = (range) => {
+    setDateRange(range)
+    saveFeedDateRange(businessId, range)
+  }
+  return (
+    <>
+      <div
+        role='group'
+        aria-label='Filtrar por fecha'
+        className='grid w-full min-w-0 grid-cols-3 gap-1 rounded-xl border border-gray-200 bg-white p-1'
+      >
+        {[
+          ['today', 'Hoy'],
+          ['week', 'Esta semana'],
+          ['all', 'Todo'],
+        ].map(([range, label]) => (
+          <button
+            key={range}
+            type='button'
+            aria-pressed={dateRange === range}
+            onClick={() => selectRange(range)}
+            className={`min-h-10 min-w-0 rounded-lg border px-2 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-primary)] ${dateRange === range ? 'border-[var(--color-primary)] bg-gray-100' : 'border-transparent hover:bg-gray-100'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {filteredThreads.length < threads.length && (
+        <p role='status' className='text-xs text-gray-500'>
+          Mostrando {filteredThreads.length} de {threads.length} conversaciones
+        </p>
+      )}
+      <FeedGroups
+        key={dateRange}
+        businessId={businessId}
+        groups={groups}
+        now={now}
+        {...props}
+      />
+    </>
+  )
 }
 
 function FeedGroups({
@@ -188,7 +240,6 @@ export default function WhatsAppFeed() {
       setBusy(false)
     }
   }
-  const groups = groupThreads(data?.threads || [], query.now)
   const save = async (payload) => {
     if (
       await mutate(() =>
@@ -257,10 +308,10 @@ export default function WhatsAppFeed() {
           </p>
         )}
         {data?.available && (
-          <FeedGroups
+          <FeedContent
             key={currentBusinessId}
             businessId={currentBusinessId}
-            groups={groups}
+            threads={data.threads || []}
             now={query.now}
             ordersPath={`/admin/${currentBusiness.slug}/orders`}
             busy={busy}
