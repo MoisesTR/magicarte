@@ -32,7 +32,8 @@ const TAB_LABELS = {
   toQuote: 'Por cotizar',
   payments: 'Pagos',
   waiting: 'Esperando cliente',
-  closed: 'Cerrados',
+  inOrders: 'En Pedidos ✓',
+  closed: 'Descartados',
 }
 
 function FeedContent({ businessId, threads, now, ...props }) {

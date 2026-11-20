@@ -52,6 +52,10 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
       promised_date: '2026-11-01',
     }),
     open('old', { status: 'lost', status_changed_at: '2026-10-01T12:00:00Z' }),
+    open('lost-recent', {
+      status: 'lost',
+      status_changed_at: '2026-11-10T12:00:00Z',
+    }),
   ]
   const groups = groupThreads(rows, now)
   assert.deepEqual(
@@ -63,7 +67,8 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
       'Por cotizar',
       'Pagos pendientes',
       'Esperando al cliente',
-      'Cerrados (30 días)',
+      'En Pedidos (30 días)',
+      'Descartados (30 días)',
     ]
   )
   assert.deepEqual(
@@ -76,6 +81,7 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
       ['payment'],
       ['waiting'],
       ['closed'],
+      ['lost-recent'],
     ]
   )
   assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 2 días')
@@ -106,7 +112,7 @@ test('earliest of both due dates wins; closed cutoff uses status change, not cre
     now
   )
   assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 1 días')
-  assert.equal(groups[6].threads.length, 1)
+  assert.equal(groups.find((g) => g.key === 'closed').threads.length, 1)
 })
 test('status and kind labels match the Spanish contract', () => {
   assert.deepEqual(Object.values(STATUS_LABELS), [

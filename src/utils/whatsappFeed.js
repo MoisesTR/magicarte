@@ -343,7 +343,8 @@ export function groupThreads(threads, now = new Date()) {
     ['toQuote', 'Por cotizar'],
     ['payments', 'Pagos pendientes'],
     ['waiting', 'Esperando al cliente'],
-    ['closed', 'Cerrados (30 días)'],
+    ['inOrders', 'En Pedidos (30 días)'],
+    ['closed', 'Descartados (30 días)'],
   ].map(([key, title]) => ({ key, title, threads: [] }))
   for (const thread of threads) {
     if (isConfirmedThread(thread)) continue
@@ -355,7 +356,8 @@ export function groupThreads(threads, now = new Date()) {
         new Date(thread.status_changed_at) < new Date(now) - 30 * DAY
       )
         continue
-      index = 5
+      // Won chats already live in Pedidos; lost and non-customer chats are discarded.
+      index = thread.status === 'won' || thread.order_id ? 5 : 6
     } else if (thread.kind === 'payment') {
       index = 3
       if (thread.follow_up_date <= today) timeHint = rowChip(thread, now).text
@@ -395,9 +397,10 @@ export function groupThreads(threads, now = new Date()) {
       b.last_our_message_at || '9999'
     )
   )
-  groups[5].threads.sort((a, b) =>
-    b.status_changed_at.localeCompare(a.status_changed_at)
-  )
+  for (const group of groups.slice(5))
+    group.threads.sort((a, b) =>
+      b.status_changed_at.localeCompare(a.status_changed_at)
+    )
   return [confirmed, ...groups]
 }
 

@@ -418,6 +418,16 @@ export default function ThreadCard({
           </span>
         )}
       </button>
+      {confirmed && !thread.order_id && (
+        <div className='flex min-w-0 flex-wrap items-center gap-2 px-3 pb-2 pl-7'>
+          <Link
+            to={`${detailProps.ordersPath}?fromThread=${encodeURIComponent(thread.id)}`}
+            className='inline-flex min-h-10 max-w-full items-center rounded-md border border-[var(--color-primary,#51c879)] px-3 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
+          >
+            Crear pedido
+          </Link>
+        </div>
+      )}
       {thread.order_id && matchedOrder && (
         <div className='flex min-w-0 flex-wrap items-center gap-2 px-3 pb-2 pl-7'>
           <Link

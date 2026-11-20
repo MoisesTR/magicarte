@@ -252,7 +252,7 @@ test('rendered tabs keep seven counts, one panel, and only selected group rows',
     now
   )
   const html = render(component, { groups, businessId: 'render-test', now })
-  assert.equal((html.match(/role="tab"/g) || []).length, 7)
+  assert.equal((html.match(/role="tab"/g) || []).length, 8)
   assert.equal((html.match(/role="tabpanel"/g) || []).length, 1)
   assert.equal((html.match(/aria-selected="true"/g) || []).length, 1)
   assert.equal((html.match(/<article/g) || []).length, 1)
@@ -265,7 +265,8 @@ test('rendered tabs keep seven counts, one panel, and only selected group rows',
     'Por cotizar',
     'Pagos',
     'Esperando cliente',
-    'Cerrados',
+    'En Pedidos ✓',
+    'Descartados',
   ])
     assert.ok(html.includes(label), label)
   assert.match(html, /opacity-50[\s\S]*?>0<\/span>/)
@@ -502,7 +503,7 @@ test('closed feed forwards matched order and session provenance to the rendered 
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
-    value: { getItem: () => 'closed' },
+    value: { getItem: () => 'inOrders' },
   })
   try {
     const html = render(component, {
@@ -584,4 +585,34 @@ test('Cerrados renders a muted non-customer chip and reason instead of money or 
     if (original) Object.defineProperty(globalThis, 'localStorage', original)
     else delete globalThis.localStorage
   }
+})
+
+test('confirmed rows expose a visible Crear pedido link outside the accordion button', async () => {
+  const { card, render } = await renderedComponents
+  const thread = {
+    id: 'thread-18',
+    chat_key: '50584216792',
+    status: 'follow_up',
+    kind: 'order',
+    paid_amount: 2700,
+    delivery_date: '2026-11-25',
+    summary: '18 vitrales',
+    customer_name: 'Julissa',
+  }
+  const props = {
+    ordersPath: '/admin/magicarte/orders',
+    expanded: false,
+    now: '2026-11-20T18:00:00Z',
+  }
+  const html = render(card, { ...props, thread })
+  assert.match(
+    html,
+    /<a[^>]*href="\/admin\/magicarte\/orders\?fromThread=thread-18"[^>]*>Crear pedido<\/a>/
+  )
+  assert.ok(html.indexOf('</button>') < html.indexOf('>Crear pedido<'))
+  for (const other of [
+    { ...thread, paid_amount: 0, delivery_date: null },
+    { ...thread, status: 'won', order_id: 'order-1' },
+  ])
+    assert.doesNotMatch(render(card, { ...props, thread: other }), />Crear pedido</)
 })

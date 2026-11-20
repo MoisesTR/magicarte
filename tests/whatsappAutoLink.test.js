@@ -85,11 +85,11 @@ test('only open unlinked matching threads are linked, once each, using existing 
   assert.equal(result.orderMatches.get('sent').id, 'order')
   const groups = groupThreads(result.threads, '2026-11-20T18:00:00Z')
   assert.ok(
-    groups.find((g) => g.key === 'closed').threads.some((t) => t.id === 'sent')
+    groups.find((g) => g.key === 'inOrders').threads.some((t) => t.id === 'sent')
   )
   assert.ok(
     groups
-      .filter((g) => g.key !== 'closed')
+      .filter((g) => g.key !== 'inOrders')
       .every((g) => !g.threads.some((t) => t.id === 'sent'))
   )
   assert.equal(before.find((t) => t.id === 'sent').order_id, undefined)

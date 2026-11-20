@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import * as feed from '../src/utils/whatsappFeed.js'
 
 const now = new Date('2026-11-20T04:00:00Z') // Nov 19, 22:00 Managua
-const keys = ['today', 'unanswered', 'toQuote', 'payments', 'waiting', 'closed']
+const keys = ['today', 'unanswered', 'toQuote', 'payments', 'waiting', 'inOrders', 'closed']
 const groupsWith = (...nonempty) =>
   keys.map((key) => ({
     key,
@@ -57,6 +57,23 @@ for (const [index, key] of keys.slice(0, 5).entries()) {
     assert.deepEqual(groups, before)
   })
 }
+test('won chats go to En Pedidos; lost and non-customer chats go to Descartados', () => {
+  const at = '2026-11-19T12:00:00Z'
+  const groups = feed.groupThreads([
+    open({ id: 'linked', status: 'won', order_id: 'order-89', status_changed_at: at }),
+    open({ id: 'won', status: 'won', status_changed_at: at }),
+    open({ id: 'lost', status: 'lost', status_changed_at: at }),
+    open({ id: 'not-customer', status: 'done', lost_reason: 'No es cliente: delivery', status_changed_at: at }),
+  ], now)
+  const inOrders = groups.find((group) => group.key === 'inOrders')
+  const discarded = groups.find((group) => group.key === 'closed')
+  assert.equal(inOrders.title, 'En Pedidos (30 días)')
+  assert.equal(discarded.title, 'Descartados (30 días)')
+  assert.deepEqual(inOrders.threads.map((thread) => thread.id).sort(), ['linked', 'won'])
+  assert.deepEqual(discarded.threads.map((thread) => thread.id).sort(), ['lost', 'not-customer'])
+  assert.equal(feed.defaultFeedTab(groups), 'today')
+})
+
 test('empty feed and closed-only feed default to today, never a closed task', () => {
   assert.equal(feed.defaultFeedTab([]), 'today')
   assert.equal(feed.defaultFeedTab(groupsWith()), 'today')
