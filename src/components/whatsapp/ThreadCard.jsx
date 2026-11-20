@@ -7,6 +7,8 @@ import {
   OPEN_STATUSES,
   chatPhone,
   rowChip,
+  isConfirmedThread,
+  deliveryDateLabel,
 } from '../../utils/whatsappFeed'
 
 const button =
@@ -14,9 +16,18 @@ const button =
 const dateLabel = (date) =>
   date ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : ''
 
-function ThreadDetail({ thread, ordersPath, onEdit, onStatus, busy }) {
+function ThreadDetail({
+  thread,
+  ordersPath,
+  onEdit,
+  onStatus,
+  onPayment,
+  busy,
+}) {
   const [lost, setLost] = useState(false),
-    [reason, setReason] = useState('')
+    [reason, setReason] = useState(''),
+    [payment, setPayment] = useState(''),
+    [paying, setPaying] = useState(false)
   const phone = chatPhone(thread)
   const open = OPEN_STATUSES.includes(thread.status)
   const copy = async () => {
@@ -203,6 +214,38 @@ function ThreadDetail({ thread, ordersPath, onEdit, onStatus, busy }) {
           </>
         )}
       </div>
+      {open && (
+        <form
+          className='mt-3 flex min-w-0 flex-wrap items-end gap-2'
+          onSubmit={async (event) => {
+            event.preventDefault()
+            if (paying || busy || !onPayment) return
+            setPaying(true)
+            try {
+              if (await onPayment(thread, payment)) setPayment('')
+            } finally {
+              setPaying(false)
+            }
+          }}
+        >
+          <label className='min-w-0 flex-1 text-xs font-medium text-gray-700'>
+            Monto del pago (C$)
+            <input
+              required
+              type='number'
+              inputMode='decimal'
+              min='0.01'
+              step='0.01'
+              value={payment}
+              onChange={(event) => setPayment(event.target.value)}
+              className='mt-1 min-h-10 w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800'
+            />
+          </label>
+          <button type='submit' disabled={busy || paying} className={button}>
+            Registrar pago
+          </button>
+        </form>
+      )}
       {lost && (
         <div className='mt-3 space-y-2 rounded-lg bg-gray-50 p-3'>
           <label className='block text-sm text-gray-700'>
@@ -232,6 +275,7 @@ function ThreadDetail({ thread, ordersPath, onEdit, onStatus, busy }) {
 const ROW_TONES = {
   danger: { dot: 'bg-red-500', chip: 'bg-red-50 text-red-700' },
   warning: { dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700' },
+  success: { dot: 'bg-green-500', chip: 'bg-green-50 text-green-700' },
   neutral: { dot: 'bg-gray-400', chip: 'bg-gray-100 text-gray-600' },
 }
 
@@ -243,6 +287,7 @@ export default function ThreadCard({
   ...detailProps
 }) {
   const id = useId()
+  const confirmed = isConfirmedThread(thread)
   const chip = rowChip(thread, now)
   const tone = ROW_TONES[chip.tone]
   const name =
@@ -260,7 +305,9 @@ export default function ThreadCard({
         onClick={onToggle}
         className='block min-h-14 w-full min-w-0 rounded-xl px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
       >
-        <span className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
+        <span
+          className={`grid min-w-0 items-center gap-2 ${confirmed ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
+        >
           <span className='flex min-w-0 items-center gap-2'>
             <span
               aria-hidden='true'
@@ -274,14 +321,31 @@ export default function ThreadCard({
             </span>
           </span>
           <span
-            className={`max-w-[10rem] truncate rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
+            className={`${confirmed ? 'w-fit max-w-full whitespace-normal' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
           >
             {chip.text}
           </span>
         </span>
-        <span className='mt-1 block truncate pl-4 text-xs text-gray-500'>
-          → {thread.next_action || 'Sin próxima acción'}
-        </span>
+        {confirmed ? (
+          <span className='mt-1 flex min-w-0 flex-wrap items-center gap-1.5 pl-4 text-xs [overflow-wrap:anywhere] text-gray-600'>
+            <span className='font-semibold'>
+              {deliveryDateLabel(thread.delivery_date, now)}
+            </span>
+            {thread.delivery_method && (
+              <span className='min-w-0'>{thread.delivery_method}</span>
+            )}
+            {thread.customer_name && thread.customer_phone && (
+              <span>{thread.customer_phone}</span>
+            )}
+            <span className='rounded-md bg-red-50 px-2 py-1 font-semibold text-red-700'>
+              Sin pedido registrado
+            </span>
+          </span>
+        ) : (
+          <span className='mt-1 block truncate pl-4 text-xs text-gray-500'>
+            → {thread.next_action || 'Sin próxima acción'}
+          </span>
+        )}
       </button>
       {expanded && (
         <div id={`${id}-detail`} role='region' aria-labelledby={`${id}-toggle`}>

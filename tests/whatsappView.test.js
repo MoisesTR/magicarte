@@ -225,7 +225,7 @@ test('rendered accordion hides detail while collapsed and preserves full existin
   assert.doesNotMatch(expanded, /Ver conversación completa|line-clamp/)
 })
 
-test('rendered tabs keep six counts, one panel, and only selected group rows', async () => {
+test('rendered tabs keep seven counts, one panel, and only selected group rows', async () => {
   const { groups: component, render } = await renderedComponents
   const { groupThreads } = await import('../src/utils/whatsappFeed.js')
   const now = '2026-11-20T04:00:00Z'
@@ -252,14 +252,15 @@ test('rendered tabs keep six counts, one panel, and only selected group rows', a
     now
   )
   const html = render(component, { groups, businessId: 'render-test', now })
-  assert.equal((html.match(/role="tab"/g) || []).length, 6)
+  assert.equal((html.match(/role="tab"/g) || []).length, 7)
   assert.equal((html.match(/role="tabpanel"/g) || []).length, 1)
   assert.equal((html.match(/aria-selected="true"/g) || []).length, 1)
   assert.equal((html.match(/<article/g) || []).length, 1)
   assert.ok(html.includes('Cliente urgente'))
   assert.ok(!html.includes('Cliente cotizar'))
   for (const label of [
-    'Para hoy',
+    'Confirmados',
+    'Responder hoy',
     'Sin responder',
     'Por cotizar',
     'Pagos',
@@ -371,4 +372,78 @@ test('date selection saves only explicit changes and resets tab state against fi
   assert.match(page, /saveFeedDateRange\(businessId, (?:range|key)\)/)
   assert.match(page, /<FeedGroups\s+key=\{(?:dateRange|range)\}/)
   assert.match(page, /<FeedContent[\s\S]*?key=\{currentBusinessId\}/)
+})
+
+test('confirmed compact rows show delivery/payment/safety-net chips and existing expanded actions', async () => {
+  const { card, groups: component, render } = await renderedComponents
+  const { groupThreads } = await import('../src/utils/whatsappFeed.js')
+  const now = '2026-11-20T18:00:00Z'
+  const thread = {
+    id: 'confirmed',
+    status: 'sent',
+    kind: 'quote',
+    customer_name: 'Ana',
+    customer_phone: '50588887777',
+    summary: '20 llaveros',
+    delivery_date: '2026-11-20',
+    delivery_method: 'Retiro El Edén',
+    paid_amount: 700,
+    quoted_amount: 1400,
+  }
+  const html = render(card, { thread, now, expanded: false })
+  for (const text of [
+    'Sin pedido registrado',
+    'Pagó la mitad · falta C$700',
+    'Hoy',
+    'Retiro El Edén',
+    'Ana',
+    '20 llaveros',
+  ])
+    assert.ok(html.includes(text), text)
+  assert.match(html, /bg-red-50[^"]*text-red-700/)
+  const expanded = render(card, {
+    thread,
+    now,
+    expanded: true,
+    ordersPath: '/admin/hikari/orders',
+  })
+  for (const text of [
+    'Registrar pago',
+    'Monto del pago (C$)',
+    'Convertir en pedido',
+    'Abrir chat',
+  ])
+    assert.ok(expanded.includes(text), text)
+  const groups = groupThreads(
+    [
+      thread,
+      {
+        ...thread,
+        id: 'undated',
+        customer_name: 'Sin fecha Ana',
+        delivery_date: null,
+      },
+    ],
+    now
+  )
+  const panel = render(component, { groups, businessId: 'deliveries', now })
+  assert.match(panel, /Acordado en WhatsApp y aún sin pedido registrado/)
+  assert.match(panel, /Sin fecha/)
+  assert.match(panel, /Confirmados <span[^>]*>1<\/span>/)
+})
+
+test('editor exposes delivery date, free-text method and paid amount without new payment tables', async () => {
+  const source = await readFile(
+    'src/components/whatsapp/ThreadEditor.jsx',
+    'utf8'
+  )
+  for (const text of [
+    'Fecha de entrega',
+    'Forma de entrega',
+    'Pagado C$',
+    'delivery_date',
+    'delivery_method',
+    'paid_amount',
+  ])
+    assert.ok(source.includes(text), text)
 })

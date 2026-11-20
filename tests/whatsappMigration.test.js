@@ -47,3 +47,26 @@ test('WhatsApp migration tenant RLS, ownership guards and constrained schema', a
   assert.match(text, /revoke execute/)
   assert.match(text, /on conflict \(business_id, chat_key\)/)
 })
+
+test('one additive delivery migration includes non-negative amount and monotone assistant contract', async () => {
+  const files = (await readdir('supabase/migrations')).filter((name) =>
+    name.endsWith('_add_whatsapp_deliveries.sql')
+  )
+  assert.equal(files.length, 1)
+  assert.ok(files[0].slice(0, 14) > '20261120041204')
+  const text = await readFile(`supabase/migrations/${files[0]}`, 'utf8')
+  assert.match(text, /alter table public.whatsapp_threads/i)
+  assert.match(text, /add column delivery_date date/i)
+  assert.match(text, /add column delivery_method text/i)
+  assert.match(
+    text,
+    /paid_amount numeric\(12,2\) not null default 0 check \(paid_amount >= 0\)/i
+  )
+  assert.match(
+    text,
+    /paid_amount = greatest\(whatsapp_threads.paid_amount, excluded.paid_amount\)/
+  )
+  assert.match(text, /delivery_date = excluded.delivery_date/)
+  assert.match(text, /delivery_method = excluded.delivery_method/)
+  assert.doesNotMatch(text, /create table|security definer/i)
+})

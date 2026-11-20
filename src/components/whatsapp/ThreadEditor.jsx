@@ -26,6 +26,9 @@ const EMPTY = {
   summary: '',
   next_action: '',
   quoted_amount: '',
+  delivery_date: '',
+  delivery_method: '',
+  paid_amount: 0,
   promised_date: '',
   promise_source: '',
   follow_up_date: '',
@@ -47,11 +50,13 @@ const TEXT_FIELDS = [
   ['customer_phone', 'Teléfono'],
   ['chat_key', 'Identificador del chat'],
   ['next_action', 'Próxima acción'],
+  ['delivery_method', 'Forma de entrega'],
   ['promise_source', 'Promesa (texto exacto)'],
   ['order_id', 'ID de pedido vinculado'],
   ['lost_reason', 'Motivo de pérdida'],
 ]
 const DATE_FIELDS = [
+  ['delivery_date', 'Fecha de entrega'],
   ['promised_date', 'Fecha prometida'],
   ['follow_up_date', 'Fecha de seguimiento'],
 ]
@@ -73,6 +78,7 @@ export default function ThreadEditor({
     ...EMPTY,
     ...thread,
     quoted_amount: thread?.quoted_amount ?? '',
+    paid_amount: thread?.paid_amount ?? 0,
   }))
   const [pasted, setPasted] = useState(''),
     [ourSenders, setOurSenders] = useState(loadOurSenders),
@@ -336,6 +342,17 @@ export default function ThreadEditor({
                 step='0.01'
                 value={form.quoted_amount}
                 onChange={(e) => update('quoted_amount', e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className='min-w-0 text-sm font-medium'>
+              Pagado C$
+              <input
+                type='number'
+                min='0'
+                step='0.01'
+                value={form.paid_amount}
+                onChange={(e) => update('paid_amount', e.target.value)}
                 className={inputClass}
               />
             </label>

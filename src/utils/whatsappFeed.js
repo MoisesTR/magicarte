@@ -93,6 +93,13 @@ export function filterThreadsByDate(threads, range, now = new Date()) {
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
   const monday = addDays(today, -((weekday + 6) % 7))
   return threads.filter((thread) => {
+    if (isConfirmedThread(thread)) {
+      const delivery = dueCalendarDay(thread.delivery_date)
+      return (
+        delivery !== null &&
+        delivery <= (range === 'today' ? today : addDays(monday, 6))
+      )
+    }
     if (
       [thread.promised_date, thread.follow_up_date].some((value) => {
         const day = dueCalendarDay(value)
@@ -139,22 +146,142 @@ export function saveFeedDateRange(businessId, range, storage) {
 
 const dueDate = (thread) =>
   [thread.promised_date, thread.follow_up_date].filter(Boolean).sort()[0]
-export function feedKPIs(threads, now = new Date()) {
-  const rows = threads.filter((t) => OPEN_STATUSES.includes(t.status)),
-    today = managuaDay(now)
+/** Confirmed chat agreements belong only to the delivery safety net, never response tasks. */
+export function isConfirmedThread(thread) {
+  return (
+    OPEN_STATUSES.includes(thread.status) &&
+    (Number(thread.paid_amount) > 0 || Boolean(thread.delivery_date))
+  )
+}
+
+/** Seven exclusive Monday-start delivery buckets; original rows are never mutated. */
+export function groupDeliveries(threads, now = new Date()) {
+  const today = managuaDay(now)
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
+  const endOfWeek = addDays(today, 6 - ((weekday + 6) % 7))
+  const groups = [
+    ['overdue', 'Atrasadas'],
+    ['today', 'Hoy'],
+    ['tomorrow', 'Mañana'],
+    ['week', 'Esta semana'],
+    ['nextWeek', 'Próxima semana'],
+    ['later', 'Más adelante'],
+    ['undated', 'Sin fecha'],
+  ].map(([key, title]) => ({ key, title, threads: [] }))
+  for (const thread of threads.filter(isConfirmedThread)) {
+    const date = dueCalendarDay(thread.delivery_date)
+    const index = !date
+      ? 6
+      : date < today
+        ? 0
+        : date === today
+          ? 1
+          : date === addDays(today, 1)
+            ? 2
+            : date <= endOfWeek
+              ? 3
+              : date <= addDays(endOfWeek, 7)
+                ? 4
+                : 5
+    groups[index].threads.push(thread)
+  }
+  for (const group of groups)
+    group.threads.sort((a, b) =>
+      (a.delivery_date || '').localeCompare(b.delivery_date || '')
+    )
+  return groups
+}
+
+export function deliveryDateLabel(date, now = new Date()) {
+  if (!date) return 'Sin fecha'
+  const today = managuaDay(now)
+  if (date === today) return 'Hoy'
+  if (date === addDays(today, 1)) return 'Mañana'
+  const weekday = new Intl.DateTimeFormat('es-NI', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  })
+    .format(new Date(`${date}T12:00:00Z`))
+    .replace(/\.$/, '')
+  return `${weekday} ${date.slice(8, 10)}/${date.slice(5, 7)}`
+}
+
+const money = (amount) =>
+  Number(amount).toLocaleString('es-NI', {
+    minimumFractionDigits: Number.isInteger(Number(amount)) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+
+/** Payment chips use cents; the half-deposit tolerance is inclusive of C$1. */
+export function paymentChip(thread) {
+  const paid = Math.round(Number(thread.paid_amount || 0) * 100)
+  const quoted =
+    thread.quoted_amount == null
+      ? null
+      : Math.round(Number(thread.quoted_amount) * 100)
+  if (!paid) return { text: 'Sin pago registrado', tone: 'neutral' }
+  if (quoted !== null && paid >= quoted)
+    return { text: 'Pagado', tone: 'success' }
+  if (quoted === null)
+    return { text: `Pagó C$${money(paid / 100)}`, tone: 'warning' }
+  const balance = money((quoted - paid) / 100)
   return {
-    today: rows.filter((t) => dueDate(t) <= today).length,
-    unanswered: rows.filter((t) => t.awaiting_reply).length,
-    toQuote: rows.filter((t) => t.status === 'to_quote').length,
-    payments: rows.filter((t) => t.kind === 'payment').length,
+    text:
+      Math.abs(paid - quoted / 2) <= 100
+        ? `Pagó la mitad · falta C$${balance}`
+        : `Anticipo C$${money(paid / 100)} · falta C$${balance}`,
+    tone: 'warning',
   }
 }
 
-/** Exclusive priority grouping. KPI counts intentionally overlap, feed cards never do. */
+/** Validate a positive addition and keep the persisted numeric(12,2) in range. */
+export function addThreadPayment(existing, amount) {
+  const value = Number(amount),
+    current = Number(existing ?? 0)
+  const cents = Math.round(value * 100),
+    previous = Math.round(current * 100)
+  if (
+    !Number.isFinite(value) ||
+    value <= 0 ||
+    Math.abs(value * 100 - cents) > 0.00001 ||
+    !Number.isFinite(current) ||
+    current < 0 ||
+    previous + cents > 999999999999
+  )
+    throw new Error(
+      'Indique un monto de pago positivo con hasta dos decimales.'
+    )
+  return (previous + cents) / 100
+}
+
+export function feedKPIs(threads, now = new Date()) {
+  const groups = groupThreads(threads, now)
+  return Object.fromEntries(
+    ['confirmed', 'today', 'unanswered', 'toQuote', 'payments'].map((key) => {
+      const group = groups.find((item) => item.key === key)
+      return [key, group.count ?? group.threads.length]
+    })
+  )
+}
+
+/** Exclusive priority grouping: confirmed agreements and payment tasks precede replies. */
 export function groupThreads(threads, now = new Date()) {
   const today = managuaDay(now)
+  const deliveries = groupDeliveries(threads, now)
+  const confirmed = {
+    key: 'confirmed',
+    title: 'Confirmados',
+    deliveryGroups: deliveries,
+    threads: deliveries.flatMap((group) => group.threads),
+    count: deliveries
+      .slice(0, 4)
+      .reduce((count, group) => count + group.threads.length, 0),
+    urgentCount: deliveries
+      .slice(0, 2)
+      .reduce((count, group) => count + group.threads.length, 0),
+  }
   const groups = [
-    ['today', 'Para hoy'],
+    ['today', 'Responder hoy'],
     ['unanswered', 'Esperando tu respuesta'],
     ['toQuote', 'Por cotizar'],
     ['payments', 'Pagos pendientes'],
@@ -162,6 +289,7 @@ export function groupThreads(threads, now = new Date()) {
     ['closed', 'Cerrados (30 días)'],
   ].map(([key, title]) => ({ key, title, threads: [] }))
   for (const thread of threads) {
+    if (isConfirmedThread(thread)) continue
     let index,
       timeHint = ''
     if (!OPEN_STATUSES.includes(thread.status)) {
@@ -171,6 +299,9 @@ export function groupThreads(threads, now = new Date()) {
       )
         continue
       index = 5
+    } else if (thread.kind === 'payment') {
+      index = 3
+      if (thread.follow_up_date <= today) timeHint = rowChip(thread, now).text
     } else if (dueDate(thread) <= today) {
       index = 0
       const days = dayDifference(today, dueDate(thread))
@@ -181,7 +312,6 @@ export function groupThreads(threads, now = new Date()) {
       timeHint =
         hours == null ? 'Sin respuesta pendiente' : `Escribió hace ${hours} h`
     } else if (thread.status === 'to_quote') index = 2
-    else if (thread.kind === 'payment') index = 3
     else {
       index = 4
       if (thread.last_our_message_at)
@@ -195,6 +325,14 @@ export function groupThreads(threads, now = new Date()) {
       b.last_customer_message_at || '9999'
     )
   )
+  groups[3].threads.sort((a, b) => {
+    const dueA = a.follow_up_date <= today,
+      dueB = b.follow_up_date <= today
+    return (
+      Number(dueB) - Number(dueA) ||
+      (a.follow_up_date || '9999').localeCompare(b.follow_up_date || '9999')
+    )
+  })
   groups[4].threads.sort((a, b) =>
     (a.last_our_message_at || '9999').localeCompare(
       b.last_our_message_at || '9999'
@@ -203,7 +341,7 @@ export function groupThreads(threads, now = new Date()) {
   groups[5].threads.sort((a, b) =>
     b.status_changed_at.localeCompare(a.status_changed_at)
   )
-  return groups
+  return [confirmed, ...groups]
 }
 
 const FEED_TAB_PRIORITY = [
@@ -214,8 +352,12 @@ const FEED_TAB_PRIORITY = [
   'waiting',
 ]
 
-/** Return an actionable group key; an empty or closed-only feed starts at today. */
+/** Urgent deliveries win; future-only confirmed rows do not hide response tasks. */
 export function defaultFeedTab(groups) {
+  if (
+    groups.some((group) => group.key === 'confirmed' && group.urgentCount > 0)
+  )
+    return 'confirmed'
   return (
     FEED_TAB_PRIORITY.find((key) =>
       groups.some((group) => group.key === key && group.threads.length > 0)
@@ -273,15 +415,19 @@ export function visibleFeedThreads(group, showAllWaiting) {
 export function rowChip(thread, now = new Date()) {
   const open = OPEN_STATUSES.includes(thread.status)
   if (open) {
+    if (isConfirmedThread(thread)) return paymentChip(thread)
     const today = managuaDay(now),
-      due = dueDate(thread)
+      due = thread.kind === 'payment' ? thread.follow_up_date : dueDate(thread)
     if (due <= today) {
       const days = dayDifference(today, due)
       return days > 0
         ? { text: `Vencido ${days} d`, tone: 'danger' }
-        : { text: 'Prometido hoy', tone: 'warning' }
+        : {
+            text: thread.kind === 'payment' ? 'Revisar hoy' : 'Prometido hoy',
+            tone: 'warning',
+          }
     }
-    if (thread.awaiting_reply) {
+    if (thread.kind !== 'payment' && thread.awaiting_reply) {
       const hours = hoursAgo(thread.last_customer_message_at, now)
       return {
         text:
@@ -501,7 +647,7 @@ export function threadOrderPrefill(thread, orderDate = managuaDay()) {
       phone.startsWith('505') && phone.length === 11 ? phone.slice(3) : phone,
     client_id: thread.client_id || null,
     notes: [thread.summary, thread.notes].filter(Boolean).join('\n\n'),
-    estimated_delivery_date: thread.promised_date || '',
+    estimated_delivery_date: thread.delivery_date || '',
     delivery_method: 'pickup',
     items: [
       {
@@ -561,6 +707,16 @@ export function buildThreadPayload(form) {
     (!Number.isFinite(quoted_amount) || quoted_amount < 0)
   )
     throw new Error('El monto debe ser un número no negativo.')
+  const paid_amount = Number(form.paid_amount ?? 0)
+  if (
+    !Number.isFinite(paid_amount) ||
+    paid_amount < 0 ||
+    paid_amount > 9999999999.99 ||
+    Math.abs(paid_amount * 100 - Math.round(paid_amount * 100)) > 0.00001
+  )
+    throw new Error(
+      'El monto pagado debe ser no negativo y tener hasta dos decimales.'
+    )
   const unread_count = Number(form.unread_count || 0)
   if (!Number.isSafeInteger(unread_count) || unread_count < 0)
     throw new Error(
@@ -590,6 +746,8 @@ export function buildThreadPayload(form) {
     customer_phone: customer_phone || null,
     summary,
     quoted_amount,
+    paid_amount,
+    delivery_method: (form.delivery_method || '').trim() || null,
     unread_count,
     reference_images,
     labels: [
@@ -600,7 +758,7 @@ export function buildThreadPayload(form) {
     client_id: form.client_id || null,
     order_id: form.order_id || null,
   }
-  for (const key of ['promised_date', 'follow_up_date']) {
+  for (const key of ['promised_date', 'follow_up_date', 'delivery_date']) {
     const value = form[key] || null
     if (
       value &&
@@ -611,7 +769,9 @@ export function buildThreadPayload(form) {
           Number(value.slice(8, 10))
         ) !== value)
     )
-      throw new Error('Use una fecha válida para la promesa y el seguimiento.')
+      throw new Error(
+        'Use una fecha válida para la entrega, la promesa y el seguimiento.'
+      )
     payload[key] = value
   }
   for (const key of [

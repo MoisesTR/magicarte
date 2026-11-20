@@ -1,3 +1,4 @@
+import { addThreadPayment } from '../utils/whatsappFeed.js'
 import { supabase } from '../config/supabaseClient'
 
 const NOTICE = 'Falta activar la sección WhatsApp'
@@ -11,6 +12,9 @@ const FIELDS = [
   'summary',
   'next_action',
   'quoted_amount',
+  'delivery_date',
+  'delivery_method',
+  'paid_amount',
   'promised_date',
   'promise_source',
   'follow_up_date',
@@ -155,4 +159,42 @@ export async function completeThreadConversion(id, orderId, businessId) {
     { status: 'won', order_id: orderId },
     businessId
   )
+}
+
+/** Fresh read plus compare-and-swap: concurrent payments fail visibly, never overwrite. */
+export async function registerWhatsAppPayment(id, amount, businessId) {
+  if (!required(businessId, id)) return invalid()
+  try {
+    addThreadPayment(0, amount)
+    const current = await fetchWhatsAppThread(id, businessId)
+    if (current.error) return current
+    const thread = current.data
+    if (!thread || !['to_quote', 'sent', 'follow_up'].includes(thread.status))
+      return {
+        data: null,
+        error: new Error('La conversación ya no está abierta.'),
+      }
+    const paid_amount = addThreadPayment(thread.paid_amount, amount)
+    const result = await readResult(
+      supabase
+        .from('whatsapp_threads')
+        .update({ paid_amount })
+        .eq('id', id)
+        .eq('business_id', businessId)
+        .eq('paid_amount', thread.paid_amount)
+        .eq('status', thread.status)
+        .select()
+        .single()
+    )
+    if (result.error?.code === 'PGRST116')
+      return {
+        data: null,
+        error: new Error(
+          'La conversación cambió. Actualice y revise el pago antes de reintentar.'
+        ),
+      }
+    return result
+  } catch (error) {
+    return { data: null, error }
+  }
 }

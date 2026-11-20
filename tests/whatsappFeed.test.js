@@ -57,7 +57,8 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
   assert.deepEqual(
     groups.map((g) => g.title),
     [
-      'Para hoy',
+      'Confirmados',
+      'Responder hoy',
       'Esperando tu respuesta',
       'Por cotizar',
       'Pagos pendientes',
@@ -68,6 +69,7 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
   assert.deepEqual(
     groups.map((g) => g.threads.map((t) => t.id)),
     [
+      [],
       ['overdue', 'today'],
       ['reply-old', 'reply-new'],
       ['quote'],
@@ -76,14 +78,15 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
       ['closed'],
     ]
   )
-  assert.equal(groups[0].threads[0].timeHint, 'Vencido hace 2 días')
-  assert.equal(groups[0].threads[1].timeHint, 'Prometido hoy')
-  assert.equal(groups[1].threads[1].timeHint, 'Escribió hace 8 h')
-  assert.equal(groups[4].threads[0].timeHint, 'Sin respuesta hace 2 días')
+  assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 2 días')
+  assert.equal(groups[1].threads[1].timeHint, 'Prometido hoy')
+  assert.equal(groups[2].threads[1].timeHint, 'Escribió hace 8 h')
+  assert.equal(groups[5].threads[0].timeHint, 'Sin respuesta hace 2 días')
   assert.deepEqual(feedKPIs(rows, now), {
+    confirmed: 0,
     today: 2,
-    unanswered: 3,
-    toQuote: 5,
+    unanswered: 2,
+    toQuote: 1,
     payments: 1,
   })
 })
@@ -102,8 +105,8 @@ test('earliest of both due dates wins; closed cutoff uses status change, not cre
     ],
     now
   )
-  assert.equal(groups[0].threads[0].timeHint, 'Vencido hace 1 días')
-  assert.equal(groups[5].threads.length, 1)
+  assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 1 días')
+  assert.equal(groups[6].threads.length, 1)
 })
 test('status and kind labels match the Spanish contract', () => {
   assert.deepEqual(Object.values(STATUS_LABELS), [
@@ -258,7 +261,7 @@ test('thread order mapping preserves identity and notes and uses a custom unpaid
       summary: '20 llaveros',
       notes: 'Azules',
       quoted_amount: '450.50',
-      promised_date: '2026-11-20',
+      delivery_date: '2026-11-20',
     },
     '2026-11-19'
   )

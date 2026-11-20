@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { addThreadPayment } from '../src/utils/whatsappFeed.js'
 async function dataWith(client) {
   const source = (
     await readFile(
@@ -12,8 +13,9 @@ async function dataWith(client) {
     .replaceAll('export ', '')
   return new Function(
     'supabase',
-    `${source};return {fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,completeThreadConversion}`
-  )(client)
+    'addThreadPayment',
+    `${source};return {fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,completeThreadConversion,registerWhatsAppPayment}`
+  )(client, addThreadPayment)
 }
 function mock(results = []) {
   const requests = []
@@ -158,4 +160,64 @@ test('detail read is scoped and missing conversion target never writes', async (
   ])
   assert.ok((await api.updateWhatsAppThread('t', {}, null)).error)
   assert.equal(c.requests.length, 1)
+})
+
+test('delivery fields survive scoped create/update and readback', async () => {
+  const fields = {
+    delivery_date: '2026-11-22',
+    delivery_method: 'Retiro El Edén',
+    paid_amount: 700,
+  }
+  const c = mock([
+    { data: { id: 't', ...fields } },
+    { data: { id: 't', ...fields } },
+  ])
+  const api = await dataWith(c)
+  await api.createWhatsAppThread(fields, 2)
+  assert.deepEqual(c.requests[0].insert[0], { ...fields, business_id: 2 })
+  assert.equal(
+    (await api.updateWhatsAppThread('t', fields, 2)).data.paid_amount,
+    700
+  )
+  assert.deepEqual(c.requests[1].update, fields)
+})
+
+test('quick payment reads fresh amount and uses tenant-scoped compare-and-swap to avoid lost additions', async () => {
+  const c = mock([
+    { data: { id: 't', status: 'sent', paid_amount: '700.10' } },
+    { data: { id: 't', paid_amount: 700.3 } },
+  ])
+  const api = await dataWith(c)
+  const result = await api.registerWhatsAppPayment('t', '0.20', 2)
+  assert.equal(result.data.paid_amount, 700.3)
+  assert.deepEqual(c.requests[1].update, { paid_amount: 700.3 })
+  assert.deepEqual(c.requests[1].filters, [
+    ['id', 't'],
+    ['business_id', 2],
+    ['paid_amount', '700.10'],
+    ['status', 'sent'],
+  ])
+  const denied = mock([{ error: { message: 'denied' } }])
+  assert.ok(
+    (await (await dataWith(denied)).registerWhatsAppPayment('t', 10, 2)).error
+  )
+  assert.equal(denied.requests.length, 1)
+  const closed = mock([{ data: { status: 'won', paid_amount: 20 } }])
+  assert.ok(
+    (await (await dataWith(closed)).registerWhatsAppPayment('t', 10, 2)).error
+  )
+  assert.equal(closed.requests.length, 1)
+  const invalid = mock()
+  assert.ok(
+    (await (await dataWith(invalid)).registerWhatsAppPayment('t', -1, 2)).error
+  )
+  assert.equal(invalid.requests.length, 0)
+  const conflict = mock([
+    { data: { status: 'sent', paid_amount: 20 } },
+    { error: { code: 'PGRST116', message: 'No rows' } },
+  ])
+  assert.ok(
+    (await (await dataWith(conflict)).registerWhatsAppPayment('t', 10, 2)).error
+  )
+  assert.equal(conflict.requests.length, 2)
 })

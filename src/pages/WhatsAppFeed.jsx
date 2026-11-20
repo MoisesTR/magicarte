@@ -19,12 +19,14 @@ import {
   updateWhatsAppThread,
   deleteWhatsAppThread,
   markWhatsAppThread,
+  registerWhatsAppPayment,
 } from '../data/whatsappThreads'
 import ThreadCard from '../components/whatsapp/ThreadCard'
 import ThreadEditor from '../components/whatsapp/ThreadEditor'
 
 const TAB_LABELS = {
-  today: 'Para hoy',
+  confirmed: 'Confirmados',
+  today: 'Responder hoy',
   unanswered: 'Sin responder',
   toQuote: 'Por cotizar',
   payments: 'Pagos',
@@ -89,6 +91,7 @@ function FeedGroups({
   busy,
   onEdit,
   onStatus,
+  onPayment,
 }) {
   const [selectedTab, setSelectedTab] = useState(() =>
     loadFeedTab(businessId, groups)
@@ -118,7 +121,8 @@ function FeedGroups({
     setShowAllWaiting(false)
     saveFeedTab(businessId, key)
   }
-  const selectedGroup = groups.find((group) => group.key === selectedTab)
+  const selectedGroup =
+    groups.find((group) => group.key === selectedTab) || groups[0]
   const threads = visibleFeedThreads(selectedGroup, showAllWaiting)
   const remaining = selectedGroup.threads.length - threads.length
 
@@ -157,7 +161,7 @@ function FeedGroups({
             >
               {TAB_LABELS[group.key]}{' '}
               <span className='ml-1 text-gray-500 tabular-nums'>
-                {group.threads.length}
+                {group.count ?? group.threads.length}
               </span>
             </button>
           )
@@ -171,24 +175,44 @@ function FeedGroups({
         className='min-w-0 space-y-2 rounded-xl focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
       >
         <h2 className='sr-only'>{selectedGroup.title}</h2>
-        {threads.map((thread) => (
-          <ThreadCard
-            key={thread.id}
-            thread={thread}
-            now={now}
-            expanded={openThread === thread.id}
-            onToggle={() =>
-              setOpenThread(openThread === thread.id ? null : thread.id)
-            }
-            ordersPath={ordersPath}
-            busy={busy}
-            onEdit={onEdit}
-            onStatus={onStatus}
-          />
+        {selectedTab === 'confirmed' && (
+          <p className='px-1 text-sm text-gray-600'>
+            Acordado en WhatsApp y aún sin pedido registrado
+          </p>
+        )}
+        {(selectedTab === 'confirmed'
+          ? selectedGroup.deliveryGroups.filter((group) => group.threads.length)
+          : [{ key: selectedGroup.key, threads }]
+        ).map((group) => (
+          <div key={group.key} className='min-w-0 space-y-2'>
+            {selectedTab === 'confirmed' && (
+              <h3 className='px-1 pt-2 text-sm font-bold text-gray-700'>
+                {group.title}
+              </h3>
+            )}
+            {group.threads.map((thread) => (
+              <ThreadCard
+                key={thread.id}
+                thread={thread}
+                now={now}
+                expanded={openThread === thread.id}
+                onToggle={() =>
+                  setOpenThread(openThread === thread.id ? null : thread.id)
+                }
+                ordersPath={ordersPath}
+                busy={busy}
+                onEdit={onEdit}
+                onStatus={onStatus}
+                onPayment={onPayment}
+              />
+            ))}
+          </div>
         ))}
         {!threads.length && (
           <p className='px-3 py-4 text-sm text-gray-500'>
-            Sin conversaciones en este grupo.
+            {selectedTab === 'confirmed'
+              ? 'Nada confirmado sin registrar'
+              : 'Sin conversaciones en este grupo.'}
           </p>
         )}
         {remaining > 0 && (
@@ -315,6 +339,11 @@ export default function WhatsAppFeed() {
             now={query.now}
             ordersPath={`/admin/${currentBusiness.slug}/orders`}
             busy={busy}
+            onPayment={(thread, amount) =>
+              mutate(() =>
+                registerWhatsAppPayment(thread.id, amount, currentBusinessId)
+              )
+            }
             onEdit={(thread) => setEditor({ thread })}
             onStatus={(thread, status, reason) =>
               mutate(() =>
