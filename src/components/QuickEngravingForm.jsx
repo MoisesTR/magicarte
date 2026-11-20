@@ -1,3 +1,5 @@
+import { resolveOrderClient } from '../utils/orderClientLink'
+import { findClientByNormalizedPhone, findClientByExactName, createClientReturning } from '../data/clients'
 import ThreadOrderDeliveryFields from './ThreadOrderDeliveryFields'
 import { threadOrderDeliveryFields } from '../utils/orderDraftFromThread'
 import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
@@ -147,10 +149,29 @@ export default function QuickEngravingForm({
     orderDraft.clear()
     setSaving(true)
     try {
+      // Use the actual optional client name, never the legacy note/material fallback.
+      const customer = {
+        ...(imported || editingOrder || {}),
+        customer_name: clientName,
+      }
+      let clientLinkFailed = false
+      const shouldLinkClient = !editingOrder || (!customer.client_id && customer.customer_name?.trim())
+      const clientId = shouldLinkClient ? await resolveOrderClient({
+        formData: customer,
+        findClientByPhone: findClientByNormalizedPhone,
+        findClientByName: findClientByExactName,
+        createClientReturning,
+        businessId: businessId,
+        onError: error => {
+          clientLinkFailed = true
+          console.error('Error linking order client:', error)
+        },
+      }) : customer.client_id || null
       let orderId
       if (editingOrder) {
         const { error: orderErr } = await updateOrder(editingOrder.id, {
           customer_name: displayName,
+          client_id: clientId,
           order_date: date,
           total_amount: effectiveTotal,
           material_cost: effectiveMaterialCost,
@@ -168,6 +189,7 @@ export default function QuickEngravingForm({
         const { data: orderRows, error: orderErr } = await createOrder(
           {
             customer_name: displayName,
+            client_id: clientId,
             order_date: date,
             status: initialThreadForm ? 'pending' : 'completed',
             priority: 'normal',
@@ -182,7 +204,7 @@ export default function QuickEngravingForm({
             partner_share_amount: allocationMode === 'amount' ? exactPartnerTake : null,
             your_share_amount: allocationMode === 'amount' ? exactMyTake : null,
             completed_at: initialThreadForm ? null : new Date().toISOString(),
-            ...(initialThreadForm ? { customer_phone:initialThreadForm.customer_phone || null, client_id:initialThreadForm.client_id || null, notes:imported.notes || null, ...threadOrderDeliveryFields(imported) } : {}),
+            ...(initialThreadForm ? { customer_phone:initialThreadForm.customer_phone || null, notes:imported.notes || null, ...threadOrderDeliveryFields(imported) } : {}),
           },
           businessId,
         )
@@ -230,6 +252,7 @@ export default function QuickEngravingForm({
       }
 
       if (initialThreadForm && threadConversion) await threadConversion.completeConversion(orderId)
+      if (clientLinkFailed) toast.error('Pedido guardado, pero no se pudo vincular el cliente.')
       toast.success(initialThreadForm ? 'Pedido creado sin registrar pago' : editingOrder ? 'Grabado actualizado' : 'Grabado registrado')
       onSaved?.(orderId)
       onClose?.()

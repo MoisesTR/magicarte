@@ -4,6 +4,11 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { transform } from 'esbuild'
 import * as helpers from '../src/utils/productPresentations.js'
+import * as clientLink from '../src/utils/orderClientLink.js'
+const clients = {
+  findClientByNormalizedPhone: async () => ({ data: null, error: null }),
+  createClientReturning: async () => ({ data: { id: 'client' }, error: null }),
+}
 const require = createRequire(import.meta.url)
 async function engravingFormWithClient(calls, overrides = {}) {
   let stateSlot = 0
@@ -41,6 +46,8 @@ async function engravingFormWithClient(calls, overrides = {}) {
         success: () => {},
       },
     },
+    '../utils/orderClientLink': clientLink,
+    '../data/clients': clients,
     '../data/orders': Object.fromEntries(
       [
         'createOrder',
@@ -283,6 +290,8 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
       }),
     },
     '../../config/supabaseClient': {},
+    '../../utils/orderClientLink': clientLink,
+    '../../data/clients': clients,
     '../../data/orders': Object.fromEntries(
       [
         'fetchOrdersForBusiness',

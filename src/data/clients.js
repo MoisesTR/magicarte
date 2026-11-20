@@ -2,6 +2,7 @@
 
 import { supabase } from '../config/supabaseClient'
 import { TABLE } from '../utils/constants'
+import { normalizeClientPhone } from '../utils/orderClientLink'
 
 /** All clients for a business (most-recently-updated first). */
 export function fetchClientsForBusiness(businessId) {
@@ -39,6 +40,48 @@ export function findClientByPhone(phone, businessId) {
     .eq('phone', phone)
   if (businessId != null) q = q.eq('business_id', businessId)
   return q.maybeSingle()
+}
+
+/** Match normalized phones within one business, including stored separators. */
+export async function findClientByNormalizedPhone(phone, businessId) {
+  if (businessId == null || businessId === '') {
+    return { data: null, error: new Error('Business is required for client lookup') }
+  }
+  const normalized = normalizeClientPhone(phone)
+  if (!normalized) return { data: null, error: null }
+
+  // Inter-digit wildcards admit free-text formatting; exact normalization below
+  // rejects unrelated prefixes/suffixes and foreign numbers with the same suffix.
+  const pattern = `%${normalized.split('').join('%')}%`
+  const pageSize = 100
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from(TABLE.CLIENTS)
+      .select('id, name, phone, social_media, delivery_address')
+      .eq('business_id', businessId)
+      .ilike('phone', pattern)
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+    if (error) return { data: null, error }
+    const match = (data || []).find(client => normalizeClientPhone(client.phone) === normalized)
+    if (match) return { data: match, error: null }
+    if (!data || data.length < pageSize) return { data: null, error: null }
+  }
+}
+
+/** Case-insensitive exact name match within a business; ambiguous names link nothing. */
+export async function findClientByExactName(name, businessId) {
+  const trimmed = String(name || '').trim()
+  if (!trimmed || businessId == null || businessId === '') return { data: null, error: null }
+  const escaped = trimmed.replace(/[\\%_]/g, (char) => `\\${char}`)
+  const { data, error } = await supabase
+    .from(TABLE.CLIENTS)
+    .select('id, name, phone, social_media, delivery_address')
+    .eq('business_id', businessId)
+    .ilike('name', escaped)
+    .limit(2)
+  if (error) return { data: null, error }
+  return { data: data?.length === 1 ? data[0] : null, error: null }
 }
 
 /** Create a client, stamping the owning business. */

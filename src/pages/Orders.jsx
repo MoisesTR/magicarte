@@ -1,3 +1,4 @@
+import { resolveOrderClient } from '../utils/orderClientLink'
 import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
 import ThreadOrderDraftNotice from '../components/ThreadOrderDraftNotice'
 import useThreadOrderImport from '../hooks/useThreadOrderImport'
@@ -24,7 +25,7 @@ import {
   fetchClientsForBusiness,
   searchClientsByName,
   fetchClientById,
-  findClientByPhone,
+  findClientByNormalizedPhone, findClientByExactName,
   createClientReturning,
 } from '../data/clients'
 import { addPayment as addPaymentRow, deletePayment as deletePaymentRow } from '../data/payments'
@@ -431,44 +432,24 @@ export default function Orders() {
   }
 
   const saveOrderCustomerAsClient = async () => {
-    const name = formData.customer_name.trim()
-    if (!name) {
-      toast.error('Agrega el nombre del cliente primero')
+    if (!formData.customer_name.trim()) {
+      toast.error('Agregue el nombre del cliente primero')
       return
     }
-
-    const phone = formData.customer_phone || null
-
-    try {
-      if (phone) {
-        const { data: existingClient, error: findError } = await findClientByPhone(phone, currentBusinessId)
-
-        if (findError) throw findError
-
-        if (existingClient) {
-          selectClient(existingClient)
-          toast.success('Cliente existente vinculado')
-          return
-        }
-      }
-
-      const { data, error } = await createClientReturning(
-        {
-          name,
-          phone,
-          social_media: formData.customer_social_media || null,
-          delivery_address: formData.delivery_address || null,
-          notes: 'Creado desde un pedido',
-        },
-        currentBusinessId,
-      )
-
-      if (error) throw error
-
-      selectClient(data)
-      toast.success('Cliente creado y vinculado')
-    } catch (error) {
-      toast.error('Error al guardar cliente: ' + error.message)
+    const clientId = await resolveOrderClient({
+      formData,
+      findClientByPhone: findClientByNormalizedPhone,
+        findClientByName: findClientByExactName,
+      createClientReturning,
+      businessId: currentBusinessId,
+      onError: error => {
+        console.error('Error linking order client:', error)
+        toast.error('No se pudo guardar el cliente.')
+      },
+    })
+    if (clientId) {
+      setFormData(previous => ({ ...previous, client_id: clientId }))
+      toast.success('Cliente vinculado')
     }
   }
 
@@ -478,8 +459,21 @@ export default function Orders() {
     setLoading(true)
 
     try {
+      let clientLinkFailed = false
+      const shouldLinkClient = !editingOrder || (!formData.client_id && formData.customer_name?.trim())
+      const clientId = shouldLinkClient ? await resolveOrderClient({
+        formData,
+        findClientByPhone: findClientByNormalizedPhone,
+        findClientByName: findClientByExactName,
+        createClientReturning,
+        businessId: currentBusinessId,
+        onError: error => {
+          clientLinkFailed = true
+          console.error('Error linking order client:', error)
+        },
+      }) : formData.client_id || null
       const orderData = {
-        client_id: formData.client_id || null,
+        client_id: clientId,
         customer_name: formData.customer_name,
         customer_phone: isInPerson ? null : (formData.customer_phone || null),
         customer_social_media: formData.customer_social_media || null,
@@ -554,6 +548,7 @@ export default function Orders() {
       }
       if (!editingOrder) await threadImport.completeConversion(orderId)
       toast.success(editingOrder ? 'Pedido actualizado!' : 'Pedido creado!')
+      if (clientLinkFailed) toast.error('Pedido guardado, pero no se pudo vincular el cliente.')
       resetForm()
       fetchOrders()
     } catch (error) {

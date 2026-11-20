@@ -1,3 +1,5 @@
+import { resolveOrderClient } from '../../utils/orderClientLink'
+import { findClientByNormalizedPhone, findClientByExactName, createClientReturning } from '../../data/clients'
 import ThreadOrderDeliveryFields from '../../components/ThreadOrderDeliveryFields'
 import { threadOrderDeliveryFields } from '../../utils/orderDraftFromThread'
 import useThreadOrderDraft from '../../hooks/useThreadOrderDraft'
@@ -188,10 +190,23 @@ export default function HikariOrders() {
     orderDraft.cancelPending()
     setSaving(true)
     try {
+      let clientLinkFailed = false
+      const shouldLinkClient = !editingOrder || (!formData.client_id && formData.customer_name?.trim())
+      const clientId = shouldLinkClient ? await resolveOrderClient({
+        formData,
+        findClientByPhone: findClientByNormalizedPhone,
+        findClientByName: findClientByExactName,
+        createClientReturning,
+        businessId: currentBusinessId,
+        onError: error => {
+          clientLinkFailed = true
+          console.error('Error linking order client:', error)
+        },
+      }) : formData.client_id || null
       const orderData = {
         customer_name: formData.customer_name.trim(),
         customer_phone: formData.customer_phone || null,
-        client_id: formData.client_id || null,
+        client_id: clientId,
         notes: formData.notes || null,
         order_date: formData.order_date,
         status: formData.status,
@@ -235,6 +250,7 @@ export default function HikariOrders() {
 
       if (!editingOrder) await threadImport.completeConversion(orderId)
       toast.success(editingOrder ? 'Pedido actualizado' : 'Pedido creado')
+      if (clientLinkFailed) toast.error('Pedido guardado, pero no se pudo vincular el cliente.')
       resetForm()
       fetchOrders()
     } catch (err) {
