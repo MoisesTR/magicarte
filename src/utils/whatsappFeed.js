@@ -26,6 +26,58 @@ const plain = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
+/** Canonical phone digits; only Nicaragua's exact 505 + eight-digit form is local. */
+export function normalizePhone(value) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (digits.length < 8) return null
+  return digits.length === 11 && digits.startsWith('505')
+    ? digits.slice(3)
+    : digits
+}
+
+/** Explicit links take precedence; inferred matches require a phone, tenant and date window. */
+export function matchThreadsToOrders(threads, orders) {
+  const matches = new Map()
+  const sameBusiness = (thread, order) =>
+    thread.business_id != null &&
+    thread.business_id !== '' &&
+    order.business_id != null &&
+    String(thread.business_id) === String(order.business_id)
+  for (const thread of threads) {
+    if (String(thread.chat_key || '').startsWith('name:')) continue
+    if (thread.order_id) {
+      const linked = orders.find(
+        (order) =>
+          String(order.id) === String(thread.order_id) &&
+          sameBusiness(thread, order)
+      )
+      if (linked) matches.set(thread.id, linked)
+      continue
+    }
+    const phone = normalizePhone(thread.chat_key)
+    const requestedAt = timestampAt(thread.requested_at || thread.created_at)
+    if (!phone || requestedAt === null) continue
+    let latest = null,
+      latestAt = -Infinity
+    for (const order of orders) {
+      const createdAt = timestampAt(order.created_at)
+      if (
+        sameBusiness(thread, order) &&
+        order.status !== 'canceled' &&
+        normalizePhone(order.customer_phone) === phone &&
+        createdAt !== null &&
+        createdAt >= requestedAt - 2 * DAY &&
+        createdAt > latestAt
+      ) {
+        latest = order
+        latestAt = createdAt
+      }
+    }
+    if (latest) matches.set(thread.id, latest)
+  }
+  return matches
+}
+
 /** Calendar arithmetic is date-only; timestamps are always interpreted in Managua. */
 export function managuaDay(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {

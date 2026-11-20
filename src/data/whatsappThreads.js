@@ -198,3 +198,30 @@ export async function registerWhatsAppPayment(id, amount, businessId) {
     return { data: null, error }
   }
 }
+
+/** Lightweight matching candidates only; a failed page disables matching, not the feed. */
+export async function fetchWhatsAppOrders(businessId, now = new Date()) {
+  if (!required(businessId)) throw new Error('A business id is required')
+  const since = new Date(new Date(now).getTime() - 90 * 86400000).toISOString()
+  const orders = []
+  try {
+    for (let offset = 0; ; offset += 500) {
+      const result = await supabase
+        .from('orders')
+        .select(
+          'id, business_id, order_number, customer_name, customer_phone, status, created_at, estimated_delivery_date'
+        )
+        .eq('business_id', businessId)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(offset, offset + 499)
+      if (result.error) throw result.error
+      orders.push(...(result.data || []))
+      if ((result.data || []).length < 500) return orders
+    }
+  } catch (error) {
+    console.warn('WhatsApp order matching unavailable', error)
+    return []
+  }
+}

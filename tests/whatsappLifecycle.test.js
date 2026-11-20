@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { transform } from 'esbuild'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { loadWhatsAppFeedWithOrders } from '../src/utils/whatsappOrderLinking.js'
 const require = createRequire(import.meta.url)
 const flush = () => new Promise((resolve) => setImmediate(resolve))
 
@@ -64,7 +65,11 @@ async function harness() {
         },
       },
     },
+    '../utils/whatsappOrderLinking': { loadWhatsAppFeedWithOrders },
     '../data/whatsappThreads': {
+      fetchWhatsAppOrders: async () => [],
+      completeThreadConversion: async () =>
+        assert.fail('no candidates should write'),
       fetchWhatsAppFeed: async (id) => {
         reads.push(id)
         return { orders: [{ id }] }

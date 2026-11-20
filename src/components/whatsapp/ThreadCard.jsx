@@ -284,6 +284,8 @@ export default function ThreadCard({
   now,
   expanded,
   onToggle,
+  matchedOrder,
+  autoLinked = false,
   ...detailProps
 }) {
   const id = useId()
@@ -347,6 +349,21 @@ export default function ThreadCard({
           </span>
         )}
       </button>
+      {thread.order_id && matchedOrder && (
+        <div className='flex min-w-0 flex-wrap items-center gap-2 px-3 pb-2 pl-7'>
+          <Link
+            to={`${detailProps.ordersPath}?order=${encodeURIComponent(thread.order_id)}`}
+            className='inline-flex min-h-10 max-w-full items-center rounded-md bg-green-50 px-2 py-1 text-xs font-semibold [overflow-wrap:anywhere] text-green-700 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
+          >
+            Pedido #{matchedOrder.order_number} ✓
+          </Link>
+          {autoLinked && (
+            <span className='text-xs text-gray-500'>
+              Vinculado por teléfono
+            </span>
+          )}
+        </div>
+      )}
       {expanded && (
         <div id={`${id}-detail`} role='region' aria-labelledby={`${id}-toggle`}>
           <ThreadDetail thread={thread} {...detailProps} />

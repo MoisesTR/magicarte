@@ -25,11 +25,16 @@ function mock(results = []) {
       const request = { table, filters: [] }
       requests.push(request)
       const q = {
-        select() {
+        select(value) {
+          request.select = value
           return q
         },
         eq(k, v) {
           request.filters.push([k, v])
+          return q
+        },
+        gte(k, v) {
+          request.gte = [k, v]
           return q
         },
         order() {
@@ -220,4 +225,67 @@ test('quick payment reads fresh amount and uses tenant-scoped compare-and-swap t
     (await (await dataWith(conflict)).registerWhatsAppPayment('t', 10, 2)).error
   )
   assert.equal(conflict.requests.length, 2)
+})
+
+async function matchingDataWith(client) {
+  const source = (await readFile('src/data/whatsappThreads.js', 'utf8'))
+    .replace(/^import .*$/gm, '')
+    .replaceAll('export ', '')
+  return new Function(
+    'supabase',
+    'addThreadPayment',
+    `${source};return {fetchWhatsAppOrders}`
+  )(client, addThreadPayment)
+}
+test('matching orders are business-scoped, projected, limited to 90 days, and paginated beyond API cap', async () => {
+  const first = Array.from({ length: 500 }, (_, id) => ({ id }))
+  const c = mock([{ data: first }, { data: [{ id: 500 }] }]),
+    api = await matchingDataWith(c)
+  const rows = await api.fetchWhatsAppOrders(
+    2,
+    new Date('2026-11-20T12:00:00Z')
+  )
+  assert.equal(rows.length, 501)
+  assert.equal(c.requests[0].table, 'orders')
+  for (const r of c.requests) {
+    assert.deepEqual(r.filters, [['business_id', 2]])
+    assert.deepEqual(r.gte, ['created_at', '2026-08-22T12:00:00.000Z'])
+    for (const field of [
+      'id',
+      'business_id',
+      'order_number',
+      'customer_name',
+      'customer_phone',
+      'status',
+      'created_at',
+      'estimated_delivery_date',
+    ])
+      assert.ok(r.select.split(/,\s*/).includes(field), field)
+  }
+  assert.deepEqual(
+    c.requests.map((r) => r.range),
+    [
+      [0, 499],
+      [500, 999],
+    ]
+  )
+  await assert.rejects(() => api.fetchWhatsAppOrders(null), /business/i)
+})
+test('matching orders soft-fail returned and thrown query errors without partial matches', async () => {
+  const c = mock([{ data: null, error: { message: 'denied' } }]),
+    api = await matchingDataWith(c)
+  assert.deepEqual(await api.fetchWhatsAppOrders(2), [])
+  const thrown = await matchingDataWith({
+    from() {
+      throw new Error('offline')
+    },
+  })
+  assert.deepEqual(await thrown.fetchWhatsAppOrders(2), [])
+  const partial = await matchingDataWith(
+    mock([
+      { data: Array.from({ length: 500 }, (_, id) => ({ id })) },
+      { error: { message: 'page failed' } },
+    ])
+  )
+  assert.deepEqual(await partial.fetchWhatsAppOrders(2), [])
 })

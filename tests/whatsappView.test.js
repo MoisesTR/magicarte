@@ -447,3 +447,86 @@ test('editor exposes delivery date, free-text method and paid amount without new
   ])
     assert.ok(source.includes(text), text)
 })
+
+test('closed linked rows expose a green order deep-link outside the accordion button with session-only note', async () => {
+  const { card, render } = await renderedComponents
+  const thread = {
+    id: 'linked',
+    chat_key: '50588841808',
+    status: 'won',
+    order_id: 'order-id',
+    summary: 'Llaveros',
+    customer_name: 'Ana',
+  }
+  const props = {
+    thread,
+    ordersPath: '/admin/hikari/orders',
+    matchedOrder: { id: 'order-id', order_number: 42 },
+    expanded: false,
+  }
+  const html = render(card, { ...props, autoLinked: true })
+  assert.match(html, /href="\/admin\/hikari\/orders\?order=order-id"/)
+  assert.match(html, /Pedido #42 ✓/)
+  assert.match(html, /bg-green-50[^\"]*text-green-700/)
+  assert.match(html, /Vinculado por teléfono/)
+  assert.ok(html.indexOf('</button>') < html.indexOf('Pedido #42'))
+  assert.doesNotMatch(render(card, props), /Vinculado por teléfono/)
+  assert.doesNotMatch(html, /Sin pedido registrado/)
+  assert.match(
+    render(card, {
+      thread: {
+        ...thread,
+        status: 'sent',
+        order_id: null,
+        delivery_date: '2026-11-20',
+      },
+      expanded: true,
+      now: '2026-11-20T18:00:00Z',
+    }),
+    /Sin pedido registrado/
+  )
+})
+
+test('closed feed forwards matched order and session provenance to the rendered compact row', async () => {
+  const { groups: component, render } = await renderedComponents
+  const { groupThreads } = await import('../src/utils/whatsappFeed.js')
+  const now = '2026-11-20T18:00:00Z'
+  const thread = {
+    id: 'linked',
+    status: 'won',
+    order_id: 'order-id',
+    status_changed_at: now,
+    chat_key: '50588841808',
+    summary: 'Llaveros',
+  }
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: () => 'closed' },
+  })
+  try {
+    const html = render(component, {
+      groups: groupThreads([thread], now),
+      businessId: 2,
+      now,
+      ordersPath: '/admin/hikari/orders',
+      orderMatches: new Map([['linked', { id: 'order-id', order_number: 42 }]]),
+      autoLinkedThreadIds: ['linked'],
+    })
+    assert.match(html, /Pedido #42 ✓/)
+    assert.match(html, /Vinculado por teléfono/)
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original)
+    else delete globalThis.localStorage
+  }
+})
+
+test('authenticated feed wires order matching and per-business session provenance into its load and UI', async () => {
+  const hook = await readFile('src/hooks/useWhatsAppFeed.js', 'utf8')
+  const page = await readFile('src/pages/WhatsAppFeed.jsx', 'utf8')
+  assert.match(hook, /loadWhatsAppFeedWithOrders\(/)
+  assert.match(hook, /fetchWhatsAppOrders/)
+  assert.match(hook, /completeThreadConversion/)
+  assert.match(page, /orderMatches=\{data\.orderMatches\}/)
+  assert.match(page, /autoLinkedThreadIds=\{data\.autoLinkedThreadIds\}/)
+})

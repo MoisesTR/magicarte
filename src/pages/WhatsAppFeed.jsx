@@ -92,6 +92,8 @@ function FeedGroups({
   onEdit,
   onStatus,
   onPayment,
+  orderMatches,
+  autoLinkedThreadIds = [],
 }) {
   const [selectedTab, setSelectedTab] = useState(() =>
     loadFeedTab(businessId, groups)
@@ -194,6 +196,8 @@ function FeedGroups({
               <ThreadCard
                 key={thread.id}
                 thread={thread}
+                matchedOrder={orderMatches?.get(thread.id)}
+                autoLinked={autoLinkedThreadIds.includes(thread.id)}
                 now={now}
                 expanded={openThread === thread.id}
                 onToggle={() =>
@@ -336,6 +340,8 @@ export default function WhatsAppFeed() {
             key={currentBusinessId}
             businessId={currentBusinessId}
             threads={data.threads || []}
+            orderMatches={data.orderMatches}
+            autoLinkedThreadIds={data.autoLinkedThreadIds}
             now={query.now}
             ordersPath={`/admin/${currentBusiness.slug}/orders`}
             busy={busy}

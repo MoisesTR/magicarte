@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../config/supabaseClient'
-import { fetchWhatsAppFeed } from '../data/whatsappThreads'
+import {
+  fetchWhatsAppFeed,
+  fetchWhatsAppOrders,
+  completeThreadConversion,
+} from '../data/whatsappThreads'
+import { loadWhatsAppFeedWithOrders } from '../utils/whatsappOrderLinking'
 
 export default function useWhatsAppFeed(businessId) {
   const [auth, setAuth] = useState({ user: null, checking: true })
   const [now, setNow] = useState(() => new Date())
+  const [autoLinkSessions] = useState(() => new Map())
 
   useEffect(() => {
     let active = true
@@ -32,7 +38,20 @@ export default function useWhatsAppFeed(businessId) {
   const enabled = Boolean(auth.user && businessId)
   const query = useQuery({
     queryKey: ['whatsapp-feed', businessId, auth.user?.id],
-    queryFn: () => fetchWhatsAppFeed(businessId),
+    queryFn: () => {
+      const sessionKey = JSON.stringify([businessId, auth.user?.id])
+      if (!autoLinkSessions.has(sessionKey))
+        autoLinkSessions.set(sessionKey, new Set())
+      return loadWhatsAppFeedWithOrders(
+        businessId,
+        {
+          fetchFeed: fetchWhatsAppFeed,
+          fetchOrders: fetchWhatsAppOrders,
+          completeConversion: completeThreadConversion,
+        },
+        autoLinkSessions.get(sessionKey)
+      )
+    },
     enabled,
     retry: false,
     staleTime: 0,
