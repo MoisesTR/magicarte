@@ -1,3 +1,8 @@
+import ThreadOrderDeliveryFields from './ThreadOrderDeliveryFields'
+import { threadOrderDeliveryFields } from '../utils/orderDraftFromThread'
+import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
+import ThreadOrderDraftNotice from './ThreadOrderDraftNotice'
+import { supabase } from '../config/supabaseClient'
 import OrderItemOptions from './OrderItemOptions'
 import { catalogOrderItem, configuredOrderTotal, orderItemInsertSnapshot, orderItemOptions, orderItemDetailLines } from '../utils/productPresentations'
 import { useEffect, useState } from 'react'
@@ -28,6 +33,7 @@ export default function QuickEngravingForm({
   partnerSplitPct = 50,
   editingOrder = null,
   initialThreadForm = null,
+  initialThread = null,
   threadConversion = null,
   onClose,
   onSaved,
@@ -45,10 +51,10 @@ export default function QuickEngravingForm({
   const isLegacyJob = Boolean(editingOrder) && !existingItem?.product_description
   const legacyNote = isLegacyJob ? editingOrder?.customer_name || '' : ''
 
-  const [date, setDate] = useState(editingOrder?.order_date || initialThreadForm?.order_date || today())
-  const [clientName, setClientName] = useState(isLegacyJob ? '' : editingOrder?.customer_name || initialThreadForm?.customer_name || '')
-  const [description, setDescription] = useState(existingItem?.product_description || initialThreadForm?.items?.[0]?.product_description || legacyNote)
-  const [total, setTotal] = useState(editingOrder ? String(editingOrder.total_amount ?? '') : String(initialThreadForm?.items?.[0]?.unit_price ?? ''))
+  const [baseDate, setBaseDate] = useState(editingOrder?.order_date || initialThreadForm?.order_date || today())
+  const [baseClientName, setBaseClientName] = useState(isLegacyJob ? '' : editingOrder?.customer_name || initialThreadForm?.customer_name || '')
+  const [baseDescription, setBaseDescription] = useState(existingItem?.product_description || initialThreadForm?.items?.[0]?.product_description || legacyNote)
+  const [baseTotal, setBaseTotal] = useState(editingOrder ? String(editingOrder.total_amount ?? '') : String(initialThreadForm?.items?.[0]?.unit_price ?? ''))
   const [material, setMaterial] = useState(existingItem?.material || ENGRAVING_MATERIALS[0])
   const [minutes, setMinutes] = useState(existingItem?.engraving_minutes ?? '')
   const [materialCost, setMaterialCost] = useState(editingOrder ? String(editingOrder.material_cost ?? 0) : '')
@@ -64,14 +70,39 @@ export default function QuickEngravingForm({
   const [method, setMethod] = useState(existingPayment?.method || 'efectivo')
   const [saving, setSaving] = useState(false)
   const [products, setProducts] = useState([])
-  const [catalogItem, setCatalogItem] = useState(() => ({ product_id:existingItem?.product_id || null, product_name:existingItem?.product_name || '', quantity:existingItem?.quantity || 1, unit_price:existingItem?.unit_price || 0, rush_fee:existingItem?.rush_fee || 0, ...orderItemOptions(existingItem || {}) }))
-  const [additionalItems, setAdditionalItems] = useState(() => (editingOrder?.order_items || []).slice(1).map(row => ({ ...row, ...orderItemOptions(row) })))
+  const [baseCatalogItem, setBaseCatalogItem] = useState(() => ({ product_id:existingItem?.product_id || null, product_name:existingItem?.product_name || '', quantity:existingItem?.quantity || 1, unit_price:existingItem?.unit_price || 0, rush_fee:existingItem?.rush_fee || 0, ...orderItemOptions(existingItem || {}) }))
+  const [baseAdditionalItems, setBaseAdditionalItems] = useState(() => (editingOrder?.order_items || []).slice(1).map(row => ({ ...row, ...orderItemOptions(row) })))
+  const [catalogBusinessId, setCatalogBusinessId] = useState(null)
+  const orderDraft = useThreadOrderDraft(() => initialThreadForm || { items: [], notes: '' }, { businessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession() })
+  useEffect(() => {
+    if (initialThreadForm && initialThread) orderDraft.begin(initialThreadForm, initialThread)
+    // The mount/import identity, not the changing draft object, owns this request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, initialThreadForm, initialThread])
   useEffect(() => {
     let current = true
-    fetchOrderProducts(businessId).then(({ data, error }) => { if (!current) return; if (error) toast.error('Error al cargar productos: ' + error.message); else setProducts(data || []) })
+    fetchOrderProducts(businessId).then(({ data, error }) => {
+      if (!current) return
+      if (error) toast.error('Error al cargar productos: ' + error.message)
+      setProducts(error ? [] : data || [])
+      setCatalogBusinessId(businessId)
+    })
     return () => { current = false }
   }, [businessId])
-  const configuredItem = !!(catalogItem.product_id || catalogItem.presentation_label || catalogItem.designs?.length)
+  const imported = initialThreadForm ? orderDraft.formData : null
+  const date = imported ? imported.order_date : baseDate
+  const clientName = imported ? imported.customer_name : baseClientName
+  const description = imported ? imported.items[0]?.product_description || '' : baseDescription
+  const total = imported ? String(imported.items.reduce((sum, row) => sum + num(row.quantity) * num(row.unit_price), 0)) : baseTotal
+  const catalogItem = imported ? imported.items[0] : baseCatalogItem
+  const additionalItems = imported ? imported.items.slice(1).map(row => ({ ...row, subtotal: configuredOrderTotal(row) })) : baseAdditionalItems
+  const setDate = value => imported ? orderDraft.setFormData(previous => ({ ...previous, order_date: value })) : setBaseDate(value)
+  const setClientName = value => imported ? orderDraft.setFormData(previous => ({ ...previous, customer_name: value })) : setBaseClientName(value)
+  const setDescription = value => imported ? orderDraft.setFormData(previous => ({ ...previous, items: previous.items.map((row, i) => i === 0 ? { ...row, product_description: value } : row) })) : setBaseDescription(value)
+  const setTotal = value => setBaseTotal(value)
+  const setCatalogItem = update => imported ? orderDraft.setFormData(previous => ({ ...previous, items: previous.items.map((row, i) => i === 0 ? (typeof update === 'function' ? update(row) : update) : row) })) : setBaseCatalogItem(update)
+  const setAdditionalItems = update => imported ? orderDraft.setFormData(previous => ({ ...previous, items: [previous.items[0], ...(typeof update === 'function' ? update(previous.items.slice(1)) : update)] })) : setBaseAdditionalItems(update)
+  const configuredItem = !!(initialThreadForm || catalogItem.product_id || catalogItem.presentation_label || catalogItem.designs?.length)
   const additionalTotal = additionalItems.reduce((sum, row) => sum + num(row.subtotal), 0)
 
   const partnerShort = partnerName.split(' ')[0] || 'Papá'
@@ -113,6 +144,7 @@ export default function QuickEngravingForm({
     const note = description.trim()
     const displayName = clientName.trim() || note || material || 'Grabado'
 
+    orderDraft.clear()
     setSaving(true)
     try {
       let orderId
@@ -150,7 +182,7 @@ export default function QuickEngravingForm({
             partner_share_amount: allocationMode === 'amount' ? exactPartnerTake : null,
             your_share_amount: allocationMode === 'amount' ? exactMyTake : null,
             completed_at: initialThreadForm ? null : new Date().toISOString(),
-            ...(initialThreadForm ? { customer_phone:initialThreadForm.customer_phone || null, client_id:initialThreadForm.client_id || null, notes:initialThreadForm.notes || null } : {}),
+            ...(initialThreadForm ? { customer_phone:initialThreadForm.customer_phone || null, client_id:initialThreadForm.client_id || null, notes:imported.notes || null, ...threadOrderDeliveryFields(imported) } : {}),
           },
           businessId,
         )
@@ -173,7 +205,12 @@ export default function QuickEngravingForm({
           material,
           engraving_minutes: minutes === '' ? null : parseInt(minutes, 10),
         },
-        ...additionalItems.map(item => orderItemInsertSnapshot(item, orderId)),
+        ...additionalItems.map(item => initialThreadForm ? {
+          order_id: orderId, product_id: item.product_id || null, product_name: item.product_name,
+          product_description: item.product_description || null, quantity: num(item.quantity) || 1,
+          unit_price: num(item.unit_price), subtotal: configuredOrderTotal(item), rush_fee: num(item.rush_fee),
+          ...orderItemOptions(item),
+        } : orderItemInsertSnapshot(item, orderId)),
       ], businessId)
       if (itemErr) throw itemErr
 
@@ -217,6 +254,11 @@ export default function QuickEngravingForm({
         </div>
 
         <div className='admin-modal-body space-y-4 p-5'>
+          <ThreadOrderDraftNotice draft={orderDraft} />
+          {imported && <ThreadOrderDeliveryFields form={imported} onChange={changes => orderDraft.setFormData(previous => ({ ...previous, ...changes }))} />}
+          {imported && <label className='block text-xs text-gray-600'>Notas del pedido
+            <textarea value={imported.notes || ''} onChange={event => orderDraft.setFormData(previous => ({ ...previous, notes: event.target.value }))} rows={3} className='mt-1 w-full min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm' />
+          </label>}
           <p className='rounded-lg bg-gray-50 px-3 py-2 text-xs font-medium text-gray-500'>Se guardará únicamente en {businessName}.</p>
           <div>
             <label className='mb-1.5 block text-xs font-medium text-gray-600'>Cliente <span className='font-normal text-gray-400'>(opcional)</span></label>
@@ -256,6 +298,7 @@ export default function QuickEngravingForm({
           </section>}
           {additionalItems.map((item, index) => <section key={item.id || index} className='min-w-0 space-y-2 rounded-xl border border-gray-200 p-3'>
             <p className='text-sm font-semibold text-gray-700'>{item.product_name} ×{item.quantity}</p>
+            {initialThreadForm && <label className='block text-xs text-gray-600'>Personalización / grabado<textarea value={item.product_description || ''} onChange={event => setAdditionalItems(previous => previous.map((row, i) => i === index ? { ...row, product_description: event.target.value } : row))} rows={2} className='mt-1 w-full min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm' /></label>}
             {orderItemDetailLines(item).map((line, lineIndex) => <p key={lineIndex} className='break-words text-xs text-gray-500'>{line}</p>)}
             <OrderItemOptions item={item} product={products.find(product => product.id === item.product_id)} onChange={changes => setAdditionalItems(previous => previous.map((row, i) => i === index ? { ...row, ...changes, subtotal:configuredOrderTotal({ ...row, ...changes }) } : row))} />
           </section>)}

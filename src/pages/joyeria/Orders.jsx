@@ -71,7 +71,8 @@ export default function JoyeriaOrders() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey())
   const [threadForm, setThreadForm] = useState(null)
-  const threadImport = useThreadOrderImport(prefilled => { setEditingOrder(null); setThreadForm(prefilled); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
+  const [threadSource, setThreadSource] = useState(null)
+  const threadImport = useThreadOrderImport((prefilled, thread) => { setEditingOrder(null); setThreadForm(prefilled); setThreadSource(thread); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
@@ -300,6 +301,7 @@ export default function JoyeriaOrders() {
           partnerSplitPct={partnerConfig?.partner_split_pct ?? 50}
           editingOrder={editingOrder}
           initialThreadForm={threadForm}
+          initialThread={threadSource}
           threadConversion={threadImport}
           onClose={() => {
             threadImport.clearImport()

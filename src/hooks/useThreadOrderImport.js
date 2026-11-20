@@ -44,7 +44,7 @@ export default function useThreadOrderImport(onImport, businessId, enabled) {
             'La conversación no está disponible para convertir en este negocio.'
           )
         source.current = data
-        callback.current(threadOrderPrefill(data))
+        callback.current(threadOrderPrefill(data), data)
       } catch (error) {
         if (!active || request !== generation.current) return
         toast.error(error.message || 'No se pudo abrir la conversación.')

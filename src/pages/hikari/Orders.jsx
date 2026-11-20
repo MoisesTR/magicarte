@@ -1,3 +1,7 @@
+import ThreadOrderDeliveryFields from '../../components/ThreadOrderDeliveryFields'
+import { threadOrderDeliveryFields } from '../../utils/orderDraftFromThread'
+import useThreadOrderDraft from '../../hooks/useThreadOrderDraft'
+import ThreadOrderDraftNotice from '../../components/ThreadOrderDraftNotice'
 import useThreadOrderImport from '../../hooks/useThreadOrderImport'
 import ThreadConversionNotice from '../../components/ThreadConversionNotice'
 import useOrderDeepLink from '../../hooks/useOrderDeepLink'
@@ -60,16 +64,18 @@ export default function HikariOrders() {
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
+  const [catalogBusinessId, setCatalogBusinessId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
-  const [formData, setFormData] = useState(initialForm)
+  const orderDraft = useThreadOrderDraft(initialForm, { businessId: currentBusinessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession() })
+  const { formData, setFormData } = orderDraft
   const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [payingOrderId, setPayingOrderId] = useState(null)
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('efectivo')
-  const threadImport = useThreadOrderImport(prefilled => { setEditingOrder(null); setFormData(prefilled); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
+  const threadImport = useThreadOrderImport((prefilled, thread) => { setEditingOrder(null); orderDraft.begin(prefilled, thread); setShowForm(true) }, currentBusinessId, Boolean(user && currentBusinessId))
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
@@ -80,10 +86,17 @@ export default function HikariOrders() {
 
   // Fetch only once we know the user AND the real business id; refetch on switch.
   useEffect(() => {
+    let active = true
     if (user && currentBusinessId) {
       fetchOrders()
-      fetchOrderProducts(currentBusinessId).then(({ data, error }) => { if (error) toast.error('Error al cargar productos: ' + error.message); else setProducts(data || []) })
+      fetchOrderProducts(currentBusinessId).then(({ data, error }) => {
+        if (!active) return
+        if (error) toast.error('Error al cargar productos: ' + error.message)
+        setProducts(error ? [] : data || [])
+        setCatalogBusinessId(currentBusinessId)
+      })
     }
+    return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusinessId, user])
 
@@ -97,6 +110,7 @@ export default function HikariOrders() {
 
   const resetForm = () => {
     threadImport.clearImport()
+    orderDraft.clear()
     setShowForm(false)
     setEditingOrder(null)
     setFormData(initialForm)
@@ -104,6 +118,7 @@ export default function HikariOrders() {
 
   const openCreate = () => {
     threadImport.clearImport()
+    orderDraft.clear()
     setEditingOrder(null)
     setFormData(initialForm)
     setShowForm(true)
@@ -111,6 +126,7 @@ export default function HikariOrders() {
 
   const openEdit = (order) => {
     threadImport.clearImport()
+    orderDraft.clear()
     setEditingOrder(order)
     setFormData({
       customer_name: order.customer_name || '',
@@ -124,6 +140,7 @@ export default function HikariOrders() {
             product_id: i.product_id || null,
             ...orderItemOptions(i),
             product_name: i.product_name || '',
+            product_description: i.product_description || '',
             material: i.material || '',
             color: i.color || '',
             hours_needed: i.hours_needed ?? '',
@@ -167,6 +184,8 @@ export default function HikariOrders() {
       return
     }
 
+    const importedDelivery = orderDraft.isImported ? threadOrderDeliveryFields(formData) : {}
+    orderDraft.cancelPending()
     setSaving(true)
     try {
       const orderData = {
@@ -188,7 +207,7 @@ export default function HikariOrders() {
         if (delErr) throw delErr
       } else {
         const { data, error } = await createOrder(
-          { ...orderData, payment_status: 'unpaid', priority: 'normal', is_gift: false, delivery_method: 'pickup', delivery_fee: 0 },
+          { ...orderData, payment_status: 'unpaid', priority: 'normal', is_gift: false, delivery_method: 'pickup', delivery_fee: 0, ...importedDelivery },
           currentBusinessId,
         )
         if (error) throw error
@@ -201,6 +220,7 @@ export default function HikariOrders() {
           product_id: it.product_id || null,
           ...orderItemOptions(it),
           product_name: it.product_name.trim(),
+          product_description: it.product_description || null,
           material: it.material || null,
           color: it.color || null,
           hours_needed: it.hours_needed === '' ? null : num(it.hours_needed),
@@ -426,6 +446,8 @@ export default function HikariOrders() {
             </div>
 
             <div className='admin-modal-body space-y-4 p-5'>
+              <ThreadOrderDraftNotice draft={orderDraft} />
+              {orderDraft.isImported && <ThreadOrderDeliveryFields form={formData} onChange={changes => setFormData(previous => ({ ...previous, ...changes }))} />}
                 <div className='space-y-3'>
                   <label className='block text-xs font-medium text-gray-500'>Teléfono<input type='tel' value={formData.customer_phone || ''} onChange={e => setFormData(p => ({ ...p, customer_phone:e.target.value }))} className='mt-1 min-h-10 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm' /></label>
                   <label className='block text-xs font-medium text-gray-500'>Notas<textarea value={formData.notes || ''} onChange={e => setFormData(p => ({ ...p, notes:e.target.value }))} className='mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm' rows={3} /></label>
@@ -550,6 +572,9 @@ export default function HikariOrders() {
                           className='col-span-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs'
                         />
                       </div>
+                      <label className='block text-xs text-gray-600'>Personalización / grabado
+                        <textarea value={it.product_description || ''} onChange={event => updateItem(idx, 'product_description', event.target.value)} rows={2} className='mt-1 w-full min-w-0 rounded-lg border border-gray-200 px-3 py-2 text-sm' />
+                      </label>
                       <OrderItemOptions item={it} product={products.find(product => product.id === it.product_id)} onChange={changes => setFormData(previous => ({ ...previous, items:previous.items.map((row, i) => i === idx ? { ...row, ...changes } : row) }))} />
                     </div>
                   ))}

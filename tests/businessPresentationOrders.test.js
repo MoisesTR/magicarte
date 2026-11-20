@@ -56,6 +56,11 @@ async function engravingFormWithClient(calls, overrides = {}) {
     },
     '../utils/constants': { ENGRAVING_MATERIALS: ['Acero inoxidable'] },
     '../utils/productPresentations': helpers,
+    '../hooks/useThreadOrderDraft': { __esModule: true, default: initial => ({ formData: typeof initial === 'function' ? initial() : initial, setFormData() {}, begin() {}, clear() {}, cancelPending() {}, status: 'idle' }) },
+    '../utils/orderDraftFromThread': require('../src/utils/orderDraftFromThread.js'),
+    './ThreadOrderDeliveryFields': { __esModule: true, default: () => null },
+    './ThreadOrderDraftNotice': { __esModule: true, default: () => null },
+    '../config/supabaseClient': {},
     './OrderItemOptions': { __esModule: true, default: () => null },
   }
   new Function('require', 'module', 'exports', code)(
@@ -184,6 +189,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
     id: 'item',
     product_id: 'p',
     product_name: 'Esferas',
+    product_description: 'Alma Medina',
     quantity: 2,
     unit_price: 690,
     subtotal: 1380,
@@ -213,7 +219,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
       designs: [],
     },
   ]
-  const states = [{ id: 'user' }, false, [order], products, false, false, null]
+  const states = [{ id: 'user' }, false, [order], products, null, false, false, null]
   let cursor = 0
   const react = {
     useEffect() {},
@@ -249,6 +255,10 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   })
   const module = { exports: {} }
   const imports = {
+    '../../hooks/useThreadOrderDraft': { __esModule: true, default(initial) { const [formData, setFormData] = react.useState(initial); return { formData, setFormData, begin() {}, clear() {}, cancelPending() {}, status: 'idle' } } },
+    '../../utils/orderDraftFromThread': require('../src/utils/orderDraftFromThread.js'),
+    '../../components/ThreadOrderDeliveryFields': { __esModule: true, default: () => null },
+    '../../components/ThreadOrderDraftNotice': { __esModule: true, default: () => null },
     '../../hooks/useOrderDeepLink': { __esModule: true, default() {} },
     '../../hooks/useThreadOrderImport': { __esModule: true, default: () => ({ clearImport() {}, completeConversion: async () => true }) },
     '../../components/ThreadConversionNotice': { __esModule: true, default: () => null },
@@ -311,6 +321,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
   )
   const [, rows, business] = calls.find(([name]) => name === 'insertOrderItems')
   assert.equal(business, 2)
+  assert.equal(rows[0].product_description, 'Alma Medina')
   assert.equal(rows[0].product_id, 'p')
   assert.equal(rows[0].presentation_id, presentationId)
   assert.equal(rows[0].presentation_label, 'Paquete antiguo')
@@ -404,4 +415,42 @@ test('legacy quick-job creation still records a completed paid job and its recei
   assert.equal(order.payment_status, 'paid')
   assert.ok(order.completed_at)
   assert.equal(calls.find(([name]) => name === 'addPayment')[1].amount, 450)
+})
+
+test('Joyería imported drafts preserve quantity/unit price, additional personalization and deposit notes without recording payment', async () => {
+  const calls = []
+  const Form = await engravingFormWithClient(calls)
+  await submit(Form, {
+    businessId: 3,
+    initialThreadForm: {
+      customer_name: 'Alma', customer_phone: '84216792', order_date: '2026-11-20', notes: 'Anticipo recibido por WhatsApp: C$2700 (verificar comprobante)',
+      items: [
+        { product_id: null, product_name: 'Vitral', product_description: 'Alma Medina', quantity: 17, unit_price: 300 },
+        { product_id: 'vitral', product_name: 'Vitral', product_description: 'Angelo Moreno', quantity: 1, unit_price: 300, _key: 'local-only' },
+      ],
+    },
+  })
+  const [, rows] = calls.find(([name]) => name === 'insertOrderItems')
+  assert.equal(rows[0].quantity, 17)
+  assert.equal(rows[0].unit_price, 300)
+  assert.equal(rows[1].product_description, 'Angelo Moreno')
+  assert.equal(rows[1]._key, undefined)
+  assert.equal(calls.find(([name]) => name === 'createOrder')[1].total_amount, 5400)
+  assert.match(calls.find(([name]) => name === 'createOrder')[1].notes, /Anticipo recibido/)
+  assert.equal(calls.some(([name]) => name === 'addPayment'), false)
+})
+
+test('Joyería imported shipping facts remain in the create payload', async () => {
+  const calls = [], Form = await engravingFormWithClient(calls)
+  await submit(Form, { businessId: 3, initialThreadForm: {
+    customer_name: 'Cliente', customer_phone: '84216792', order_date: '2026-11-20', notes: '',
+    delivery_method: 'delivery', delivery_address: 'Cargotrans a Estelí', recipient_name: 'Alma Medina', estimated_delivery_date: '2026-11-25', delivery_fee: 100,
+    items: [{ product_id: null, product_name: 'Vitral', product_description: 'Alma Medina', quantity: 18, unit_price: 300 }],
+  } })
+  const saved = calls.find(([name]) => name === 'createOrder')[1]
+  assert.equal(saved.delivery_method, 'delivery')
+  assert.equal(saved.delivery_address, 'Cargotrans a Estelí')
+  assert.equal(saved.recipient_name, 'Alma Medina')
+  assert.equal(saved.estimated_delivery_date, '2026-11-25')
+  assert.equal(saved.delivery_fee, 100)
 })

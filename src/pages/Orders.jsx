@@ -1,3 +1,5 @@
+import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
+import ThreadOrderDraftNotice from '../components/ThreadOrderDraftNotice'
 import useThreadOrderImport from '../hooks/useThreadOrderImport'
 import ThreadConversionNotice from '../components/ThreadConversionNotice'
 import useOrderDeepLink from '../hooks/useOrderDeepLink'
@@ -52,6 +54,8 @@ export default function Orders() {
   const [showForm, setShowForm] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [products, setProducts] = useState([])
+  const [catalogBusinessId, setCatalogBusinessId] = useState(null)
+  const productRequest = useRef(0)
   const [filterStatus, setFilterStatus] = useState('active')
   const [filterPriority, setFilterPriority] = useState('all')
   const [sortBy, setSortBy] = useState('created_at')
@@ -83,13 +87,16 @@ export default function Orders() {
   // Temporary UI toggles. Flip to true to bring these back.
   const SHOW_SOCIAL_MEDIA = false
   const SHOW_WHATSAPP_REMINDER = false
-  const [formData, setFormData] = useState(() => newOrderForm(new Date().toISOString().split('T')[0]))
-  const threadImport = useThreadOrderImport(prefilled => {
+  const orderDraft = useThreadOrderDraft(() => newOrderForm(new Date().toISOString().split('T')[0]), {
+    businessId: currentBusinessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession(),
+  })
+  const { formData, setFormData } = orderDraft
+  const threadImport = useThreadOrderImport((prefilled, thread) => {
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
     prefilled.items[0]._key = crypto.randomUUID()
-    setFormData(prefilled)
+    orderDraft.begin(prefilled, thread)
     setEditingOrder(null)
     setEditPayments([])
     setClientMatches([])
@@ -150,6 +157,8 @@ export default function Orders() {
           orderDate: new Date().toISOString().split('T')[0],
         })
         prefilled.items[0]._key = crypto.randomUUID()
+        orderDraft.clear()
+        threadImport.clearImport()
         setFormData(prefilled)
         setEditingOrder(null)
         setEditPayments([])
@@ -167,6 +176,8 @@ export default function Orders() {
     }
     loadQuote()
     return () => { ignore = true }
+    // Form actions are intentionally read from the render that owns this quote request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentBusinessId, quoteId, quoteDeliveryDate])
 
   // Engraving is a log of completed jobs → show all by default; otherwise active.
@@ -240,8 +251,12 @@ export default function Orders() {
   }
 
   const fetchProducts = async () => {
-    const { data } = await fetchOrderProducts(currentBusinessId)
+    const request = ++productRequest.current
+    const businessId = currentBusinessId
+    const { data } = await fetchOrderProducts(businessId)
+    if (request !== productRequest.current) return
     setProducts(data || [])
+    setCatalogBusinessId(businessId)
   }
 
   const addItem = () => {
@@ -459,6 +474,7 @@ export default function Orders() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    orderDraft.clear()
     setLoading(true)
 
     try {
@@ -549,6 +565,7 @@ export default function Orders() {
 
   const resetForm = () => {
     threadImport.clearImport()
+    orderDraft.clear()
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
@@ -562,6 +579,7 @@ export default function Orders() {
 
   const editOrder = (order) => {
     threadImport.clearImport()
+    orderDraft.clear()
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
@@ -1228,7 +1246,7 @@ export default function Orders() {
               {/* Row 1: Action + Search */}
               <div className='flex flex-wrap items-center gap-3'>
                 <button
-                  onClick={() => { threadImport.clearImport(); quoteRequest.current += 1; setShowForm(true) }}
+                  onClick={() => { threadImport.clearImport(); orderDraft.clear(); quoteRequest.current += 1; setShowForm(true) }}
                   className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all shadow-lg'
                 >
                   + Nuevo Pedido
@@ -1834,6 +1852,7 @@ export default function Orders() {
 
               <form onSubmit={handleSubmit} className='flex flex-col flex-1 overflow-hidden'>
                 <div className='admin-modal-body p-5 space-y-5'>
+                  <ThreadOrderDraftNotice draft={orderDraft} />
 
                   {sourceQuote && !editingOrder && (
                     <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
@@ -2533,18 +2552,18 @@ export default function Orders() {
                                     placeholder='Ej: Piñata personalizada'
                                   />
                                 </div>
-                                <div>
-                                  <label className='block text-xs font-medium text-gray-600 mb-1.5'>Descripción</label>
-                                  <input
-                                    type='text'
-                                    value={item.product_description}
-                                    onChange={(e) => updateItem(index, 'product_description', e.target.value)}
-                                    className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                                    placeholder='Detalles del producto'
-                                  />
-                                </div>
                               </>
                             )}
+
+                            <label className='col-span-full block text-xs font-medium text-gray-600'>Personalización / grabado
+                              <textarea
+                                value={item.product_description || ''}
+                                onChange={event => updateItem(index, 'product_description', event.target.value)}
+                                rows={2}
+                                className='mt-1.5 w-full min-w-0 rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:ring-2 focus:ring-[#51c879]'
+                                placeholder='Textos para grabar, nombres o detalles del diseño'
+                              />
+                            </label>
 
                             <div>
                               <label className='block text-xs font-medium text-gray-600 mb-1.5'>{item.presentation_label ? 'Paquetes' : 'Cantidad'}</label>

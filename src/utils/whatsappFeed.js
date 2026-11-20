@@ -699,26 +699,64 @@ export function parseWhatsAppChat(input, ourSenders = ['Ivonne Silva']) {
   }
 }
 
+/** Short line label: first clause (commas inside numbers kept), without leading quantity or price text. */
+export function threadItemLabel(summary) {
+  const clause = (summary || '').split(/[;\n]|,(?!\d)|\.(?:\s|$)/)[0]
+  const label = clause
+    .replace(/\s+(?:a|por|=)\s+C\$.*$/i, '')
+    .replace(/^\s*\d+\s+/, '')
+    .trim()
+    .slice(0, 60)
+    .trim()
+  return label ? label[0].toUpperCase() + label.slice(1) : 'Pedido de WhatsApp'
+}
+
+const parseMoney = (value) => Number(String(value).replaceAll(',', ''))
+
+/** Quantity × unit price from "N … a C$X c/u", or an evenly divisible "N … por C$TOTAL". */
+function threadItemPricing(summary, perPiece, quotedAmount) {
+  if (perPiece)
+    return { quantity: Number(perPiece[1]) || 1, unit_price: parseMoney(perPiece[2]) }
+  const total = summary.match(/^\s*(\d+)\s+[^;\n]*?\s+(?:por|=)\s+C\$\s*([\d,]+(?:\.\d+)?)/i)
+  if (total) {
+    const quantity = Number(total[1])
+    const unit = parseMoney(total[2]) / quantity
+    if (quantity > 1 && Number.isInteger(unit)) return { quantity, unit_price: unit }
+  }
+  return {
+    quantity: 1,
+    unit_price: quotedAmount == null ? '' : Number(quotedAmount),
+  }
+}
+
 /** Adapter shared by all three business order forms; never invent a payment. */
 export function threadOrderPrefill(thread, orderDate = managuaDay()) {
-  const phone = (thread.customer_phone || '').replace(/\D/g, '')
+  const phone = chatPhone({ ...thread, customer_phone: (thread.customer_phone || '').trim() })
+  const summary = (thread.summary || '').trim()
+  const perPiece = summary.match(/(?:^|\s)(\d+)\s+[^;\n]*?\s+a\s+C\$\s*([\d,]+(?:\.\d+)?)\s*c\s*\/\s*u\b/i)
+  const pricing = threadItemPricing(summary, perPiece, thread.quoted_amount)
+  const method = (thread.delivery_method || '').trim()
+  const delivery = /delivery|motorizado|cargotrans|env[ií]o|encomienda/i.test(method)
+  const pickup = /retiro|recoge/i.test(method)
+  const notes = [thread.summary, thread.notes].filter(Boolean)
+  const paid = Number(thread.paid_amount)
+  if (Number.isFinite(paid) && paid > 0) notes.push(`Anticipo recibido por WhatsApp: C$${paid} (verificar comprobante)`)
   return {
     ...newOrderForm(orderDate),
-    customer_name: thread.customer_name || thread.customer_phone || '',
-    customer_phone:
-      phone.startsWith('505') && phone.length === 11 ? phone.slice(3) : phone,
+    customer_name: (thread.customer_name || '').trim(),
+    customer_phone: phone.startsWith('505') && phone.length === 11 ? phone.slice(3) : phone,
     client_id: thread.client_id || null,
-    notes: [thread.summary, thread.notes].filter(Boolean).join('\n\n'),
+    notes: notes.join('\n\n'),
     estimated_delivery_date: thread.delivery_date || '',
-    delivery_method: 'pickup',
+    delivery_method: pickup || !delivery ? 'pickup' : 'delivery',
+    delivery_address: !pickup && delivery ? [method, thread.delivery_address].filter(Boolean).join(' — ') : '',
     items: [
       {
         product_id: null,
-        product_name: thread.summary || 'Pedido de WhatsApp',
-        product_description: thread.summary || '',
-        quantity: 1,
-        unit_price:
-          thread.quoted_amount == null ? '' : Number(thread.quoted_amount),
+        product_name: threadItemLabel(summary),
+        product_description: summary,
+        quantity: pricing.quantity,
+        unit_price: pricing.unit_price,
         hours_needed: '',
         rush_fee: 0,
         is_custom: true,
