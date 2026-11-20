@@ -8,6 +8,7 @@ import {
   chatPhone,
   rowChip,
   isConfirmedThread,
+  isNotCustomer,
   deliveryDateLabel,
 } from '../../utils/whatsappFeed'
 
@@ -21,13 +22,18 @@ function ThreadDetail({
   ordersPath,
   onEdit,
   onStatus,
+  onNotCustomer,
   onPayment,
   busy,
 }) {
   const [lost, setLost] = useState(false),
     [reason, setReason] = useState(''),
+    [notCustomer, setNotCustomer] = useState(false),
+    [nonCustomerReason, setNonCustomerReason] = useState(''),
+    [marking, setMarking] = useState(false),
     [payment, setPayment] = useState(''),
     [paying, setPaying] = useState(false)
+  const confirmationId = useId()
   const phone = chatPhone(thread)
   const open = OPEN_STATUSES.includes(thread.status)
   const copy = async () => {
@@ -192,7 +198,10 @@ function ThreadDetail({
             <button
               disabled={busy}
               className={button}
-              onClick={() => setLost(!lost)}
+              onClick={() => {
+                setNotCustomer(false)
+                setLost(!lost)
+              }}
             >
               Marcar perdida
             </button>
@@ -202,6 +211,18 @@ function ThreadDetail({
               onClick={() => onStatus(thread, 'done')}
             >
               Cerrar
+            </button>
+            <button
+              disabled={busy || marking}
+              className={button}
+              aria-expanded={notCustomer}
+              aria-controls={confirmationId}
+              onClick={() => {
+                setLost(false)
+                setNotCustomer(!notCustomer)
+              }}
+            >
+              No es cliente
             </button>
             {!thread.order_id && (
               <Link
@@ -214,6 +235,53 @@ function ThreadDetail({
           </>
         )}
       </div>
+      {open && notCustomer && (
+        <form
+          id={confirmationId}
+          className='mt-3 space-y-2 rounded-lg bg-gray-50 p-3'
+          onSubmit={async (event) => {
+            event.preventDefault()
+            if (busy || marking || !onNotCustomer) return
+            setMarking(true)
+            try {
+              if (await onNotCustomer(thread, nonCustomerReason)) {
+                setNotCustomer(false)
+                setNonCustomerReason('')
+              }
+            } finally {
+              setMarking(false)
+            }
+          }}
+        >
+          <p className='text-sm font-semibold text-gray-700'>
+            ¿Marcar como no cliente y cerrar la conversación?
+          </p>
+          <label className='block text-sm text-gray-700'>
+            Motivo (opcional)
+            <input
+              value={nonCustomerReason}
+              onChange={(event) => setNonCustomerReason(event.target.value)}
+              maxLength={80}
+              placeholder='Ej.: delivery, proveedor'
+              className='mt-1 min-h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-gray-800'
+            />
+          </label>
+          <button type='submit' disabled={busy || marking} className={button}>
+            Confirmar
+          </button>
+          <button
+            type='button'
+            disabled={busy || marking}
+            className={`${button} ml-2`}
+            onClick={() => {
+              setNotCustomer(false)
+              setNonCustomerReason('')
+            }}
+          >
+            Cancelar
+          </button>
+        </form>
+      )}
       {open && (
         <form
           className='mt-3 flex min-w-0 flex-wrap items-end gap-2'
@@ -290,6 +358,7 @@ export default function ThreadCard({
 }) {
   const id = useId()
   const confirmed = isConfirmedThread(thread)
+  const notCustomer = isNotCustomer(thread)
   const chip = rowChip(thread, now)
   const tone = ROW_TONES[chip.tone]
   const name =
@@ -308,7 +377,7 @@ export default function ThreadCard({
         className='block min-h-14 w-full min-w-0 rounded-xl px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
       >
         <span
-          className={`grid min-w-0 items-center gap-2 ${confirmed ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
+          className={`grid min-w-0 items-center gap-2 ${confirmed || notCustomer ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
         >
           <span className='flex min-w-0 items-center gap-2'>
             <span
@@ -323,7 +392,7 @@ export default function ThreadCard({
             </span>
           </span>
           <span
-            className={`${confirmed ? 'w-fit max-w-full whitespace-normal' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
+            className={`${confirmed || notCustomer ? 'w-fit max-w-full whitespace-normal [overflow-wrap:anywhere]' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
           >
             {chip.text}
           </span>

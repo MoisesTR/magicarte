@@ -151,6 +151,25 @@ export async function markWhatsAppThread(
     businessId
   )
 }
+
+/**
+ * The review assistant must skip any chat_key that has a thread where
+ * status='done' and lost_reason like 'No es cliente%'.
+ */
+export async function markNotCustomer(thread, reason, businessId) {
+  if (!required(businessId, thread?.id ?? null)) return invalid()
+  const detail = String(reason ?? '').trim().slice(0, 80).trim()
+  return updateWhatsAppThread(
+    thread.id,
+    {
+      status: 'done',
+      kind: 'other',
+      lost_reason: detail ? `No es cliente: ${detail}` : 'No es cliente',
+    },
+    businessId
+  )
+}
+
 /** Call only after both order and items have been successfully persisted. */
 export async function completeThreadConversion(id, orderId, businessId) {
   if (!required(businessId, id) || !orderId) return invalid()

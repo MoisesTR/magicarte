@@ -16,6 +16,15 @@ export const KIND_LABELS = {
   other: 'Otro',
 }
 export const OPEN_STATUSES = ['to_quote', 'sent', 'follow_up']
+
+export function isNotCustomer(thread) {
+  return (
+    thread.status === 'done' &&
+    typeof thread.lost_reason === 'string' &&
+    thread.lost_reason.startsWith('No es cliente')
+  )
+}
+
 const DAY = 86400000
 const normalize = (value) =>
   String(value || '')
@@ -465,6 +474,8 @@ export function visibleFeedThreads(group, showAllWaiting) {
 
 /** Compact text and urgency, using the same exclusive priorities and Managua day as the feed. */
 export function rowChip(thread, now = new Date()) {
+  if (isNotCustomer(thread))
+    return { text: thread.lost_reason, tone: 'neutral' }
   const open = OPEN_STATUSES.includes(thread.status)
   if (open) {
     if (isConfirmedThread(thread)) return paymentChip(thread)

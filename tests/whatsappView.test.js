@@ -530,3 +530,58 @@ test('authenticated feed wires order matching and per-business session provenanc
   assert.match(page, /orderMatches=\{data\.orderMatches\}/)
   assert.match(page, /autoLinkedThreadIds=\{data\.autoLinkedThreadIds\}/)
 })
+
+test('non-customer action is next to Cerrar only for expanded open threads and has an inline optional reason confirmation', async () => {
+  const { card, render } = await renderedComponents
+  const props = {
+    thread: { id: 't', status: 'sent', kind: 'quote', summary: 'Delivery' },
+    ordersPath: '/admin/hikari/orders',
+  }
+  const html = render(card, { ...props, expanded: true })
+  assert.match(html, />Cerrar<\/button><button[^>]*>No es cliente<\/button>/)
+  assert.doesNotMatch(render(card, { ...props, expanded: false }), /No es cliente/)
+  assert.doesNotMatch(render(card, {
+    ...props,
+    thread: { ...props.thread, status: 'done' },
+    expanded: true,
+  }), />No es cliente<\/button>/)
+  const source = await readFile('src/components/whatsapp/ThreadCard.jsx', 'utf8')
+  assert.match(source, /placeholder='Ej\.: delivery, proveedor'/)
+  assert.match(source, /maxLength=\{80\}/)
+  assert.match(source, />\s*Confirmar\s*<\/button>/)
+  assert.doesNotMatch(source, /window\.confirm/)
+  const page = await readFile('src/pages/WhatsAppFeed.jsx', 'utf8')
+  assert.match(page, /markNotCustomer\(thread, reason, currentBusinessId\)/)
+})
+
+test('Cerrados renders a muted non-customer chip and reason instead of money or ordinary closed styling', async () => {
+  const { groups: component, render } = await renderedComponents
+  const { groupThreads } = await import('../src/utils/whatsappFeed.js')
+  const now = '2026-11-20T18:00:00Z'
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: () => 'closed' },
+  })
+  try {
+    const html = render(component, {
+      businessId: 'non-customer-test',
+      now,
+      groups: groupThreads([{
+        id: 'supplier',
+        status: 'done',
+        kind: 'other',
+        lost_reason: 'No es cliente: proveedor',
+        status_changed_at: now,
+        quoted_amount: 1200,
+        summary: 'Entrega de insumos',
+      }], now),
+    })
+    assert.match(html, /aria-labelledby="whatsapp-tab-closed"/)
+    assert.match(html, /bg-gray-100 text-gray-600[^>]*>No es cliente: proveedor<\/span>/)
+    assert.doesNotMatch(html, /C\$|>Cerrado<|bg-green-50|bg-red-50/)
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original)
+    else delete globalThis.localStorage
+  }
+})

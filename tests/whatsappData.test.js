@@ -14,7 +14,7 @@ async function dataWith(client) {
   return new Function(
     'supabase',
     'addThreadPayment',
-    `${source};return {fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,completeThreadConversion,registerWhatsAppPayment}`
+    `${source};return {fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,markNotCustomer,completeThreadConversion,registerWhatsAppPayment}`
   )(client, addThreadPayment)
 }
 function mock(results = []) {
@@ -165,6 +165,67 @@ test('detail read is scoped and missing conversion target never writes', async (
   ])
   assert.ok((await api.updateWhatsAppThread('t', {}, null)).error)
   assert.equal(c.requests.length, 1)
+})
+
+test('markNotCustomer writes only its classification payload and scopes the existing update path', async () => {
+  const thread = Object.freeze({
+    id: 'unrelated',
+    business_id: 2,
+    status: 'sent',
+    kind: 'quote',
+    notes: 'Keep this note',
+    quoted_amount: 450,
+    paid_amount: 100,
+    order_id: 'existing-order',
+    reference_images: ['https://example.invalid/photo.jpg'],
+  })
+  const c = mock([{ data: { ...thread, status: 'done' }, error: null }])
+  const api = await dataWith(c)
+  const result = await api.markNotCustomer(thread, '  proveedor  ', 2)
+  assert.equal(result.data.status, 'done')
+  assert.equal(c.requests.length, 1)
+  assert.equal(c.requests[0].table, 'whatsapp_threads')
+  assert.deepEqual(c.requests[0].update, {
+    status: 'done',
+    kind: 'other',
+    lost_reason: 'No es cliente: proveedor',
+  })
+  assert.deepEqual(c.requests[0].filters, [
+    ['id', 'unrelated'],
+    ['business_id', 2],
+  ])
+  assert.equal(thread.status, 'sent')
+  assert.equal(thread.notes, 'Keep this note')
+  assert.equal(thread.quoted_amount, 450)
+})
+
+test('markNotCustomer trims optional reasons and caps them at 80 characters', async () => {
+  const c = mock()
+  const api = await dataWith(c)
+  for (const reason of [undefined, null, '', '   ']) {
+    await api.markNotCustomer({ id: 't' }, reason, 2)
+    assert.deepEqual(c.requests.at(-1).update, {
+      status: 'done',
+      kind: 'other',
+      lost_reason: 'No es cliente',
+    })
+  }
+  await api.markNotCustomer({ id: 't' }, `  ${'x'.repeat(90)}  `, 2)
+  assert.equal(c.requests.at(-1).update.lost_reason, `No es cliente: ${'x'.repeat(80)}`)
+  await api.markNotCustomer({ id: 't' }, `${'x'.repeat(79)} trailing`, 2)
+  assert.equal(c.requests.at(-1).update.lost_reason, `No es cliente: ${'x'.repeat(79)}`)
+})
+
+test('markNotCustomer rejects missing scope and preserves update failures', async () => {
+  const error = { code: '42501', message: 'denied' }
+  const c = mock([{ data: null, error }])
+  const api = await dataWith(c)
+  assert.ok((await api.markNotCustomer({ id: 't' }, '', null)).error)
+  assert.ok((await api.markNotCustomer({}, '', 2)).error)
+  assert.ok((await api.markNotCustomer(null, '', 2)).error)
+  assert.ok((await api.markNotCustomer(undefined, '', 2)).error)
+  assert.equal(c.requests.length, 0)
+  assert.equal((await api.markNotCustomer({ id: 't' }, '', 2)).error, error)
 })
 
 test('delivery fields survive scoped create/update and readback', async () => {

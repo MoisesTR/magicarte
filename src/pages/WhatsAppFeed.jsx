@@ -19,6 +19,7 @@ import {
   updateWhatsAppThread,
   deleteWhatsAppThread,
   markWhatsAppThread,
+  markNotCustomer,
   registerWhatsAppPayment,
 } from '../data/whatsappThreads'
 import ThreadCard from '../components/whatsapp/ThreadCard'
@@ -91,6 +92,7 @@ function FeedGroups({
   busy,
   onEdit,
   onStatus,
+  onNotCustomer,
   onPayment,
   orderMatches,
   autoLinkedThreadIds = [],
@@ -207,6 +209,7 @@ function FeedGroups({
                 busy={busy}
                 onEdit={onEdit}
                 onStatus={onStatus}
+                onNotCustomer={onNotCustomer}
                 onPayment={onPayment}
               />
             ))}
@@ -351,6 +354,9 @@ export default function WhatsAppFeed() {
               )
             }
             onEdit={(thread) => setEditor({ thread })}
+            onNotCustomer={(thread, reason) =>
+              mutate(() => markNotCustomer(thread, reason, currentBusinessId))
+            }
             onStatus={(thread, status, reason) =>
               mutate(() =>
                 markWhatsAppThread(thread.id, status, currentBusinessId, reason)

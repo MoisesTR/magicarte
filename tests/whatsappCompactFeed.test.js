@@ -11,6 +11,44 @@ const groupsWith = (...nonempty) =>
   }))
 const open = (fields = {}) => ({ status: 'to_quote', kind: 'quote', ...fields })
 
+test('isNotCustomer requires done status and the exact lost reason prefix', () => {
+  for (const lost_reason of ['No es cliente', 'No es cliente: delivery', 'No es cliente equivocado'])
+    assert.equal(feed.isNotCustomer({ status: 'done', lost_reason }), true)
+  for (const status of ['to_quote', 'sent', 'follow_up', 'won', 'lost'])
+    assert.equal(feed.isNotCustomer({ status, lost_reason: 'No es cliente: proveedor' }), false)
+  for (const lost_reason of [undefined, null, '', 'No aceptó', 'no es cliente', ' No es cliente'])
+    assert.equal(feed.isNotCustomer({ status: 'done', lost_reason }), false)
+  assert.equal(feed.isNotCustomer({ status: 'done' }), false)
+})
+
+test('non-customer row chips override quoted money and stale urgency with muted classification', () => {
+  for (const lost_reason of ['No es cliente', 'No es cliente: delivery'])
+    assert.deepEqual(feed.rowChip({
+      status: 'done',
+      lost_reason,
+      quoted_amount: 1200,
+      promised_date: '2026-11-01',
+      awaiting_reply: true,
+    }, now), { text: lost_reason, tone: 'neutral' })
+})
+
+test('non-customer threads appear only in Cerrados despite stale open-task and delivery fields', () => {
+  const groups = feed.groupThreads([{
+    id: 'not-customer',
+    status: 'done',
+    kind: 'other',
+    lost_reason: 'No es cliente: delivery',
+    status_changed_at: now.toISOString(),
+    promised_date: '2026-11-01',
+    delivery_date: '2026-11-19',
+    paid_amount: 100,
+    awaiting_reply: true,
+    follow_up_date: '2026-11-01',
+  }], now)
+  assert.deepEqual(groups.filter((group) => group.key !== 'closed').flatMap((group) => group.threads), [])
+  assert.deepEqual(groups.find((group) => group.key === 'closed').threads.map((thread) => thread.id), ['not-customer'])
+})
+
 for (const [index, key] of keys.slice(0, 5).entries()) {
   test(`default tab prioritizes ${key} regardless of input order`, () => {
     const groups = groupsWith(...keys.slice(index)).reverse()
