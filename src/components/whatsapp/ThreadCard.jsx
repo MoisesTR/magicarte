@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -6,6 +6,7 @@ import {
   STATUS_LABELS,
   OPEN_STATUSES,
   chatPhone,
+  rowChip,
 } from '../../utils/whatsappFeed'
 
 const button =
@@ -13,15 +14,8 @@ const button =
 const dateLabel = (date) =>
   date ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : ''
 
-export default function ThreadCard({
-  thread,
-  ordersPath,
-  onEdit,
-  onStatus,
-  busy,
-}) {
-  const [expanded, setExpanded] = useState(false),
-    [lost, setLost] = useState(false),
+function ThreadDetail({ thread, ordersPath, onEdit, onStatus, busy }) {
+  const [lost, setLost] = useState(false),
     [reason, setReason] = useState('')
   const phone = chatPhone(thread)
   const open = OPEN_STATUSES.includes(thread.status)
@@ -34,13 +28,13 @@ export default function ThreadCard({
     }
   }
   return (
-    <article className='min-w-0 rounded-2xl border border-gray-200 bg-white p-4 [overflow-wrap:anywhere] shadow-sm'>
+    <div className='min-w-0 border-t border-gray-200 p-4 [overflow-wrap:anywhere]'>
       <div className='flex flex-wrap items-start justify-between gap-2'>
         <div className='min-w-0'>
           <h3 className='font-bold text-gray-800'>
             {thread.customer_name ||
               thread.customer_phone ||
-              thread.chat_key.replace(/^name:/, '')}
+              thread.chat_key?.replace(/^name:/, '')}
           </h3>
           {phone && <p className='mt-1 text-sm text-gray-500'>+{phone}</p>}
         </div>
@@ -71,18 +65,9 @@ export default function ThreadCard({
           </span>
         )}
       </div>
-      <p
-        className={`mt-3 text-sm whitespace-pre-wrap text-gray-800 ${expanded ? '' : 'line-clamp-3'}`}
-      >
+      <p className='mt-3 text-sm whitespace-pre-wrap text-gray-800'>
         {thread.summary}
       </p>
-      <button
-        className='mt-1 min-h-10 text-xs font-semibold text-gray-500'
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {expanded ? 'Ver menos' : 'Ver conversación completa'}
-      </button>
       {thread.next_action && (
         <p className='mt-1 rounded-xl border-l-4 border-[var(--color-primary,#51c879)] bg-gray-50 p-3 text-sm font-semibold text-gray-800'>
           {thread.next_action}
@@ -238,6 +223,69 @@ export default function ThreadCard({
           <button className={`${button} ml-2`} onClick={() => setLost(false)}>
             Cancelar
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ROW_TONES = {
+  danger: { dot: 'bg-red-500', chip: 'bg-red-50 text-red-700' },
+  warning: { dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700' },
+  neutral: { dot: 'bg-gray-400', chip: 'bg-gray-100 text-gray-600' },
+}
+
+export default function ThreadCard({
+  thread,
+  now,
+  expanded,
+  onToggle,
+  ...detailProps
+}) {
+  const id = useId()
+  const chip = rowChip(thread, now)
+  const tone = ROW_TONES[chip.tone]
+  const name =
+    thread.customer_name ||
+    thread.customer_phone ||
+    thread.chat_key?.replace(/^name:/, '') ||
+    'Cliente'
+  return (
+    <article className='min-w-0 rounded-xl border border-gray-200 bg-white'>
+      <button
+        type='button'
+        id={`${id}-toggle`}
+        aria-expanded={expanded}
+        aria-controls={`${id}-detail`}
+        onClick={onToggle}
+        className='block min-h-14 w-full min-w-0 rounded-xl px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
+      >
+        <span className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
+          <span className='flex min-w-0 items-center gap-2'>
+            <span
+              aria-hidden='true'
+              className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`}
+            />
+            <span className='max-w-[45%] truncate text-sm font-semibold text-gray-800'>
+              {name}
+            </span>
+            <span className='min-w-0 flex-1 truncate text-sm text-gray-500'>
+              {thread.summary}
+            </span>
+          </span>
+          <span
+            className={`max-w-[10rem] truncate rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
+          >
+            {chip.text}
+          </span>
+        </span>
+        <span className='mt-1 block truncate pl-4 text-xs text-gray-500'>
+          → {thread.next_action || 'Sin próxima acción'}
+        </span>
+      </button>
+      {expanded && (
+        <div id={`${id}-detail`} role='region' aria-labelledby={`${id}-toggle`}>
+          <ThreadDetail thread={thread} {...detailProps} />
         </div>
       )}
     </article>

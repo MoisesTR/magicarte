@@ -119,6 +119,113 @@ export function groupThreads(threads, now = new Date()) {
   return groups
 }
 
+const FEED_TAB_PRIORITY = [
+  'today',
+  'unanswered',
+  'toQuote',
+  'payments',
+  'waiting',
+]
+
+/** Return an actionable group key; an empty or closed-only feed starts at today. */
+export function defaultFeedTab(groups) {
+  return (
+    FEED_TAB_PRIORITY.find((key) =>
+      groups.some((group) => group.key === key && group.threads.length > 0)
+    ) || 'today'
+  )
+}
+
+/** Restore only a populated tab, without overwriting preferences during loading. */
+export function loadFeedTab(businessId, groups, storage) {
+  if (businessId) {
+    try {
+      const key = (storage || globalThis.localStorage).getItem(
+        `whatsapp.feedTab.${businessId}`
+      )
+      if (groups.some((group) => group.key === key && group.threads.length > 0))
+        return key
+    } catch {
+      /* Private browsing may deny storage; the feed remains usable. */
+    }
+  }
+  return defaultFeedTab(groups)
+}
+
+export function saveFeedTab(businessId, key, storage) {
+  if (!businessId) return
+  try {
+    ;(storage || globalThis.localStorage).setItem(
+      `whatsapp.feedTab.${businessId}`,
+      key
+    )
+  } catch {
+    /* The current tab still works for this session. */
+  }
+}
+
+/** Automatic horizontal tab activation; null leaves ordinary keys untouched. */
+export function feedTabKey(groups, selected, key) {
+  if (!groups.length) return null
+  const index = groups.findIndex((group) => group.key === selected)
+  if (key === 'Home') return groups[0].key
+  if (key === 'End') return groups.at(-1).key
+  if (key === 'ArrowLeft')
+    return groups[(index - 1 + groups.length) % groups.length].key
+  if (key === 'ArrowRight') return groups[(index + 1) % groups.length].key
+  return null
+}
+
+export function visibleFeedThreads(group, showAllWaiting) {
+  return group.key === 'waiting' && !showAllWaiting
+    ? group.threads.slice(0, 8)
+    : group.threads
+}
+
+/** Compact text and urgency, using the same exclusive priorities and Managua day as the feed. */
+export function rowChip(thread, now = new Date()) {
+  const open = OPEN_STATUSES.includes(thread.status)
+  if (open) {
+    const today = managuaDay(now),
+      due = dueDate(thread)
+    if (due <= today) {
+      const days = dayDifference(today, due)
+      return days > 0
+        ? { text: `Vencido ${days} d`, tone: 'danger' }
+        : { text: 'Prometido hoy', tone: 'warning' }
+    }
+    if (thread.awaiting_reply) {
+      const hours = hoursAgo(thread.last_customer_message_at, now)
+      return {
+        text:
+          hours == null
+            ? 'Sin responder'
+            : `Escribió hace ${hours >= 24 ? `${Math.floor(hours / 24)} d` : `${hours} h`}`,
+        tone: 'warning',
+      }
+    }
+    if (
+      thread.status !== 'to_quote' &&
+      thread.kind !== 'payment' &&
+      thread.last_our_message_at &&
+      Number.isFinite(Date.parse(thread.last_our_message_at))
+    ) {
+      const days = Math.max(
+        0,
+        dayDifference(today, managuaDay(thread.last_our_message_at))
+      )
+      return { text: `Sin respuesta ${days} d`, tone: 'neutral' }
+    }
+  }
+  return {
+    text:
+      thread.quoted_amount != null
+        ? `C$ ${Number(thread.quoted_amount).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : STATUS_LABELS[thread.status] || 'Sin actividad',
+    tone: 'neutral',
+  }
+}
+
 const SENDERS_KEY = 'whatsapp.ourSenders'
 const cleanSenders = (names) => [
   ...new Set(
