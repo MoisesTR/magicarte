@@ -7,6 +7,7 @@ import {
   OPEN_STATUSES,
   chatPhone,
   rowChip,
+  aiTagChip,
   isConfirmedThread,
   isNotCustomer,
   deliveryDateLabel,
@@ -24,6 +25,9 @@ function ThreadDetail({
   onStatus,
   onNotCustomer,
   onPayment,
+  onClassify,
+  classification,
+  now,
   busy,
 }) {
   const [lost, setLost] = useState(false),
@@ -34,6 +38,7 @@ function ThreadDetail({
     [payment, setPayment] = useState(''),
     [paying, setPaying] = useState(false)
   const confirmationId = useId()
+  const tag = aiTagChip(thread, now)
   const phone = chatPhone(thread)
   const open = OPEN_STATUSES.includes(thread.status)
   const copy = async () => {
@@ -62,6 +67,7 @@ function ThreadDetail({
         )}
       </div>
       <div className='mt-2 flex flex-wrap gap-1.5 text-xs text-gray-700'>
+        {tag && <AITag chip={tag} />}
         <span className='rounded-full bg-gray-100 px-2 py-1'>
           {KIND_LABELS[thread.kind]}
         </span>
@@ -82,6 +88,9 @@ function ThreadDetail({
           </span>
         )}
       </div>
+      {tag && thread.ai_tag_reason && (
+        <p className='mt-2 text-xs text-gray-500'>{thread.ai_tag_reason}</p>
+      )}
       <p className='mt-3 text-sm whitespace-pre-wrap text-gray-800'>
         {thread.summary}
       </p>
@@ -142,6 +151,16 @@ function ThreadDetail({
         </p>
       )}
       <div className='mt-3 flex flex-wrap gap-2'>
+        {thread.ai_tag == null && (
+          <button
+            type='button'
+            className={button}
+            disabled={busy || classification?.pending}
+            onClick={() => onClassify?.(thread)}
+          >
+            {classification?.pending ? 'Clasificando…' : 'Clasificar con AI'}
+          </button>
+        )}
         {phone && (
           <>
             <a
@@ -235,6 +254,11 @@ function ThreadDetail({
           </>
         )}
       </div>
+      {classification?.error && (
+        <p role='alert' className='mt-2 text-xs text-red-700'>
+          {classification.error}
+        </p>
+      )}
       {open && notCustomer && (
         <form
           id={confirmationId}
@@ -347,6 +371,19 @@ const ROW_TONES = {
   neutral: { dot: 'bg-gray-400', chip: 'bg-gray-100 text-gray-600' },
 }
 
+function AITag({ chip }) {
+  return (
+    <span
+      className={`inline-flex max-w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-medium [overflow-wrap:anywhere] ${ROW_TONES[chip.tone].chip}`}
+    >
+      {chip.text}
+      <span className='shrink-0 rounded border border-current px-1 text-[9px] leading-4'>
+        AI
+      </span>
+    </span>
+  )
+}
+
 export default function ThreadCard({
   thread,
   now,
@@ -359,6 +396,7 @@ export default function ThreadCard({
   const id = useId()
   const confirmed = isConfirmedThread(thread)
   const notCustomer = isNotCustomer(thread)
+  const tag = aiTagChip(thread, now)
   const chip = rowChip(thread, now)
   const tone = ROW_TONES[chip.tone]
   const name =
@@ -377,7 +415,7 @@ export default function ThreadCard({
         className='block min-h-14 w-full min-w-0 rounded-xl px-3 py-2 text-left hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-[var(--color-primary)]'
       >
         <span
-          className={`grid min-w-0 items-center gap-2 ${confirmed || notCustomer ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
+          className={`grid min-w-0 items-center gap-2 ${confirmed || notCustomer || tag ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_auto]'}`}
         >
           <span className='flex min-w-0 items-center gap-2'>
             <span
@@ -391,10 +429,13 @@ export default function ThreadCard({
               {thread.summary}
             </span>
           </span>
-          <span
-            className={`${confirmed || notCustomer ? 'w-fit max-w-full whitespace-normal [overflow-wrap:anywhere]' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
-          >
-            {chip.text}
+          <span className='flex min-w-0 flex-wrap items-center gap-1.5'>
+            {tag && <AITag chip={tag} />}
+            <span
+              className={`${confirmed || notCustomer ? 'w-fit max-w-full [overflow-wrap:anywhere] whitespace-normal' : 'max-w-[10rem] truncate'} rounded-md px-2 py-1 text-xs font-medium tabular-nums ${tone.chip}`}
+            >
+              {chip.text}
+            </span>
           </span>
         </span>
         {confirmed ? (
@@ -445,7 +486,7 @@ export default function ThreadCard({
       )}
       {expanded && (
         <div id={`${id}-detail`} role='region' aria-labelledby={`${id}-toggle`}>
-          <ThreadDetail thread={thread} {...detailProps} />
+          <ThreadDetail thread={thread} now={now} {...detailProps} />
         </div>
       )}
     </article>

@@ -1,3 +1,4 @@
+export { aiTagChip } from './whatsappTags.js'
 import { newOrderForm } from './quoteForms.js'
 
 export const STATUS_LABELS = {
@@ -203,8 +204,11 @@ export function saveFeedDateRange(businessId, range, storage) {
   }
 }
 
-const dueDate = (thread) =>
-  [thread.promised_date, thread.follow_up_date].filter(Boolean).sort()[0]
+const promiseDue = (thread) =>
+  thread.ai_tag == null || thread.ai_tag === 'promised'
+    ? dueCalendarDay(thread.promised_date)
+    : null
+const isDue = (date, today) => Boolean(date && date <= today)
 /** Confirmed chat agreements belong only to the delivery safety net, never response tasks. */
 export function isConfirmedThread(thread) {
   return (
@@ -361,15 +365,20 @@ export function groupThreads(threads, now = new Date()) {
     } else if (thread.kind === 'payment') {
       index = 3
       if (thread.follow_up_date <= today) timeHint = rowChip(thread, now).text
-    } else if (dueDate(thread) <= today) {
-      index = 0
-      const days = dayDifference(today, dueDate(thread))
-      timeHint = days > 0 ? `Vencido hace ${days} días` : 'Prometido hoy'
     } else if (thread.awaiting_reply) {
       index = 1
       const hours = hoursAgo(thread.last_customer_message_at, now)
       timeHint =
         hours == null ? 'Sin respuesta pendiente' : `Escribió hace ${hours} h`
+    } else if (
+      isDue(promiseDue(thread), today) ||
+      ['promised', 'customer_waiting'].includes(thread.ai_tag)
+    ) {
+      index = 0
+      timeHint = rowChip(thread, now).text
+    } else if (isDue(dueCalendarDay(thread.follow_up_date), today)) {
+      index = 4
+      timeHint = rowChip(thread, now).text
     } else if (thread.status === 'to_quote') index = 2
     else {
       index = 4
@@ -378,7 +387,9 @@ export function groupThreads(threads, now = new Date()) {
     }
     groups[index].threads.push({ ...thread, timeHint })
   }
-  groups[0].threads.sort((a, b) => dueDate(a).localeCompare(dueDate(b)))
+  groups[0].threads.sort((a, b) =>
+    (promiseDue(a) || '9999').localeCompare(promiseDue(b) || '9999')
+  )
   groups[1].threads.sort((a, b) =>
     (a.last_customer_message_at || '9999').localeCompare(
       b.last_customer_message_at || '9999'
@@ -392,11 +403,17 @@ export function groupThreads(threads, now = new Date()) {
       (a.follow_up_date || '9999').localeCompare(b.follow_up_date || '9999')
     )
   })
-  groups[4].threads.sort((a, b) =>
-    (a.last_our_message_at || '9999').localeCompare(
-      b.last_our_message_at || '9999'
+  groups[4].threads.sort((a, b) => {
+    const dueA = isDue(dueCalendarDay(a.follow_up_date), today)
+    const dueB = isDue(dueCalendarDay(b.follow_up_date), today)
+    return (
+      Number(dueB) - Number(dueA) ||
+      (dueA && dueB ? a.follow_up_date.localeCompare(b.follow_up_date) : 0) ||
+      (a.last_our_message_at || '9999').localeCompare(
+        b.last_our_message_at || '9999'
+      )
     )
-  )
+  })
   for (const group of groups.slice(5))
     group.threads.sort((a, b) =>
       b.status_changed_at.localeCompare(a.status_changed_at)
@@ -478,16 +495,24 @@ export function rowChip(thread, now = new Date()) {
   const open = OPEN_STATUSES.includes(thread.status)
   if (open) {
     if (isConfirmedThread(thread)) return paymentChip(thread)
-    const today = managuaDay(now),
-      due = thread.kind === 'payment' ? thread.follow_up_date : dueDate(thread)
-    if (due <= today) {
+    const today = managuaDay(now)
+    const payment = thread.kind === 'payment'
+    const due = payment
+      ? dueCalendarDay(thread.follow_up_date)
+      : promiseDue(thread)
+    if (isDue(due, today)) {
       const days = dayDifference(today, due)
       return days > 0
         ? { text: `Vencido ${days} d`, tone: 'danger' }
-        : {
-            text: thread.kind === 'payment' ? 'Revisar hoy' : 'Prometido hoy',
-            tone: 'warning',
-          }
+        : { text: payment ? 'Revisar hoy' : 'Prometido hoy', tone: 'warning' }
+    }
+    const followUp = dueCalendarDay(thread.follow_up_date)
+    if (!payment && isDue(followUp, today)) {
+      const days = dayDifference(today, followUp)
+      return {
+        text: days > 0 ? `Seguimiento vencido ${days} d` : 'Seguimiento hoy',
+        tone: days > 0 ? 'danger' : 'warning',
+      }
     }
     if (thread.kind !== 'payment' && thread.awaiting_reply) {
       const hours = hoursAgo(thread.last_customer_message_at, now)

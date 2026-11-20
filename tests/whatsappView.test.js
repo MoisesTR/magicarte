@@ -540,13 +540,22 @@ test('non-customer action is next to Cerrar only for expanded open threads and h
   }
   const html = render(card, { ...props, expanded: true })
   assert.match(html, />Cerrar<\/button><button[^>]*>No es cliente<\/button>/)
-  assert.doesNotMatch(render(card, { ...props, expanded: false }), /No es cliente/)
-  assert.doesNotMatch(render(card, {
-    ...props,
-    thread: { ...props.thread, status: 'done' },
-    expanded: true,
-  }), />No es cliente<\/button>/)
-  const source = await readFile('src/components/whatsapp/ThreadCard.jsx', 'utf8')
+  assert.doesNotMatch(
+    render(card, { ...props, expanded: false }),
+    /No es cliente/
+  )
+  assert.doesNotMatch(
+    render(card, {
+      ...props,
+      thread: { ...props.thread, status: 'done' },
+      expanded: true,
+    }),
+    />No es cliente<\/button>/
+  )
+  const source = await readFile(
+    'src/components/whatsapp/ThreadCard.jsx',
+    'utf8'
+  )
   assert.match(source, /placeholder='Ej\.: delivery, proveedor'/)
   assert.match(source, /maxLength=\{80\}/)
   assert.match(source, />\s*Confirmar\s*<\/button>/)
@@ -568,18 +577,26 @@ test('Cerrados renders a muted non-customer chip and reason instead of money or 
     const html = render(component, {
       businessId: 'non-customer-test',
       now,
-      groups: groupThreads([{
-        id: 'supplier',
-        status: 'done',
-        kind: 'other',
-        lost_reason: 'No es cliente: proveedor',
-        status_changed_at: now,
-        quoted_amount: 1200,
-        summary: 'Entrega de insumos',
-      }], now),
+      groups: groupThreads(
+        [
+          {
+            id: 'supplier',
+            status: 'done',
+            kind: 'other',
+            lost_reason: 'No es cliente: proveedor',
+            status_changed_at: now,
+            quoted_amount: 1200,
+            summary: 'Entrega de insumos',
+          },
+        ],
+        now
+      ),
     })
     assert.match(html, /aria-labelledby="whatsapp-tab-closed"/)
-    assert.match(html, /bg-gray-100 text-gray-600[^>]*>No es cliente: proveedor<\/span>/)
+    assert.match(
+      html,
+      /bg-gray-100 text-gray-600[^>]*>No es cliente: proveedor<\/span>/
+    )
     assert.doesNotMatch(html, /C\$|>Cerrado<|bg-green-50|bg-red-50/)
   } finally {
     if (original) Object.defineProperty(globalThis, 'localStorage', original)
@@ -615,4 +632,84 @@ test('confirmed rows expose a visible Crear pedido link outside the accordion bu
     { ...thread, status: 'won', order_id: 'order-1' },
   ])
     assert.doesNotMatch(render(card, { ...props, thread: other }), />Crear pedido</)
+})
+
+test('AI tag is first on rows and detail with mini badge/reason; null tags stay absent and classify errors are inline', async () => {
+  const { card, render } = await renderedComponents
+  const thread = {
+    id: 'ai',
+    status: 'sent',
+    kind: 'quote',
+    summary: 'Seguimiento',
+    customer_name: 'Cliente',
+    ai_tag: 'follow_up',
+    ai_tag_reason: 'Solo se planea volver a escribir.',
+    follow_up_date: '2026-11-19',
+  }
+  const props = {
+    thread,
+    now: '2026-11-20T04:00:00Z',
+    ordersPath: '/admin/hikari/orders',
+    onToggle() {},
+    onEdit() {},
+  }
+  const row = render(card, props)
+  assert.ok(row.indexOf('Dar seguimiento') < row.indexOf('Seguimiento hoy'))
+  assert.match(row, />AI<\/span>/)
+  const detail = render(card, { ...props, expanded: true })
+  assert.equal((detail.match(/Dar seguimiento/g) || []).length, 3) // row tag, detail tag, action
+  assert.match(detail, /text-gray-500[^>]*>Solo se planea volver a escribir\./)
+  assert.doesNotMatch(detail, /Clasificar con AI/)
+  const untagged = render(card, {
+    ...props,
+    thread: { ...thread, ai_tag: null, ai_tag_reason: null },
+    expanded: true,
+    classification: { pending: true, error: 'La IA alcanzó su límite de uso.' },
+  })
+  assert.match(untagged, /Clasificando…/)
+  assert.match(untagged, /role="alert"[^>]*>La IA alcanzó su límite de uso\./)
+  assert.doesNotMatch(untagged, />AI<\/span>|Solo se planea volver/)
+})
+
+test('manual creation classifies exactly once after successful save; edits/failures/already tagged rows do not auto-classify', async () => {
+  const page = await readFile('src/pages/WhatsAppFeed.jsx', 'utf8')
+  const source = page.slice(
+    page.indexOf('  const save = async'),
+    page.indexOf('  const reviewHours')
+  )
+  assert.ok(source.includes('classify('))
+  for (const scenario of ['create', 'edit', 'failed', 'tagged']) {
+    const calls = []
+    const created = {
+      id: 'created',
+      ai_tag: scenario === 'tagged' ? 'paid' : null,
+    }
+    const save = new Function(
+      'editor',
+      'mutate',
+      'updateWhatsAppThread',
+      'createWhatsAppThread',
+      'currentBusinessId',
+      'setEditor',
+      'toast',
+      'classify',
+      `${source}; return save`
+    )(
+      scenario === 'edit' ? { thread: { id: 'existing' } } : { thread: null },
+      async (operation) => {
+        const result = await operation()
+        return scenario !== 'failed' && !result.error
+      },
+      async () => ({ data: { id: 'existing' } }),
+      async () => ({ data: created }),
+      2,
+      () => {},
+      { success() {} },
+      async (thread) => {
+        calls.push(thread.id)
+      }
+    )
+    await save({ summary: 'Resumen' })
+    assert.deepEqual(calls, scenario === 'create' ? ['created'] : [])
+  }
 })

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { addThreadPayment } from '../src/utils/whatsappFeed.js'
+import { validateClassification } from '../api/_lib/whatsappClassification.js'
 async function dataWith(client) {
   const source = (
     await readFile(
@@ -14,8 +15,9 @@ async function dataWith(client) {
   return new Function(
     'supabase',
     'addThreadPayment',
-    `${source};return {fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,markNotCustomer,completeThreadConversion,registerWhatsAppPayment}`
-  )(client, addThreadPayment)
+    'validateClassification',
+    `${source};return {classifyWhatsAppThread,fetchWhatsAppFeed,fetchWhatsAppThread,createWhatsAppThread,updateWhatsAppThread,deleteWhatsAppThread,markWhatsAppThread,markNotCustomer,completeThreadConversion,registerWhatsAppPayment}`
+  )(client, addThreadPayment, validateClassification)
 }
 function mock(results = []) {
   const requests = []
@@ -211,9 +213,15 @@ test('markNotCustomer trims optional reasons and caps them at 80 characters', as
     })
   }
   await api.markNotCustomer({ id: 't' }, `  ${'x'.repeat(90)}  `, 2)
-  assert.equal(c.requests.at(-1).update.lost_reason, `No es cliente: ${'x'.repeat(80)}`)
+  assert.equal(
+    c.requests.at(-1).update.lost_reason,
+    `No es cliente: ${'x'.repeat(80)}`
+  )
   await api.markNotCustomer({ id: 't' }, `${'x'.repeat(79)} trailing`, 2)
-  assert.equal(c.requests.at(-1).update.lost_reason, `No es cliente: ${'x'.repeat(79)}`)
+  assert.equal(
+    c.requests.at(-1).update.lost_reason,
+    `No es cliente: ${'x'.repeat(79)}`
+  )
 })
 
 test('markNotCustomer rejects missing scope and preserves update failures', async () => {
@@ -349,4 +357,192 @@ test('matching orders soft-fail returned and thrown query errors without partial
     ])
   )
   assert.deepEqual(await partial.fetchWhatsAppOrders(2), [])
+})
+
+test('AI fields survive scoped creates and updates; reads normalize absent columns to null', async () => {
+  const fields = {
+    ai_tag: 'follow_up',
+    ai_tag_reason: 'Solo se planea volver a escribir.',
+    ai_tagged_at: '2026-11-19T20:00:00.000Z',
+  }
+  const c = mock([
+    { data: { id: 't', ...fields } },
+    { data: { id: 't', ...fields } },
+    { data: [{ id: 'legacy' }] },
+    { data: [] },
+    { data: { id: 'legacy' } },
+  ])
+  const api = await dataWith(c)
+  assert.equal(
+    (await api.createWhatsAppThread(fields, 2)).data.ai_tag,
+    fields.ai_tag
+  )
+  assert.deepEqual(c.requests[0].insert[0], { ...fields, business_id: 2 })
+  await api.updateWhatsAppThread('t', fields, 2)
+  assert.deepEqual(c.requests[1].update, fields)
+  const feed = await api.fetchWhatsAppFeed(2)
+  assert.equal(feed.available, true)
+  assert.equal(feed.threads[0].ai_tag, null)
+  assert.equal(feed.threads[0].ai_tag_reason, null)
+  assert.equal(feed.threads[0].ai_tagged_at, null)
+  assert.equal((await api.fetchWhatsAppThread('legacy', 2)).data.ai_tag, null)
+})
+for (const error of [
+  {
+    code: '42703',
+    message: 'column "ai_tag" of relation "whatsapp_threads" does not exist',
+  },
+  {
+    code: 'PGRST204',
+    message:
+      "Could not find the 'ai_tag_reason' column of 'whatsapp_threads' in the schema cache",
+  },
+])
+  test(`missing AI column ${error.code} retries mixed writes once without tag fields, maintaining tenant scope`, async () => {
+    const fields = {
+      summary: 'Keep me',
+      ai_tag: 'follow_up',
+      ai_tag_reason: 'Razón.',
+      ai_tagged_at: '2026-11-19T20:00:00Z',
+    }
+    const c = mock([
+      { error },
+      { data: { id: 't', summary: 'Keep me' } },
+      { error },
+      { data: { id: 't', summary: 'Keep me' } },
+    ])
+    const api = await dataWith(c)
+    const created = await api.createWhatsAppThread(fields, 2)
+    assert.equal(created.error, undefined)
+    assert.equal(created.aiTagsAvailable, false)
+    assert.deepEqual(c.requests[1].insert[0], {
+      summary: 'Keep me',
+      business_id: 2,
+    })
+    const updated = await api.updateWhatsAppThread('t', fields, 2)
+    assert.equal(updated.aiTagsAvailable, false)
+    assert.deepEqual(c.requests[3].update, { summary: 'Keep me' })
+    assert.deepEqual(c.requests[3].filters, [
+      ['id', 't'],
+      ['business_id', 2],
+    ])
+  })
+test('tag-only writes fail softly before migration without blank updates; unrelated errors are never masked', async () => {
+  const missing = {
+    code: 'PGRST204',
+    message: "Could not find 'ai_tag' column of 'whatsapp_threads'",
+  }
+  const c = mock([{ error: missing }]),
+    api = await dataWith(c)
+  const result = await api.updateWhatsAppThread('t', { ai_tag: 'follow_up' }, 2)
+  assert.equal(result.aiTagsAvailable, false)
+  assert.match(result.error.message, /migración/i)
+  assert.equal(c.requests.length, 1)
+  for (const error of [
+    { code: '42501', message: 'ai_tag denied' },
+    { code: '42703', message: 'column summary missing' },
+    { code: 'PGRST204', message: 'ai_tag column in other_table missing' },
+  ]) {
+    const c = mock([{ error }]),
+      api = await dataWith(c)
+    assert.equal(
+      (
+        await api.updateWhatsAppThread(
+          't',
+          { summary: 'a', ai_tag: 'follow_up' },
+          2
+        )
+      ).error,
+      error
+    )
+    assert.equal(c.requests.length, 1)
+  }
+})
+
+test('classifier uses session auth, saves only three AI fields with tenant scope and supplied timestamp', async () => {
+  const thread = {
+    id: 't',
+    summary: 'Follow up',
+    status: 'sent',
+    kind: 'quote',
+  }
+  const fields = {
+    ai_tag: 'follow_up',
+    ai_tag_reason: 'Dar seguimiento al cliente.',
+    ai_tagged_at: '2026-11-20T12:00:00.000Z',
+  }
+  const c = mock([{ data: { ...thread, ...fields } }])
+  c.auth = {
+    getSession: async () => ({ data: { session: { access_token: 'token' } } }),
+  }
+  const api = await dataWith(c)
+  const result = await api.classifyWhatsAppThread(thread, 2, {
+    now: () => new Date('2026-11-20T12:00:00Z'),
+    requestClassification: async (value, { getSession }) => {
+      assert.equal(value, thread)
+      assert.equal((await getSession()).data.session.access_token, 'token')
+      return { tag: 'follow_up', reason: ' Dar seguimiento al cliente. ' }
+    },
+  })
+  assert.equal(result.data.ai_tag, fields.ai_tag)
+  assert.deepEqual(c.requests[0].update, fields)
+  assert.deepEqual(c.requests[0].filters, [
+    ['id', 't'],
+    ['business_id', 2],
+  ])
+  assert.equal(thread.ai_tag, undefined)
+})
+test('classifier skips already tagged rows, rejects missing scope and invalid AI, and preserves failed saves', async () => {
+  const c = mock(),
+    api = await dataWith(c)
+  const requestClassification = () => assert.fail('AI must not run')
+  assert.ok(
+    (
+      await api.classifyWhatsAppThread({ id: 't' }, null, {
+        requestClassification,
+      })
+    ).error
+  )
+  assert.ok(
+    (await api.classifyWhatsAppThread({}, 2, { requestClassification })).error
+  )
+  assert.equal(
+    (
+      await api.classifyWhatsAppThread({ id: 't', ai_tag: 'paid' }, 2, {
+        requestClassification,
+      })
+    ).data.ai_tag,
+    'paid'
+  )
+  for (const result of [
+    { tag: 'toString', reason: 'bad' },
+    { tag: 'paid', reason: '' },
+  ])
+    assert.ok(
+      (
+        await api.classifyWhatsAppThread({ id: 't' }, 2, {
+          requestClassification: async () => result,
+        })
+      ).error
+    )
+  assert.equal(c.requests.length, 0)
+  const missing = mock([
+    {
+      error: {
+        code: '42703',
+        message: 'column ai_tag of whatsapp_threads does not exist',
+      },
+    },
+  ])
+  const failed = await (
+    await dataWith(missing)
+  ).classifyWhatsAppThread({ id: 't' }, 2, {
+    requestClassification: async () => ({
+      tag: 'follow_up',
+      reason: 'Volver a escribir.',
+    }),
+  })
+  assert.equal(failed.aiTagsAvailable, false)
+  assert.match(failed.error.message, /migración/)
+  assert.equal(missing.requests.length, 1)
 })

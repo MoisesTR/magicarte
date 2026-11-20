@@ -1,4 +1,6 @@
 import { addThreadPayment } from '../utils/whatsappFeed.js'
+import { requestThreadClassification } from '../utils/whatsappClassification.js'
+import { validateClassification } from '../../api/_lib/whatsappClassification.js'
 import { supabase } from '../config/supabaseClient'
 
 const NOTICE = 'Falta activar la sección WhatsApp'
@@ -30,7 +32,42 @@ const FIELDS = [
   'notes',
   'source',
   'last_reviewed_at',
+  'ai_tag',
+  'ai_tag_reason',
+  'ai_tagged_at',
 ]
+const AI_FIELDS = ['ai_tag', 'ai_tag_reason', 'ai_tagged_at']
+const withAITags = (thread) =>
+  thread && {
+    ...thread,
+    ...Object.fromEntries(AI_FIELDS.map((key) => [key, thread[key] ?? null])),
+  }
+const missingAITags = (error) =>
+  ['42703', 'PGRST204'].includes(error?.code) &&
+  /whatsapp_threads/i.test(error.message || '') &&
+  /\bai_tag(?:_reason|ged_at)?\b/i.test(error.message || '')
+const withoutAITags = (payload) =>
+  Object.fromEntries(
+    Object.entries(payload).filter(([key]) => !AI_FIELDS.includes(key))
+  )
+const tagUnavailable = () => ({
+  data: null,
+  aiTagsAvailable: false,
+  error: new Error(
+    'Falta aplicar la migración de etiquetas AI. La conversación se conserva sin clasificar.'
+  ),
+})
+async function writeWithAITags(payload, operation) {
+  const result = await readResult(operation(payload))
+  if (
+    !missingAITags(result.error) ||
+    !AI_FIELDS.some((key) => Object.hasOwn(payload, key))
+  )
+    return result
+  const legacy = withoutAITags(payload)
+  if (!Object.keys(legacy).length) return tagUnavailable()
+  return { ...(await readResult(operation(legacy))), aiTagsAvailable: false }
+}
 const editable = (value) =>
   Object.fromEntries(
     FIELDS.filter((key) => Object.hasOwn(value, key)).map((key) => [
@@ -73,7 +110,7 @@ export async function fetchWhatsAppFeed(businessId) {
       break
     }
     if (result.error) throw new Error(result.error.message)
-    threads.push(...(result.data || []))
+    threads.push(...(result.data || []).map(withAITags))
     if ((result.data || []).length < 500) break
     offset += 500
   }
@@ -94,7 +131,7 @@ export async function fetchWhatsAppFeed(businessId) {
 }
 export async function fetchWhatsAppThread(id, businessId) {
   if (!required(businessId, id)) return invalid()
-  return readResult(
+  const result = await readResult(
     supabase
       .from('whatsapp_threads')
       .select('*')
@@ -102,29 +139,31 @@ export async function fetchWhatsAppThread(id, businessId) {
       .eq('business_id', businessId)
       .maybeSingle()
   )
+  return { ...result, data: withAITags(result.data) }
 }
 export async function createWhatsAppThread(thread, businessId) {
   if (!required(businessId)) return invalid()
-  return readResult(
+  return writeWithAITags(editable(thread), (payload) =>
     supabase
       .from('whatsapp_threads')
-      .insert([{ ...editable(thread), business_id: businessId }])
+      .insert([{ ...payload, business_id: businessId }])
       .select()
       .single()
   )
 }
 export async function updateWhatsAppThread(id, thread, businessId) {
   if (!required(businessId, id)) return invalid()
-  return readResult(
+  return writeWithAITags(editable(thread), (payload) =>
     supabase
       .from('whatsapp_threads')
-      .update(editable(thread))
+      .update(payload)
       .eq('id', id)
       .eq('business_id', businessId)
       .select()
       .single()
   )
 }
+
 export async function deleteWhatsAppThread(id, businessId) {
   if (!required(businessId, id)) return invalid()
   return readResult(
@@ -158,7 +197,10 @@ export async function markWhatsAppThread(
  */
 export async function markNotCustomer(thread, reason, businessId) {
   if (!required(businessId, thread?.id ?? null)) return invalid()
-  const detail = String(reason ?? '').trim().slice(0, 80).trim()
+  const detail = String(reason ?? '')
+    .trim()
+    .slice(0, 80)
+    .trim()
   return updateWhatsAppThread(
     thread.id,
     {
@@ -242,5 +284,36 @@ export async function fetchWhatsAppOrders(businessId, now = new Date()) {
   } catch (error) {
     console.warn('WhatsApp order matching unavailable', error)
     return []
+  }
+}
+
+/** Classification is optional: return failures without changing or hiding the thread. */
+export async function classifyWhatsAppThread(
+  thread,
+  businessId,
+  {
+    requestClassification = requestThreadClassification,
+    now = () => new Date(),
+  } = {}
+) {
+  if (!required(businessId, thread?.id ?? null)) return invalid()
+  if (thread.ai_tag != null) return { data: thread, error: null }
+  try {
+    const result = validateClassification(
+      await requestClassification(thread, {
+        getSession: () => supabase.auth.getSession(),
+      })
+    )
+    return await updateWhatsAppThread(
+      thread.id,
+      {
+        ai_tag: result.tag,
+        ai_tag_reason: result.reason,
+        ai_tagged_at: now().toISOString(),
+      },
+      businessId
+    )
+  } catch (error) {
+    return { data: null, error }
   }
 }

@@ -12,41 +12,76 @@ const groupsWith = (...nonempty) =>
 const open = (fields = {}) => ({ status: 'to_quote', kind: 'quote', ...fields })
 
 test('isNotCustomer requires done status and the exact lost reason prefix', () => {
-  for (const lost_reason of ['No es cliente', 'No es cliente: delivery', 'No es cliente equivocado'])
+  for (const lost_reason of [
+    'No es cliente',
+    'No es cliente: delivery',
+    'No es cliente equivocado',
+  ])
     assert.equal(feed.isNotCustomer({ status: 'done', lost_reason }), true)
   for (const status of ['to_quote', 'sent', 'follow_up', 'won', 'lost'])
-    assert.equal(feed.isNotCustomer({ status, lost_reason: 'No es cliente: proveedor' }), false)
-  for (const lost_reason of [undefined, null, '', 'No aceptó', 'no es cliente', ' No es cliente'])
+    assert.equal(
+      feed.isNotCustomer({ status, lost_reason: 'No es cliente: proveedor' }),
+      false
+    )
+  for (const lost_reason of [
+    undefined,
+    null,
+    '',
+    'No aceptó',
+    'no es cliente',
+    ' No es cliente',
+  ])
     assert.equal(feed.isNotCustomer({ status: 'done', lost_reason }), false)
   assert.equal(feed.isNotCustomer({ status: 'done' }), false)
 })
 
 test('non-customer row chips override quoted money and stale urgency with muted classification', () => {
   for (const lost_reason of ['No es cliente', 'No es cliente: delivery'])
-    assert.deepEqual(feed.rowChip({
-      status: 'done',
-      lost_reason,
-      quoted_amount: 1200,
-      promised_date: '2026-11-01',
-      awaiting_reply: true,
-    }, now), { text: lost_reason, tone: 'neutral' })
+    assert.deepEqual(
+      feed.rowChip(
+        {
+          status: 'done',
+          lost_reason,
+          quoted_amount: 1200,
+          promised_date: '2026-11-01',
+          awaiting_reply: true,
+        },
+        now
+      ),
+      { text: lost_reason, tone: 'neutral' }
+    )
 })
 
 test('non-customer threads appear only in Cerrados despite stale open-task and delivery fields', () => {
-  const groups = feed.groupThreads([{
-    id: 'not-customer',
-    status: 'done',
-    kind: 'other',
-    lost_reason: 'No es cliente: delivery',
-    status_changed_at: now.toISOString(),
-    promised_date: '2026-11-01',
-    delivery_date: '2026-11-19',
-    paid_amount: 100,
-    awaiting_reply: true,
-    follow_up_date: '2026-11-01',
-  }], now)
-  assert.deepEqual(groups.filter((group) => group.key !== 'closed').flatMap((group) => group.threads), [])
-  assert.deepEqual(groups.find((group) => group.key === 'closed').threads.map((thread) => thread.id), ['not-customer'])
+  const groups = feed.groupThreads(
+    [
+      {
+        id: 'not-customer',
+        status: 'done',
+        kind: 'other',
+        lost_reason: 'No es cliente: delivery',
+        status_changed_at: now.toISOString(),
+        promised_date: '2026-11-01',
+        delivery_date: '2026-11-19',
+        paid_amount: 100,
+        awaiting_reply: true,
+        follow_up_date: '2026-11-01',
+      },
+    ],
+    now
+  )
+  assert.deepEqual(
+    groups
+      .filter((group) => group.key !== 'closed')
+      .flatMap((group) => group.threads),
+    []
+  )
+  assert.deepEqual(
+    groups
+      .find((group) => group.key === 'closed')
+      .threads.map((thread) => thread.id),
+    ['not-customer']
+  )
 })
 
 for (const [index, key] of keys.slice(0, 5).entries()) {
@@ -161,7 +196,7 @@ test('waiting group alone is limited to eight until explicitly expanded', () => 
   )
 })
 
-test('row chip prioritizes earliest overdue date over reply and amount', () => {
+test('row chip prioritizes actual promised date, with distinct follow-up wording', () => {
   assert.deepEqual(
     feed.rowChip(
       open({
@@ -172,14 +207,14 @@ test('row chip prioritizes earliest overdue date over reply and amount', () => {
       }),
       now
     ),
-    { text: 'Vencido 2 d', tone: 'danger' }
+    { text: 'Prometido hoy', tone: 'warning' }
   )
   assert.deepEqual(feed.rowChip(open({ promised_date: '2026-11-19' }), now), {
     text: 'Prometido hoy',
     tone: 'warning',
   })
   assert.deepEqual(feed.rowChip(open({ follow_up_date: '2026-11-18' }), now), {
-    text: 'Vencido 1 d',
+    text: 'Seguimiento vencido 1 d',
     tone: 'danger',
   })
 })

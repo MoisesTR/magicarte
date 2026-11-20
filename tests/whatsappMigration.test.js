@@ -70,3 +70,31 @@ test('one additive delivery migration includes non-negative amount and monotone 
   assert.match(text, /delivery_method = excluded.delivery_method/)
   assert.doesNotMatch(text, /create table|security definer/i)
 })
+
+test('one newer additive AI tag migration constrains nullable tags and documents every upsert field', async () => {
+  const files = (await readdir('supabase/migrations')).filter((name) =>
+    name.endsWith('_add_whatsapp_ai_tags.sql')
+  )
+  assert.equal(files.length, 1)
+  assert.ok(files[0].slice(0, 14) > '20261120153722')
+  const text = await readFile(`supabase/migrations/${files[0]}`, 'utf8')
+  assert.match(text, /alter table public.whatsapp_threads/i)
+  assert.match(text, /add column ai_tag text null check \(ai_tag in \(/i)
+  for (const tag of [
+    'promised',
+    'follow_up',
+    'customer_deciding',
+    'new_lead',
+    'needs_quote',
+    'awaiting_payment',
+    'paid',
+    'customer_waiting',
+    'not_customer',
+  ])
+    assert.ok(text.includes(`'${tag}'`))
+  assert.match(text, /add column ai_tag_reason text null/i)
+  assert.match(text, /add column ai_tagged_at timestamptz null/i)
+  for (const field of ['ai_tag', 'ai_tag_reason', 'ai_tagged_at'])
+    assert.match(text, new RegExp(`${field} = excluded\\.${field}`))
+  assert.doesNotMatch(text, /create table|security definer|update public\./i)
+})

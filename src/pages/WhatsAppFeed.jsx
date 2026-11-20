@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import AdminLogin from '../components/AdminLogin'
 import { useBusiness } from '../context/BusinessContext'
@@ -21,6 +21,7 @@ import {
   markWhatsAppThread,
   markNotCustomer,
   registerWhatsAppPayment,
+  classifyWhatsAppThread,
 } from '../data/whatsappThreads'
 import ThreadCard from '../components/whatsapp/ThreadCard'
 import ThreadEditor from '../components/whatsapp/ThreadEditor'
@@ -95,6 +96,8 @@ function FeedGroups({
   onStatus,
   onNotCustomer,
   onPayment,
+  onClassify,
+  classifications = {},
   orderMatches,
   autoLinkedThreadIds = [],
 }) {
@@ -212,6 +215,8 @@ function FeedGroups({
                 onStatus={onStatus}
                 onNotCustomer={onNotCustomer}
                 onPayment={onPayment}
+                onClassify={onClassify}
+                classification={classifications[thread.id]}
               />
             ))}
           </div>
@@ -241,7 +246,9 @@ export default function WhatsAppFeed() {
   const { currentBusinessId, currentBusiness } = useBusiness()
   const query = useWhatsAppFeed(currentBusinessId)
   const [editor, setEditor] = useState(null),
-    [busy, setBusy] = useState(false)
+    [busy, setBusy] = useState(false),
+    [classifications, setClassifications] = useState({})
+  const pendingClassifications = useRef(new Set())
   if (!query.checkingAuth && !query.user)
     return <AdminLogin onLogin={query.onLogin} />
   if (query.loading)
@@ -272,16 +279,50 @@ export default function WhatsAppFeed() {
       setBusy(false)
     }
   }
+  const classify = async (thread) => {
+    const key = `${currentBusinessId}:${thread.id}`
+    if (thread.ai_tag != null || pendingClassifications.current.has(key)) return
+    pendingClassifications.current.add(key)
+    setClassifications((previous) => ({
+      ...previous,
+      [key]: { pending: true, error: null },
+    }))
+    try {
+      const result = await classifyWhatsAppThread(thread, currentBusinessId)
+      if (result.error) throw result.error
+      setClassifications((previous) => ({
+        ...previous,
+        [key]: { pending: false, error: null },
+      }))
+      await query.refresh()
+    } catch (error) {
+      setClassifications((previous) => ({
+        ...previous,
+        [key]: { pending: false, error: error.message },
+      }))
+    } finally {
+      pendingClassifications.current.delete(key)
+    }
+  }
   const save = async (payload) => {
+    let created = null
     if (
-      await mutate(() =>
-        editor?.thread
-          ? updateWhatsAppThread(editor.thread.id, payload, currentBusinessId)
-          : createWhatsAppThread(payload, currentBusinessId)
-      )
+      await mutate(async () => {
+        const result = editor?.thread
+          ? await updateWhatsAppThread(
+              editor.thread.id,
+              payload,
+              currentBusinessId
+            )
+          : await createWhatsAppThread(payload, currentBusinessId)
+        if (!editor?.thread) created = result.data
+        return result
+      })
     ) {
       setEditor(null)
       toast.success('Conversación guardada')
+      // One event-driven attempt after creation; never retry in an effect/render loop.
+      if (created && created.ai_tag == null) void classify(created)
     }
   }
   const reviewHours = hoursAgo(data?.lastReview?.reviewed_at, query.now)
@@ -339,6 +380,21 @@ export default function WhatsAppFeed() {
             {data.notice}. La migración debe aplicarse por separado.
           </p>
         )}
+        {Object.entries(classifications)
+          .filter(
+            ([key, value]) =>
+              key.startsWith(`${currentBusinessId}:`) && value.error
+          )
+          .map(([key, value]) => (
+            <p
+              key={key}
+              role='alert'
+              className='rounded-xl border border-gray-200 bg-white p-3 text-sm text-red-700'
+            >
+              No se pudo clasificar una conversación. {value.error} Puede
+              reintentar desde su detalle.
+            </p>
+          ))}
         {data?.available && (
           <FeedContent
             key={currentBusinessId}
@@ -348,6 +404,13 @@ export default function WhatsAppFeed() {
             autoLinkedThreadIds={data.autoLinkedThreadIds}
             now={query.now}
             ordersPath={`/admin/${currentBusiness.slug}/orders`}
+            onClassify={classify}
+            classifications={Object.fromEntries(
+              (data.threads || []).map((thread) => [
+                thread.id,
+                classifications[`${currentBusinessId}:${thread.id}`],
+              ])
+            )}
             busy={busy}
             onPayment={(thread, amount) =>
               mutate(() =>

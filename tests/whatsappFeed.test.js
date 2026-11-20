@@ -29,7 +29,7 @@ test('Managua date uses local day across UTC midnight; leap dates round trip', (
 })
 test('feed is mutually exclusive, ordered by urgency, and excludes old closed rows', () => {
   const rows = [
-    open('today', { promised_date: '2026-11-19', awaiting_reply: true }),
+    open('today', { promised_date: '2026-11-19' }),
     open('overdue', { follow_up_date: '2026-11-17' }),
     open('reply-new', {
       awaiting_reply: true,
@@ -75,28 +75,28 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
     groups.map((g) => g.threads.map((t) => t.id)),
     [
       [],
-      ['overdue', 'today'],
+      ['today'],
       ['reply-old', 'reply-new'],
       ['quote'],
       ['payment'],
-      ['waiting'],
+      ['overdue', 'waiting'],
       ['closed'],
       ['lost-recent'],
     ]
   )
-  assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 2 días')
-  assert.equal(groups[1].threads[1].timeHint, 'Prometido hoy')
+  assert.equal(groups[1].threads[0].timeHint, 'Prometido hoy')
+  assert.equal(groups[5].threads[0].timeHint, 'Seguimiento vencido 2 d')
   assert.equal(groups[2].threads[1].timeHint, 'Escribió hace 8 h')
-  assert.equal(groups[5].threads[0].timeHint, 'Sin respuesta hace 2 días')
+  assert.equal(groups[5].threads[1].timeHint, 'Sin respuesta hace 2 días')
   assert.deepEqual(feedKPIs(rows, now), {
     confirmed: 0,
-    today: 2,
+    today: 1,
     unanswered: 2,
     toQuote: 1,
     payments: 1,
   })
 })
-test('earliest of both due dates wins; closed cutoff uses status change, not creation', () => {
+test('due follow-up stays waiting despite future promise; closed cutoff uses status change', () => {
   const groups = groupThreads(
     [
       open('two', {
@@ -111,7 +111,7 @@ test('earliest of both due dates wins; closed cutoff uses status change, not cre
     ],
     now
   )
-  assert.equal(groups[1].threads[0].timeHint, 'Vencido hace 1 días')
+  assert.equal(groups[5].threads[0].timeHint, 'Seguimiento vencido 1 d')
   assert.equal(groups.find((g) => g.key === 'closed').threads.length, 1)
 })
 test('status and kind labels match the Spanish contract', () => {
