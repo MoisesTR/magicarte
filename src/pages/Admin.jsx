@@ -11,6 +11,8 @@ import { createPhotoDraft } from '../utils/productPhotoDraft'
 import { formatPresentationMoney } from '../utils/productPresentations'
 import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
 import ProductGallery from '../components/ProductGallery'
+import ProductTextField from '../components/ProductTextField'
+import { productTextContext } from '../utils/productTextEnhance'
 import { useBusiness } from '../context/BusinessContext'
 import { businessFilter } from '../data/scope'
 import {
@@ -649,51 +651,42 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div>
-                    <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
-                      <div>
-                        <label className='text-sm font-medium text-gray-700'>
-                          Descripción
-                        </label>
-                      </div>
-                    </div>
-                    <textarea
-                      required
-                      rows={8}
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent resize-y'
-                      placeholder='Agrega notas para la IA: ocasión, colores, nombres, estilo, detalles personalizados...'
-                    />
-                  </div>
+                  <ProductTextField
+                    key={`${currentBusinessId}:${quoteRequest.current}:description`}
+                    field='description'
+                    label='Descripción'
+                    required
+                    rows={8}
+                    value={formData.description}
+                    onChange={text => setFormData(current => ({ ...current, description: text }))}
+                    context={productTextContext(formData)}
+                    getSession={() => supabase.auth.getSession()}
+                    placeholder='Escriba una base: ocasión, colores, nombres o detalles personalizados...'
+                  />
 
-                  {/* Material y Técnica */}
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      🎨 Material y Técnica
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.material_technique}
-                      onChange={(e) => setFormData({ ...formData, material_technique: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
-                      placeholder='Ej: Trabajo realizado en MDF (Fibrán) mediante técnica de corte láser...'
-                    />
-                  </div>
+                  <ProductTextField
+                    key={`${currentBusinessId}:${quoteRequest.current}:material`}
+                    field='material'
+                    label='🎨 Material y Técnica'
+                    rows={2}
+                    value={formData.material_technique}
+                    onChange={text => setFormData(current => ({ ...current, material_technique: text }))}
+                    context={productTextContext(formData)}
+                    getSession={() => supabase.auth.getSession()}
+                    placeholder='Ej.: acrílico 3 mm, impresión UV, base de MDF...'
+                  />
 
-                  {/* Cuidados */}
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      ✨ Cuidados del Producto
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={formData.care_instructions}
-                      onChange={(e) => setFormData({ ...formData, care_instructions: e.target.value })}
-                      className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
-                      placeholder='Ej: Para limpiar tu producto te recomendamos usar una brocha seca...'
-                    />
-                  </div>
+                  <ProductTextField
+                    key={`${currentBusinessId}:${quoteRequest.current}:care`}
+                    field='care'
+                    label='✨ Cuidados del Producto'
+                    rows={3}
+                    value={formData.care_instructions}
+                    onChange={text => setFormData(current => ({ ...current, care_instructions: text }))}
+                    context={productTextContext(formData)}
+                    getSession={() => supabase.auth.getSession()}
+                    placeholder='Ej.: limpie con un paño suave y seco, evite el agua...'
+                  />
 
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                     <div>
