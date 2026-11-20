@@ -5,8 +5,24 @@ export const COMMISSION_RATE = 0.0675
 export const TZ = 'America/Managua'
 
 /** Today in Nicaragua as 'YYYY-MM-DD'. */
-export function nicaraguaToday() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: TZ })
+export function nicaraguaToday(now = new Date()) {
+  return new Date(now).toLocaleDateString('en-CA', { timeZone: TZ })
+}
+
+/** Date-only arithmetic, independent of the browser's timezone. */
+export function addDays(date, days) {
+  return new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000)
+    .toISOString()
+    .slice(0, 10)
+}
+
+/** Managua calendar week, inclusive Monday through Sunday. */
+export function nicaraguaWeek(now = new Date()) {
+  const today = nicaraguaToday(now)
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
+  const weekStart = addDays(today, -((weekday + 6) % 7))
+  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
+  return { today, weekStart, weekEnd: days[6], days }
 }
 
 /**
@@ -17,7 +33,7 @@ export function nicaraguaToday() {
 export function nicaraguaDay(value) {
   const raw = String(value || '')
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
-  return new Date(raw).toLocaleDateString('en-CA', { timeZone: TZ })
+  return nicaraguaToday(raw)
 }
 
 /** Gross, card total, commission and net for a list of payments. */

@@ -8,6 +8,8 @@ import * as presentations from '../src/utils/productPresentations.js'
 import * as quoteForms from '../src/utils/quoteForms.js'
 import * as payments from '../src/utils/orderPayments.js'
 import * as clientLink from '../src/utils/orderClientLink.js'
+import * as finance from '../src/utils/finance.js'
+import * as itemSave from '../src/utils/orderItemsSave.js'
 const require = createRequire(import.meta.url)
 function find(tree, predicate) {
   if (!tree || typeof tree !== 'object') return null
@@ -40,6 +42,8 @@ async function page(file, initial, imported = true, { failCreateOnce = false, fa
     if (name.endsWith('/BusinessContext')) return { useBusiness: () => ({ currentBusinessId: 2, currentBusiness: { slug: 'hikari', name: 'Hikari' } }) }
     if (name.endsWith('/supabaseClient')) return { supabase: {} }
     if (name.endsWith('/orderClientLink')) return clientLink
+    if (name.endsWith('/finance')) return finance
+    if (name.endsWith('/orderItemsSave')) return itemSave
     if (name.endsWith('/data/clients')) return new Proxy({}, { get: (_, method) => async (...args) => { calls.push([method, ...args]); if (failClientLink) return { data: null, error: new Error('Client unavailable') }; return { data: method === 'createClientReturning' ? { id: 'client' } : null, error: null } } })
     if (name.includes('/data/')) return new Proxy({}, { get: (_, method) => mutation(method) })
     if (name.endsWith('/productPresentations')) return presentations

@@ -1,3 +1,5 @@
+import { nicaraguaToday } from '../../utils/finance'
+import { replaceOrderItems } from '../../utils/orderItemsSave'
 import { resolveOrderClient } from '../../utils/orderClientLink'
 import { findClientByNormalizedPhone, findClientByExactName, createClientReturning } from '../../data/clients'
 import ThreadOrderDeliveryFields from '../../components/ThreadOrderDeliveryFields'
@@ -19,7 +21,7 @@ import {
   createOrder,
   updateOrder,
   deleteOrder as deleteOrderRow,
-  deleteOrderItems,
+  deleteOrderItemsByIds,
   insertOrderItems,
 } from '../../data/orders'
 import { addPayment, deletePayment as deletePaymentRow } from '../../data/payments'
@@ -33,8 +35,6 @@ const STATUSES = [
 ]
 
 const emptyItem = () => ({ product_name: '', material: '', color: '', hours_needed: '', weight_grams: '', quantity: 1, unit_price: '' })
-
-const today = () => new Date().toISOString().split('T')[0]
 
 const num = (v) => {
   const n = parseFloat(v)
@@ -53,7 +53,7 @@ function paymentStatusOf(totalAmount, payments) {
   return 'unpaid'
 }
 
-const initialForm = { customer_phone: '', client_id: null, notes: '', customer_name: '', order_date: today(), status: 'pending', items: [emptyItem()] }
+const initialForm = () => ({ customer_phone: '', client_id: null, notes: '', customer_name: '', order_date: nicaraguaToday(), status: 'pending', items: [emptyItem()] })
 
 /**
  * Hikari Studio (3D printing) order log. Lighter than Magic Arte's order form —
@@ -115,14 +115,14 @@ export default function HikariOrders() {
     orderDraft.clear()
     setShowForm(false)
     setEditingOrder(null)
-    setFormData(initialForm)
+    setFormData(initialForm())
   }
 
   const openCreate = () => {
     threadImport.clearImport()
     orderDraft.clear()
     setEditingOrder(null)
-    setFormData(initialForm)
+    setFormData(initialForm())
     setShowForm(true)
   }
 
@@ -135,7 +135,7 @@ export default function HikariOrders() {
       customer_phone: order.customer_phone || '',
       client_id: order.client_id || null,
       notes: order.notes || '',
-      order_date: order.order_date || today(),
+      order_date: order.order_date || nicaraguaToday(),
       status: order.status || 'pending',
       items: (order.order_items || []).length
         ? order.order_items.map((i) => ({
@@ -218,8 +218,6 @@ export default function HikariOrders() {
         const { error } = await updateOrder(editingOrder.id, orderData)
         if (error) throw error
         orderId = editingOrder.id
-        const { error: delErr } = await deleteOrderItems(orderId)
-        if (delErr) throw delErr
       } else {
         const { data, error } = await createOrder(
           { ...orderData, payment_status: 'unpaid', priority: 'normal', is_gift: false, delivery_method: 'pickup', delivery_fee: 0, ...importedDelivery },
@@ -229,24 +227,35 @@ export default function HikariOrders() {
         orderId = data[0].id
       }
 
-      const { error: itemsErr } = await insertOrderItems(
-        validItems.map((it) => ({
-          order_id: orderId,
-          product_id: it.product_id || null,
-          ...orderItemOptions(it),
-          product_name: it.product_name.trim(),
-          product_description: it.product_description || null,
-          material: it.material || null,
-          color: it.color || null,
-          hours_needed: it.hours_needed === '' ? null : num(it.hours_needed),
-          weight_grams: it.weight_grams === '' ? null : num(it.weight_grams),
-          quantity: num(it.quantity) || 1,
-          unit_price: num(it.unit_price),
-          subtotal: num(it.unit_price) * (num(it.quantity) || 1),
-        })),
-        currentBusinessId,
-      )
+      const items = validItems.map((it) => ({
+        order_id: orderId,
+        product_id: it.product_id || null,
+        ...orderItemOptions(it),
+        product_name: it.product_name.trim(),
+        product_description: it.product_description || null,
+        material: it.material || null,
+        color: it.color || null,
+        hours_needed: it.hours_needed === '' ? null : num(it.hours_needed),
+        weight_grams: it.weight_grams === '' ? null : num(it.weight_grams),
+        quantity: num(it.quantity) || 1,
+        unit_price: num(it.unit_price),
+        subtotal: num(it.unit_price) * (num(it.quantity) || 1),
+      }))
+      const { error: itemsErr, cleanupError } = editingOrder
+        ? await replaceOrderItems({
+            orderId,
+            previousIds: (editingOrder.order_items || []).map(item => item.id),
+            items,
+            insertOrderItems,
+            deleteOrderItemsByIds,
+            businessId: currentBusinessId,
+          })
+        : await insertOrderItems(items, currentBusinessId)
       if (itemsErr) throw itemsErr
+      if (cleanupError) {
+        console.error('Error cleaning previous order items:', cleanupError)
+        toast.error('Pedido guardado, pero no se pudieron limpiar productos anteriores; revise el pedido.')
+      }
 
       if (!editingOrder) await threadImport.completeConversion(orderId)
       toast.success(editingOrder ? 'Pedido actualizado' : 'Pedido creado')
@@ -284,7 +293,7 @@ export default function HikariOrders() {
     }
     try {
       const { error } = await addPayment(
-        { order_id: order.id, amount, method: payMethod, paid_at: today() },
+        { order_id: order.id, amount, method: payMethod, paid_at: nicaraguaToday() },
         currentBusinessId,
       )
       if (error) throw error

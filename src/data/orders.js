@@ -63,9 +63,25 @@ export function deleteOrder(id) {
   return supabase.from(TABLE.ORDERS).delete().eq('id', id)
 }
 
-/** Replace an order's line items: delete existing then insert the new set. */
+/** Delete all line items; editors use scoped id cleanup after insertion instead. */
 export function deleteOrderItems(orderId) {
   return supabase.from(TABLE.ORDER_ITEMS).delete().eq('order_id', orderId)
+}
+
+/** Delete only loaded item ids after verifying ownership through the parent order. */
+export async function deleteOrderItemsByIds(orderId, ids, businessId) {
+  if (orderId == null || orderId === '' || businessId == null || businessId === '') {
+    return { error: new Error('Order and business ids are required') }
+  }
+  if (!ids.length) return { error: null }
+  // order_items has no business_id; the parent supplies the mandatory scope.
+  const { data, error } = await supabase.from(TABLE.ORDERS).select('id')
+    .eq('id', orderId).eq('business_id', businessId).maybeSingle()
+  if (error) return { error }
+  if (!data || String(data.id) !== String(orderId)) {
+    return { error: new Error('Order not found in business') }
+  }
+  return supabase.from(TABLE.ORDER_ITEMS).delete().eq('order_id', orderId).in('id', ids)
 }
 
 export function insertOrderItems(items, businessId) {

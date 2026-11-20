@@ -1,3 +1,5 @@
+import { nicaraguaToday, nicaraguaWeek, addDays, daysBetween } from '../utils/finance'
+import { replaceOrderItems } from '../utils/orderItemsSave'
 import { resolveOrderClient } from '../utils/orderClientLink'
 import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
 import ThreadOrderDraftNotice from '../components/ThreadOrderDraftNotice'
@@ -18,7 +20,7 @@ import {
   createOrder,
   updateOrder,
   deleteOrder as deleteOrderRow,
-  deleteOrderItems,
+  deleteOrderItemsByIds,
   insertOrderItems,
 } from '../data/orders'
 import {
@@ -47,7 +49,7 @@ export default function Orders() {
   // In-person business (engraving): no delivery / recipient / gift fields.
   const isInPerson = currentBusiness?.slug === 'joyeria-trigueros'
   // Current month (YYYY-MM) in Nicaragua time, regardless of where the app runs.
-  const currentMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Managua' }).slice(0, 7)
+  const currentMonth = nicaraguaToday().slice(0, 7)
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [orders, setOrders] = useState([])
@@ -81,14 +83,14 @@ export default function Orders() {
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     method: 'transferencia',
-    paid_at: new Date().toISOString().split('T')[0],
+    paid_at: nicaraguaToday(),
     note: ''
   })
   const ITEMS_PER_PAGE = 10
   // Temporary UI toggles. Flip to true to bring these back.
   const SHOW_SOCIAL_MEDIA = false
   const SHOW_WHATSAPP_REMINDER = false
-  const orderDraft = useThreadOrderDraft(() => newOrderForm(new Date().toISOString().split('T')[0]), {
+  const orderDraft = useThreadOrderDraft(() => newOrderForm(nicaraguaToday()), {
     businessId: currentBusinessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession(),
   })
   const { formData, setFormData } = orderDraft
@@ -155,7 +157,7 @@ export default function Orders() {
           deliveryDate: quoteDeliveryDate,
           clients: clientsResult.error ? [] : (clientsResult.data || []),
           linkedProduct: productResult.error ? null : productResult.data,
-          orderDate: new Date().toISOString().split('T')[0],
+          orderDate: nicaraguaToday(),
         })
         prefilled.items[0]._key = crypto.randomUUID()
         orderDraft.clear()
@@ -501,9 +503,6 @@ export default function Orders() {
 
         if (error) throw error
         orderId = editingOrder.id
-
-        const { error: deleteError } = await deleteOrderItems(orderId)
-        if (deleteError) throw deleteError
       } else {
         if (sourceQuote) orderData.calculator_data = calculatorDataFromQuote(sourceQuote)
         const { data, error } = await createOrder(orderData, currentBusinessId)
@@ -536,9 +535,22 @@ export default function Orders() {
         return row
       })
 
-      const { error: itemsError } = await insertOrderItems(items, currentBusinessId)
+      const { error: itemsError, cleanupError } = editingOrder
+        ? await replaceOrderItems({
+            orderId,
+            previousIds: (editingOrder.order_items || []).map(item => item.id),
+            items,
+            insertOrderItems,
+            deleteOrderItemsByIds,
+            businessId: currentBusinessId,
+          })
+        : await insertOrderItems(items, currentBusinessId)
 
       if (itemsError) throw itemsError
+      if (cleanupError) {
+        console.error('Error cleaning previous order items:', cleanupError)
+        toast.error('Pedido guardado, pero no se pudieron limpiar productos anteriores; revise el pedido.')
+      }
 
       if (!editingOrder && sourceQuote) {
         const params = new URLSearchParams(location.search)
@@ -564,7 +576,7 @@ export default function Orders() {
     quoteRequest.current += 1
     setSourceQuote(null)
     setExistingQuoteOrder(null)
-    setFormData(newOrderForm(new Date().toISOString().split('T')[0]))
+    setFormData(newOrderForm(nicaraguaToday()))
     setEditingOrder(null)
     setEditPayments([])
     setClientMatches([])
@@ -585,7 +597,7 @@ export default function Orders() {
       customer_social_media: order.customer_social_media || '',
       delivery_address: order.delivery_address || '',
       delivery_method: order.delivery_method || 'delivery',
-      order_date: order.order_date || new Date().toISOString().split('T')[0],
+      order_date: order.order_date || nicaraguaToday(),
       status: order.status,
       priority: order.priority,
       payment_status: order.payment_status || 'unpaid',
@@ -620,7 +632,7 @@ export default function Orders() {
     setPaymentForm({
       amount: '',
       method: 'transferencia',
-      paid_at: new Date().toISOString().split('T')[0],
+      paid_at: nicaraguaToday(),
       note: ''
     })
     setEditingOrder(order)
@@ -680,7 +692,7 @@ export default function Orders() {
         order_id: editingOrder.id,
         amount,
         method: paymentForm.method,
-        paid_at: paymentForm.paid_at || new Date().toISOString().split('T')[0],
+        paid_at: paymentForm.paid_at || nicaraguaToday(),
         note: paymentForm.note.trim() || null
       },
       currentBusinessId,
@@ -695,7 +707,7 @@ export default function Orders() {
     setPaymentForm({
       amount: '',
       method: paymentForm.method,
-      paid_at: new Date().toISOString().split('T')[0],
+      paid_at: nicaraguaToday(),
       note: ''
     })
     toast.success('Pago registrado')
@@ -851,10 +863,7 @@ export default function Orders() {
 
   const getDeliveryCountdown = (deliveryDate, status) => {
     if (!deliveryDate || status === 'completed' || status === 'canceled') return null
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const delivery = new Date(deliveryDate + 'T00:00:00')
-    const diffDays = Math.ceil((delivery - today) / (1000 * 60 * 60 * 24))
+    const diffDays = daysBetween(nicaraguaToday(), deliveryDate)
 
     if (diffDays < 0) return { text: `Vencido (${Math.abs(diffDays)}d)`, color: 'bg-red-700 text-white' }
     if (diffDays === 0) return { text: 'Hoy', color: 'bg-red-600 text-white' }
@@ -1028,24 +1037,8 @@ export default function Orders() {
 
   const ACTIVE_STATUSES = ['pending', 'confirmed', 'in_progress', 'ready']
 
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  // Current week: Monday to Sunday (local time)
-  const dayOfWeek = now.getDay() // 0=Sun, 1=Mon...
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diffToMonday)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
-  const weekEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    return { date: d, dateStr }
-  })
+  const { today, weekStart, weekEnd, days } = nicaraguaWeek()
+  const weekDays = days.map(dateStr => ({ date: new Date(`${dateStr}T12:00:00Z`), dateStr }))
 
   const filteredOrders = orders.filter(order => {
     if (filterStatus === 'active' && !ACTIVE_STATUSES.includes(order.status)) return false
@@ -1207,7 +1200,7 @@ export default function Orders() {
                 {weekDays.map(({ date, dateStr }) => {
                   const isToday = dateStr === today
                   const isSelected = selectedDay === dateStr
-                  const dayName = date.toLocaleDateString('es', { weekday: 'short' })
+                  const dayName = date.toLocaleDateString('es', { weekday: 'short', timeZone: 'UTC' })
                   const count = weekDayCounts[dateStr] || 0
                   return (
                     <button
@@ -1222,7 +1215,7 @@ export default function Orders() {
                       }`}
                     >
                       <span className='text-[10px] font-semibold uppercase'>{dayName}</span>
-                      <span className='text-lg font-bold'>{date.getDate()}</span>
+                      <span className='text-lg font-bold'>{date.getUTCDate()}</span>
                       {count > 0 && (
                         <span className={`text-[10px] font-bold px-1.5 rounded-full ${
                           isSelected ? 'bg-white/30' : 'bg-orange-100 text-orange-700'
@@ -2061,9 +2054,7 @@ export default function Orders() {
                                 key={days}
                                 type='button'
                                 onClick={() => {
-                                  const base = formData.order_date ? new Date(formData.order_date + 'T00:00:00') : new Date()
-                                  base.setDate(base.getDate() + days)
-                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  const dateStr = addDays(formData.order_date || nicaraguaToday(), days)
                                   setFormData({ ...formData, estimated_delivery_date: dateStr })
                                 }}
                                 className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-[#51c879] hover:text-white transition-colors'
@@ -2339,9 +2330,7 @@ export default function Orders() {
                               <button
                                 type='button'
                                 onClick={() => {
-                                  const base = new Date(formData.estimated_delivery_date + 'T00:00:00')
-                                  base.setDate(base.getDate() - 1)
-                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  const dateStr = addDays(formData.estimated_delivery_date, -1)
                                   setFormData({
                                     ...formData,
                                     follow_up_reason: formData.follow_up_reason || 'confirm_delivery_details',
@@ -2358,9 +2347,7 @@ export default function Orders() {
                                 key={days}
                                 type='button'
                                 onClick={() => {
-                                  const base = new Date()
-                                  base.setDate(base.getDate() + days)
-                                  const dateStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                                  const dateStr = addDays(nicaraguaToday(), days)
                                   setFormData({ ...formData, follow_up_date: dateStr })
                                 }}
                                 className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-amber-500 hover:text-white transition-colors'

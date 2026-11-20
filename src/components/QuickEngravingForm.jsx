@@ -1,3 +1,5 @@
+import { nicaraguaToday } from '../utils/finance'
+import { replaceOrderItems } from '../utils/orderItemsSave'
 import { resolveOrderClient } from '../utils/orderClientLink'
 import { findClientByNormalizedPhone, findClientByExactName, createClientReturning } from '../data/clients'
 import ThreadOrderDeliveryFields from './ThreadOrderDeliveryFields'
@@ -9,7 +11,7 @@ import OrderItemOptions from './OrderItemOptions'
 import { catalogOrderItem, configuredOrderTotal, orderItemInsertSnapshot, orderItemOptions, orderItemDetailLines } from '../utils/productPresentations'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { createOrder, updateOrder, deleteOrderItems, insertOrderItems, fetchOrderProducts } from '../data/orders'
+import { createOrder, updateOrder, deleteOrderItemsByIds, insertOrderItems, fetchOrderProducts } from '../data/orders'
 import { addPayment, updatePayment } from '../data/payments'
 import { ENGRAVING_MATERIALS } from '../utils/constants'
 
@@ -17,8 +19,6 @@ const num = (v) => {
   const n = parseFloat(v)
   return Number.isFinite(n) ? n : 0
 }
-
-const today = () => new Date().toISOString().split('T')[0]
 
 /**
  * Lightweight job log for the engraving business (Joyería). Captures just the
@@ -53,7 +53,7 @@ export default function QuickEngravingForm({
   const isLegacyJob = Boolean(editingOrder) && !existingItem?.product_description
   const legacyNote = isLegacyJob ? editingOrder?.customer_name || '' : ''
 
-  const [baseDate, setBaseDate] = useState(editingOrder?.order_date || initialThreadForm?.order_date || today())
+  const [baseDate, setBaseDate] = useState(editingOrder?.order_date || initialThreadForm?.order_date || nicaraguaToday())
   const [baseClientName, setBaseClientName] = useState(isLegacyJob ? '' : editingOrder?.customer_name || initialThreadForm?.customer_name || '')
   const [baseDescription, setBaseDescription] = useState(existingItem?.product_description || initialThreadForm?.items?.[0]?.product_description || legacyNote)
   const [baseTotal, setBaseTotal] = useState(editingOrder ? String(editingOrder.total_amount ?? '') : String(initialThreadForm?.items?.[0]?.unit_price ?? ''))
@@ -182,9 +182,6 @@ export default function QuickEngravingForm({
         })
         if (orderErr) throw orderErr
         orderId = editingOrder.id
-
-        const { error: delErr } = await deleteOrderItems(orderId)
-        if (delErr) throw delErr
       } else {
         const { data: orderRows, error: orderErr } = await createOrder(
           {
@@ -212,7 +209,7 @@ export default function QuickEngravingForm({
         orderId = orderRows[0].id
       }
 
-      const { error: itemErr } = await insertOrderItems([
+      const items = [
         {
           order_id: orderId,
           product_id: catalogItem.product_id || null,
@@ -233,8 +230,23 @@ export default function QuickEngravingForm({
           unit_price: num(item.unit_price), subtotal: configuredOrderTotal(item), rush_fee: num(item.rush_fee),
           ...orderItemOptions(item),
         } : orderItemInsertSnapshot(item, orderId)),
-      ], businessId)
+      ]
+      const { error: itemErr, cleanupError } = editingOrder
+        ? await replaceOrderItems({
+            orderId,
+            previousIds: (editingOrder.order_items || []).map(item => item.id),
+            items,
+            insertOrderItems,
+            deleteOrderItemsByIds,
+            businessId,
+          })
+        : await insertOrderItems(items, businessId)
       if (itemErr) throw itemErr
+      if (cleanupError) {
+        console.error('Error cleaning previous order items:', cleanupError)
+        toast.error('Pedido guardado, pero no se pudieron limpiar productos anteriores; revise el pedido.')
+        onSaved?.(orderId)
+      }
 
       if (logsFullPayment && existingPayment) {
         const { error: payErr } = await updatePayment(existingPayment.id, {
@@ -254,7 +266,7 @@ export default function QuickEngravingForm({
       if (initialThreadForm && threadConversion) await threadConversion.completeConversion(orderId)
       if (clientLinkFailed) toast.error('Pedido guardado, pero no se pudo vincular el cliente.')
       toast.success(initialThreadForm ? 'Pedido creado sin registrar pago' : editingOrder ? 'Grabado actualizado' : 'Grabado registrado')
-      onSaved?.(orderId)
+      if (!cleanupError) onSaved?.(orderId)
       onClose?.()
     } catch (e) {
       toast.error('Error al guardar: ' + e.message)

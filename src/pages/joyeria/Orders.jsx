@@ -1,3 +1,4 @@
+import { nicaraguaToday } from '../../utils/finance'
 import useThreadOrderImport from '../../hooks/useThreadOrderImport'
 import ThreadConversionNotice from '../../components/ThreadConversionNotice'
 import useOrderDeepLink from '../../hooks/useOrderDeepLink'
@@ -38,7 +39,7 @@ function splitOf(o) {
 
 const monthKey = (d) => (d || '').slice(0, 7) // 'YYYY-MM'
 
-const currentMonthKey = () => new Date().toISOString().slice(0, 7)
+const currentMonthKey = () => nicaraguaToday().slice(0, 7)
 
 /** Shift a 'YYYY-MM' key by N months. */
 function shiftMonth(key, delta) {

@@ -5,6 +5,8 @@ import { createRequire } from 'node:module'
 import { transform } from 'esbuild'
 import * as helpers from '../src/utils/productPresentations.js'
 import * as clientLink from '../src/utils/orderClientLink.js'
+import * as finance from '../src/utils/finance.js'
+import * as itemSave from '../src/utils/orderItemsSave.js'
 const clients = {
   findClientByNormalizedPhone: async () => ({ data: null, error: null }),
   createClientReturning: async () => ({ data: { id: 'client' }, error: null }),
@@ -47,12 +49,14 @@ async function engravingFormWithClient(calls, overrides = {}) {
       },
     },
     '../utils/orderClientLink': clientLink,
+    '../utils/finance': finance,
+    '../utils/orderItemsSave': itemSave,
     '../data/clients': clients,
     '../data/orders': Object.fromEntries(
       [
         'createOrder',
         'updateOrder',
-        'deleteOrderItems',
+        'deleteOrderItemsByIds',
         'insertOrderItems',
         'fetchOrderProducts',
       ].map((name) => [name, mutation(name)])
@@ -291,6 +295,8 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
     },
     '../../config/supabaseClient': {},
     '../../utils/orderClientLink': clientLink,
+    '../../utils/finance': finance,
+    '../../utils/orderItemsSave': itemSave,
     '../../data/clients': clients,
     '../../data/orders': Object.fromEntries(
       [
@@ -299,7 +305,7 @@ for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-s
         'createOrder',
         'updateOrder',
         'deleteOrder',
-        'deleteOrderItems',
+        'deleteOrderItemsByIds',
         'insertOrderItems',
       ].map((name) => [name, mutation(name)])
     ),

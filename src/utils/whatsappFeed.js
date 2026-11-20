@@ -1,5 +1,7 @@
 export { aiTagChip } from './whatsappTags.js'
 import { newOrderForm } from './quoteForms.js'
+import { addDays, nicaraguaToday } from './finance.js'
+export { addDays } from './finance.js'
 
 export const STATUS_LABELS = {
   to_quote: 'Por cotizar',
@@ -90,17 +92,7 @@ export function matchThreadsToOrders(threads, orders) {
 
 /** Calendar arithmetic is date-only; timestamps are always interpreted in Managua. */
 export function managuaDay(now = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Managua',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(now))
-}
-export function addDays(date, days) {
-  return new Date(Date.parse(`${date}T12:00:00Z`) + days * DAY)
-    .toISOString()
-    .slice(0, 10)
+  return nicaraguaToday(now)
 }
 const dayDifference = (a, b) =>
   Math.round(
