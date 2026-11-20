@@ -262,7 +262,7 @@ test('picker thumbnail opens native accessible modal; close button closes and mi
     onChange() {},
   }
   let tree = h.render(props)
-  assert.match(text(tree), /Elige tus diseños de la foto principal/)
+  assert.match(text(tree), /Elija sus diseños de la foto principal/)
   const dialog = nodes(tree).find((row) => row.type === 'dialog')
   assert.ok(dialog.props['aria-labelledby'])
   assert.equal(nodes(tree).filter((row) => row.type === 'img').length, 2)
@@ -286,7 +286,7 @@ test('picker thumbnail opens native accessible modal; close button closes and mi
       { id: 'e', name: 'Eevee' },
     ],
   })
-  assert.doesNotMatch(text(tree), /Elige tus diseños de la foto principal/)
+  assert.doesNotMatch(text(tree), /Elija sus diseños de la foto principal/)
   assert.match(text(tree), /2 · Eevee/)
 })
 

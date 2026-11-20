@@ -63,7 +63,7 @@ test('feed is mutually exclusive, ordered by urgency, and excludes old closed ro
     [
       'Confirmados',
       'Responder hoy',
-      'Esperando tu respuesta',
+      'Sin responder',
       'Por cotizar',
       'Pagos pendientes',
       'Esperando al cliente',

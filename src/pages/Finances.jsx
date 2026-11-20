@@ -38,7 +38,7 @@ function CombinedFinances({ loading, earnings, settlements }) {
         <div className='admin-page-header bg-white rounded-2xl shadow-soft p-4 sm:p-5'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Studio HQ</p>
           <h1 className='mt-1 text-xl font-bold text-gray-800'>Finanzas consolidadas</h1>
-          <p className='mt-1 text-sm text-gray-500'>Totales acumulados de los negocios a los que tienes acceso.</p>
+          <p className='mt-1 text-sm text-gray-500'>Totales acumulados de los negocios a los que tiene acceso.</p>
         </div>
 
         {loading ? (
@@ -48,7 +48,7 @@ function CombinedFinances({ loading, earnings, settlements }) {
             <div className='grid grid-cols-1 gap-3 sm:grid-cols-4'>
               <FinanceCard label='Cobrado' value={money(totals.collected)} tone='bg-sky-50 text-sky-900' hint={`${totals.orders} pedido${totals.orders !== 1 ? 's' : ''}`} />
               <FinanceCard label='Parte de socios' value={money(totals.partner)} tone='bg-amber-50 text-amber-900' hint='De pedidos totalmente pagados' />
-              <FinanceCard label='Neto para ti' value={money(totals.mine)} tone='bg-emerald-50 text-emerald-900' hint='Después de repartos y reembolsos' />
+              <FinanceCard label='Neto para usted' value={money(totals.mine)} tone='bg-emerald-50 text-emerald-900' hint='Después de repartos y reembolsos' />
               <FinanceCard label='Por liquidar' value={money(settlements.reduce((sum, row) => sum + Number(row.partner_owed || 0), 0))} tone='bg-violet-50 text-violet-900' hint='Socios configurados' />
             </div>
 
@@ -65,7 +65,7 @@ function CombinedFinances({ loading, earnings, settlements }) {
                       <div><p className='font-semibold text-gray-800'>{row.name}</p><p className='text-xs text-gray-400'>{row.orders_count} pedido{Number(row.orders_count) !== 1 ? 's' : ''}</p></div>
                       <Metric label='Cobrado' value={money(row.collected)} />
                       <Metric label='Socio' value={money(row.partner_share_paid)} />
-                      <Metric label='Neto para ti' value={money(row.net_to_us_paid)} strong />
+                      <Metric label='Neto para usted' value={money(row.net_to_us_paid)} strong />
                     </div>
                   ))}
                 </div>
@@ -310,23 +310,23 @@ export default function Finances() {
               <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
                 <div className='bg-gradient-to-br from-[#51c879]/10 to-[#50bfe6]/10 p-4 rounded-xl'>
                   <p className='text-xs text-gray-500 font-medium mb-1'>Ingresos brutos</p>
-                  <p className='text-xl font-bold text-gray-900'>C$ {monthSummary.paid.toFixed(0)}</p>
+                  <p className='text-xl font-bold text-gray-900'>{money(monthSummary.paid)}</p>
                 </div>
                 <div className='bg-gradient-to-br from-violet-50 to-violet-100 p-4 rounded-xl'>
                   <p className='text-xs text-violet-600 font-medium mb-1'>Comisión tarjeta</p>
-                  <p className='text-xl font-bold text-violet-900'>− C$ {monthSummary.commission.toFixed(0)}</p>
+                  <p className='text-xl font-bold text-violet-900'>− {money(monthSummary.commission)}</p>
                   {monthSummary.paidCard > 0 && (
-                    <p className='text-[11px] text-violet-400 mt-0.5'>de C$ {monthSummary.paidCard.toFixed(0)} en tarjeta</p>
+                    <p className='text-[11px] text-violet-400 mt-0.5'>de {money(monthSummary.paidCard)} en tarjeta</p>
                   )}
                 </div>
                 <div className='bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-xl'>
                   <p className='text-xs text-emerald-600 font-medium mb-1'>Neto recibido</p>
-                  <p className='text-xl font-bold text-emerald-900'>C$ {monthSummary.net.toFixed(0)}</p>
+                  <p className='text-xl font-bold text-emerald-900'>{money(monthSummary.net)}</p>
                 </div>
                 <div className='bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-xl'>
                   <p className='text-xs text-red-500 font-medium mb-1'>Pendiente de cobro</p>
-                  <p className='text-xl font-bold text-red-900'>C$ {totalPending.toFixed(0)}</p>
-                  <p className='text-[11px] text-red-400 mt-0.5'>Lo que clientes aún te deben · {pendingOrders.length} pedido{pendingOrders.length !== 1 ? 's' : ''}</p>
+                  <p className='text-xl font-bold text-red-900'>{money(totalPending)}</p>
+                  <p className='text-[11px] text-red-400 mt-0.5'>Lo que los clientes aún le deben · {pendingOrders.length} pedido{pendingOrders.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
             </div>
@@ -347,7 +347,7 @@ export default function Finances() {
                 <div className='mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3'>
                   <div><p className='text-amber-700/75'>Facturado</p><p className='font-semibold text-amber-950'>{money(currentSettlement.gross)}</p></div>
                   <div><p className='text-amber-700/75'>Materiales</p><p className='font-semibold text-amber-950'>{money(currentSettlement.material_total)}</p></div>
-                  <div><p className='text-amber-700/75'>Tu parte</p><p className='font-semibold text-amber-950'>{money(currentSettlement.your_take)}</p></div>
+                  <div><p className='text-amber-700/75'>Su parte</p><p className='font-semibold text-amber-950'>{money(currentSettlement.your_take)}</p></div>
                 </div>
               </div>
             )}
@@ -369,8 +369,8 @@ export default function Finances() {
                           {monthLabelShort(ym)}
                         </button>
                         <span className='text-gray-700 font-semibold'>
-                          C$ {net.toFixed(0)}
-                          {commission > 0 && <span className='text-gray-400 font-normal'> (−{commission.toFixed(0)} comisión)</span>}
+                          {money(net)}
+                          {commission > 0 && <span className='text-gray-400 font-normal'> (−{money(commission)} comisión)</span>}
                         </span>
                       </div>
                       <div className='h-2 bg-gray-100 rounded-full overflow-hidden'>
@@ -401,7 +401,7 @@ export default function Finances() {
                             {methodLabel[method]}
                           </span>
                           <span className='font-semibold text-gray-800'>
-                            C$ {amount.toFixed(0)} <span className='text-gray-400 font-normal'>({pct.toFixed(0)}%)</span>
+                            {money(amount)} <span className='text-gray-400 font-normal'>({pct.toFixed(0)}%)</span>
                           </span>
                         </div>
                         <div className='h-2.5 bg-gray-100 rounded-full overflow-hidden'>
@@ -411,7 +411,7 @@ export default function Finances() {
                           />
                         </div>
                         {method === 'tarjeta' && (
-                          <p className='text-[11px] text-violet-400 mt-1'>Comisión 6.75%: − C$ {(amount * COMMISSION_RATE).toFixed(0)}</p>
+                          <p className='text-[11px] text-violet-400 mt-1'>Comisión 6.75%: − {money(amount * COMMISSION_RATE)}</p>
                         )}
                       </div>
                     ))}
@@ -443,9 +443,9 @@ export default function Finances() {
                         </div>
                       </div>
                       <div className='text-right flex-shrink-0'>
-                        <p className='text-sm font-bold text-gray-800'>C$ {o.paid.toFixed(0)}</p>
+                        <p className='text-sm font-bold text-gray-800'>{money(o.paid)}</p>
                         {o.commission > 0.009 && (
-                          <p className='text-[11px] text-violet-400'>neto C$ {o.net.toFixed(0)}</p>
+                          <p className='text-[11px] text-violet-400'>neto {money(o.net)}</p>
                         )}
                       </div>
                       <button
@@ -464,7 +464,7 @@ export default function Finances() {
                   ))}
                   <div className='flex justify-between pt-2 text-sm font-semibold text-gray-700 border-t border-gray-100 mt-2'>
                     <span>{monthDrilldown.length} pedido{monthDrilldown.length !== 1 ? 's' : ''}</span>
-                    <span>C$ {monthDrilldown.reduce((s, o) => s + o.net, 0).toFixed(0)} neto</span>
+                    <span>{money(monthDrilldown.reduce((s, o) => s + o.net, 0))} neto</span>
                   </div>
                 </div>
               )}
@@ -484,8 +484,8 @@ export default function Finances() {
                           <p className='text-xs text-gray-400'>Pedido #{o.order_number} · {daysOpen}d abierto</p>
                         </div>
                         <div className='text-right flex-shrink-0'>
-                          <p className='text-sm font-bold text-red-600'>C$ {o.balance.toFixed(0)}</p>
-                          <p className='text-xs text-gray-400'>de C$ {getOrderChargeTotal(o).toFixed(0)}</p>
+                          <p className='text-sm font-bold text-red-600'>{money(o.balance)}</p>
+                          <p className='text-xs text-gray-400'>de {money(getOrderChargeTotal(o))}</p>
                         </div>
                         <button
                           onClick={() => navigate(`/admin/${currentBusiness.slug}/orders`, o.client_id ? { state: { clientId: o.client_id, clientName: o.customer_name } } : { state: { search: o.customer_name } })}
@@ -522,9 +522,9 @@ export default function Finances() {
                         {p.orders?.customer_name || '—'}
                         {p.note && <span className='text-gray-400'> · {p.note}</span>}
                       </span>
-                      <span className='font-semibold text-gray-800 flex-shrink-0'>C$ {Number(p.amount).toFixed(0)}</span>
+                      <span className='font-semibold text-gray-800 flex-shrink-0'>{money(Number(p.amount))}</span>
                       {p.method === 'tarjeta' && (
-                        <span className='text-[11px] text-violet-400 flex-shrink-0'>−C$ {(Number(p.amount) * COMMISSION_RATE).toFixed(0)}</span>
+                        <span className='text-[11px] text-violet-400 flex-shrink-0'>−{money(Number(p.amount) * COMMISSION_RATE)}</span>
                       )}
                     </div>
                   ))}

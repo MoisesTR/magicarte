@@ -1,8 +1,5 @@
-/** Normalize free-text phones, using local digits only for Nicaragua's +505. */
-export function normalizeClientPhone(phone) {
-  const digits = String(phone || '').replace(/\D/g, '')
-  return digits.length === 11 && digits.startsWith('505') ? digits.slice(3) : digits
-}
+import { normalizePhone as normalizeClientPhone } from './phone.js'
+export { normalizeClientPhone }
 
 /** Resolve a client id without mutating customer data or blocking an order save. */
 export async function resolveOrderClient({ formData, findClientByPhone, findClientByName, createClientReturning, businessId, onError }) {

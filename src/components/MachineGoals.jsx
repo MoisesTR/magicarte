@@ -219,11 +219,11 @@ export default function MachineGoals({ businessId }) {
 
       {machines.length === 0 ? (
         <p className='text-sm text-gray-400 text-center py-6'>
-          Todavía no registrás máquinas. Agregá una para seguir cuánto falta para pagarla este ciclo.
+          Todavía no ha registrado máquinas. Agregue una para seguir cuánto falta para pagarla este ciclo.
         </p>
       ) : !selected ? (
         <p className='text-sm text-gray-400 text-center py-6'>
-          Elegí una máquina para ver cuánto te falta vender en su ciclo.
+          Elija una máquina para ver cuánto le falta vender en su ciclo.
         </p>
       ) : (
         <>

@@ -1,4 +1,5 @@
-import { nicaraguaToday, nicaraguaWeek, addDays, daysBetween } from '../utils/finance'
+import { normalizePhone } from '../utils/phone'
+import { nicaraguaToday, nicaraguaWeek, addDays, daysBetween, moneyNIO } from '../utils/finance'
 import { replaceOrderItems } from '../utils/orderItemsSave'
 import { resolveOrderClient } from '../utils/orderClientLink'
 import useThreadOrderDraft from '../hooks/useThreadOrderDraft'
@@ -46,8 +47,7 @@ export default function Orders() {
   const [sourceQuote, setSourceQuote] = useState(null)
   const [existingQuoteOrder, setExistingQuoteOrder] = useState(null)
   const { currentBusinessId, currentBusiness } = useBusiness()
-  // In-person business (engraving): no delivery / recipient / gift fields.
-  const isInPerson = currentBusiness?.slug === 'joyeria-trigueros'
+
   // Current month (YYYY-MM) in Nicaragua time, regardless of where the app runs.
   const currentMonth = nicaraguaToday().slice(0, 7)
   const [user, setUser] = useState(null)
@@ -78,7 +78,7 @@ export default function Orders() {
   const [clientMatches, setClientMatches] = useState([])
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [clientSearchLoading, setClientSearchLoading] = useState(false)
-  const [openWhatsAppMenuId, setOpenWhatsAppMenuId] = useState(null)
+
   const [editPayments, setEditPayments] = useState([])
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
@@ -87,9 +87,7 @@ export default function Orders() {
     note: ''
   })
   const ITEMS_PER_PAGE = 10
-  // Temporary UI toggles. Flip to true to bring these back.
-  const SHOW_SOCIAL_MEDIA = false
-  const SHOW_WHATSAPP_REMINDER = false
+
   const orderDraft = useThreadOrderDraft(() => newOrderForm(nicaraguaToday()), {
     businessId: currentBusinessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession(),
   })
@@ -183,11 +181,6 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentBusinessId, quoteId, quoteDeliveryDate])
 
-  // Engraving is a log of completed jobs → show all by default; otherwise active.
-  useEffect(() => {
-    setFilterStatus(isInPerson ? 'all' : 'active')
-  }, [isInPerson])
-
   useEffect(() => {
     if (location.state?.clientId) {
       setFilterClientId(location.state.clientId)
@@ -278,8 +271,6 @@ export default function Orders() {
         hours_needed: 0,
         rush_fee: 0,
         is_custom: false,
-        material: '',
-        engraving_minutes: ''
       }]
     })
   }
@@ -339,7 +330,7 @@ export default function Orders() {
         newItems[index].unit_price = 0
       }
     }
-    
+
     setFormData({ ...formData, items: newItems })
   }
 
@@ -406,7 +397,6 @@ export default function Orders() {
       client_id: client.id,
       customer_name: client.name || '',
       customer_phone: client.phone || '',
-      customer_social_media: client.social_media || '',
       delivery_address: client.delivery_address || '',
     }))
     setClientMatches([])
@@ -427,7 +417,6 @@ export default function Orders() {
       ...prev,
       customer_name: data.name || '',
       customer_phone: data.phone || '',
-      customer_social_media: data.social_media || '',
       delivery_address: data.delivery_address || '',
     }))
     toast.success('Datos del cliente sincronizados')
@@ -477,21 +466,18 @@ export default function Orders() {
       const orderData = {
         client_id: clientId,
         customer_name: formData.customer_name,
-        customer_phone: isInPerson ? null : (formData.customer_phone || null),
-        customer_social_media: formData.customer_social_media || null,
-        delivery_address: isInPerson ? null : (formData.delivery_address || null),
-        delivery_method: isInPerson ? 'pickup' : formData.delivery_method,
+        customer_phone: formData.customer_phone || null,
+        delivery_address: formData.delivery_address || null,
+        delivery_method: formData.delivery_method,
         order_date: formData.order_date,
         status: formData.status,
         priority: formData.priority,
-        follow_up_reason: formData.follow_up_reason || null,
-        follow_up_date: formData.follow_up_date || null,
         notes: formData.notes || null,
         estimated_delivery_date: formData.estimated_delivery_date || null,
-        delivery_fee: (!isInPerson && formData.delivery_method === 'delivery') ? toNumber(formData.delivery_fee) : 0,
-        recipient_name: (!isInPerson && formData.delivery_method === 'delivery') ? (formData.recipient_name || null) : null,
-        recipient_phone: (!isInPerson && formData.delivery_method === 'delivery') ? (formData.recipient_phone || null) : null,
-        is_gift: isInPerson ? false : formData.is_gift,
+        delivery_fee: formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0,
+        recipient_name: formData.delivery_method === 'delivery' ? (formData.recipient_name || null) : null,
+        recipient_phone: formData.delivery_method === 'delivery' ? (formData.recipient_phone || null) : null,
+        is_gift: formData.is_gift,
         total_amount: calculateTotal()
       }
 
@@ -512,7 +498,7 @@ export default function Orders() {
       const items = formData.items.map(item => {
         const row = {
           order_id: orderId,
-          product_id: (isInPerson || item.is_custom) ? null : item.product_id,
+          product_id: item.is_custom ? null : item.product_id,
           product_name: item.product_name,
           product_description: item.product_description || null,
           quantity: toQuantity(item.quantity),
@@ -521,14 +507,6 @@ export default function Orders() {
           rush_fee: toNumber(item.rush_fee),
           subtotal: (toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee),
           ...orderItemOptions(item)
-        }
-        // Only engraving (Joyería) writes these columns, so other businesses
-        // don't depend on the engraving_item_fields migration.
-        if (isInPerson) {
-          row.material = item.material || null
-          row.engraving_minutes = item.engraving_minutes !== '' && item.engraving_minutes != null
-            ? parseInt(item.engraving_minutes, 10)
-            : null
         }
         return row
       })
@@ -592,14 +570,11 @@ export default function Orders() {
       client_id: order.client_id || null,
       customer_name: order.customer_name,
       customer_phone: order.customer_phone || '',
-      customer_social_media: order.customer_social_media || '',
       delivery_address: order.delivery_address || '',
       delivery_method: order.delivery_method || 'delivery',
       order_date: order.order_date || nicaraguaToday(),
       status: order.status,
       priority: order.priority,
-      follow_up_reason: order.follow_up_reason || '',
-      follow_up_date: order.follow_up_date || '',
       notes: order.notes || '',
       estimated_delivery_date: order.estimated_delivery_date || '',
       delivery_fee: order.delivery_fee || 0,
@@ -620,8 +595,6 @@ export default function Orders() {
         hours_needed: item.hours_needed || 0,
         rush_fee: item.rush_fee || 0,
         is_custom: !item.product_id,
-        material: item.material || '',
-        engraving_minutes: item.engraving_minutes ?? ''
       }))
     })
     setEditPayments(order.order_payments || [])
@@ -679,7 +652,7 @@ export default function Orders() {
     if (!editingOrder) return
     const amount = toNumber(paymentForm.amount)
     if (amount <= 0) {
-      toast.error('Ingresa un monto válido')
+      toast.error('Ingrese un monto válido')
       return
     }
 
@@ -723,55 +696,6 @@ export default function Orders() {
     fetchOrders()
   }
 
-  const openFollowUpWhatsApp = (order, reasonOverride = null) => {
-    let phone = order.customer_phone
-    if (!phone) {
-      toast.error('Este pedido no tiene número de teléfono registrado')
-      return
-    }
-
-    const reason = reasonOverride || order.follow_up_reason
-
-    if (!reason) {
-      toast.error('Selecciona un tipo de mensaje para WhatsApp')
-      return
-    }
-
-    phone = phone.replace(/\D/g, '')
-
-    const customerName = displayName(order) || 'cliente'
-    const itemsList = order.order_items?.length
-      ? order.order_items.map(item => {
-        const quantity = Number(item.quantity) > 1 ? ` x${item.quantity}` : ''
-        const details = item.product_description ? ` (${item.product_description})` : ''
-        return [`- ${item.product_name}${quantity}${details}`, ...orderItemDetailLines(item)].join('\n')
-      }).join('\n')
-      : ''
-
-    const deliveryLines = [
-      `- Dirección: ${order.delivery_address || 'pendiente de confirmar'}`,
-      `- Recibe: ${order.recipient_name || displayName(order) || 'pendiente de confirmar'}`,
-      `- Teléfono de contacto: ${order.recipient_phone || order.customer_phone || 'pendiente de confirmar'}`
-    ].join('\n')
-
-    const followUpMessages = {
-      deposit_request: `Hola ${customerName}! Te escribe MagicArte. Para avanzar con tu pedido, necesitamos confirmar el anticipo del 50%. Cuando tengas oportunidad, nos puedes enviar el comprobante por este medio.`,
-      confirm_delivery_details: `Hola ${customerName}! Te escribe MagicArte. Queremos confirmar los datos de entrega de tu pedido:\n\n${deliveryLines}\n\nMe confirmas por favor si todo está correcto o si debemos ajustar algún dato.`,
-      notify_ready: `Hola ${customerName}! Te escribe MagicArte. Tu pedido ya está listo. Cuando puedas, nos confirmas si prefieres coordinar entrega o retiro.`,
-      waiting_customer_response: `Hola ${customerName}! Te escribe MagicArte. Quedamos pendientes de tu confirmación para poder continuar con tu pedido. Cuando tengas oportunidad, nos respondes por este medio.`,
-      delivery_received_check: `Hola ${customerName}! Te escribe MagicArte. Solo queríamos confirmar si tu pedido llegó bien y si todo quedó como esperabas. Nos ayudaría mucho saber si todo está correcto.`
-    }
-
-    const messageParts = [
-      followUpMessages[reason] || `Hola ${customerName}! Te escribo de MagicArte para dar seguimiento a tu pedido.`,
-      reason !== 'delivery_received_check' && itemsList ? `Detalle del pedido:\n${itemsList}` : null,
-      reason === 'delivery_received_check' ? 'Muchas gracias!' : 'Gracias!'
-    ].filter(Boolean)
-
-    const encodedMessage = encodeURIComponent(messageParts.join('\n\n'))
-    window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank')
-  }
-
   const getStatusColor = (status) => {
     const colors = {
       backlog: 'bg-gray-100 text-gray-500',
@@ -803,15 +727,8 @@ export default function Orders() {
     return colors[paymentStatus] || 'bg-gray-100 text-gray-800'
   }
 
-  const getFollowUpColor = (followUpDate) => {
-    if (!followUpDate) return 'bg-gray-100 text-gray-600'
-    if (followUpDate < today) return 'bg-red-600 text-white'
-    if (followUpDate === today) return 'bg-amber-500 text-white'
-    return 'bg-sky-100 text-sky-800 border border-sky-300'
-  }
-
   const statusLabels = {
-    backlog: 'Backlog',
+    backlog: 'En espera',
     pending: 'Pendiente',
     confirmed: 'Confirmado',
     in_progress: 'En Proceso',
@@ -844,14 +761,6 @@ export default function Orders() {
     tarjeta: 'bg-violet-100 text-violet-800'
   }
 
-  const followUpReasonLabels = {
-    deposit_request: 'Pedir anticipo 50%',
-    confirm_delivery_details: 'Confirmar datos de entrega',
-    notify_ready: 'Avisar que está listo',
-    waiting_customer_response: 'Cliente quedó en responder',
-    delivery_received_check: 'Confirmar si llegó bien'
-  }
-
   const deliveryMethodLabels = {
     delivery: 'Entrega a Domicilio',
     pickup: 'Recoger en Tienda'
@@ -869,7 +778,7 @@ export default function Orders() {
     return { text: `${diffDays} días`, color: 'bg-emerald-100 text-emerald-800 border border-emerald-300' }
   }
 
-  const fmtPhone = (p) => p?.replace(/\D/g, '').replace(/(.{4})/g, '$1-').replace(/-$/, '') || ''
+  const fmtPhone = (p) => normalizePhone(p).replace(/(.{4})/g, '$1-').replace(/-$/, '') || ''
 
   const printItemOptions = item => orderItemDetailLines(item).map(line => `<div class="item">${escapePresentationHtml(line)}</div>`).join('')
 
@@ -898,9 +807,9 @@ export default function Orders() {
         }
         ${order.notes ? `<div class="notes">${order.notes}</div>` : ''}
         <div class="footer-row">
-          <div class="thanks">¡Gracias por tu compra! ✨</div>
+          <div class="thanks">¡Gracias por su compra! ✨</div>
           <div class="qr-wrap">
-            <div class="qr-label">Visitanos</div>
+            <div class="qr-label">Visítenos</div>
             <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=https://magicarte.net" alt="QR" />
           </div>
         </div>
@@ -973,7 +882,7 @@ export default function Orders() {
           <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://magicarte.net" alt="QR" />
           <div class="qr-label">magicarte.net</div>
         </div>
-        <div class="thanks">¡Gracias por tu compra! ✨</div>
+        <div class="thanks">¡Gracias por su compra! ✨</div>
       </div>`
     }).join('')
 
@@ -1489,7 +1398,7 @@ export default function Orders() {
                               <div className='text-xs text-gray-400 mb-2'>
                                 {order.order_items?.length || 0} producto{(order.order_items?.length || 0) !== 1 ? 's' : ''}
                                 <span className='mx-1'>·</span>
-                                <span className='font-medium text-gray-600'>C$ {parseFloat(order.total_amount).toFixed(0)}</span>
+                                <span className='font-medium text-gray-600'>{moneyNIO(parseFloat(order.total_amount))}</span>
                               </div>
                               <div className='flex items-center justify-between gap-1 flex-wrap'>
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(paySummary.status)}`}>
@@ -1500,11 +1409,7 @@ export default function Orders() {
                                     {payMethodLabels[m]}
                                   </span>
                                 ))}
-                                {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
-                                  <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
-                                    {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
-                                  </span>
-                                )}
+
                                 {countdown && (
                                   <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${countdown.color}`}>
                                     {countdown.text}
@@ -1516,18 +1421,7 @@ export default function Orders() {
 	                                  {new Date(order.estimated_delivery_date + 'T00:00:00').toLocaleDateString('es-NI')}
 	                                </div>
 	                              )}
-                              {SHOW_WHATSAPP_REMINDER && order.customer_phone && order.follow_up_reason && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    openFollowUpWhatsApp(order)
-                                  }}
-                                  className='mt-2 w-full px-2 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors'
-                                  title='Enviar mensaje guardado por WhatsApp'
-                                >
-                                  WhatsApp: {followUpReasonLabels[order.follow_up_reason] || 'Mensaje'}
-                                </button>
-                              )}
+
 	                            </div>
 	                          )
 	                        })}
@@ -1568,11 +1462,7 @@ export default function Orders() {
                                 {payMethodLabels[m]}
                               </span>
                             ))}
-                            {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
-                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${getFollowUpColor(order.follow_up_date)}`}>
-                                {followUpReasonLabels[order.follow_up_reason] || 'Recordatorio'}
-                              </span>
-                            )}
+
                             {order.is_gift && (
                               <span className='px-2.5 py-0.5 rounded-full text-xs font-semibold bg-pink-100 text-pink-800'>
                                 Regalo
@@ -1580,38 +1470,36 @@ export default function Orders() {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-1.5 text-sm text-gray-600'>
                           <p><strong>Cliente:</strong> {displayName(order)}</p>
                           {order.customer_phone && <p><strong>Teléfono:</strong> {order.customer_phone}</p>}
-                          {SHOW_SOCIAL_MEDIA && order.customer_social_media && <p><strong>Red Social:</strong> {order.customer_social_media}</p>}
+
                           {order.delivery_address && <p><strong>Dirección:</strong> {order.delivery_address}</p>}
                           {order.recipient_name && (
                             <p><strong>Recibe:</strong> {order.recipient_name}{order.recipient_phone ? ` — ${order.recipient_phone}` : ''}</p>
                           )}
                           <p><strong>Modalidad:</strong> {deliveryMethodLabels[order.delivery_method] || 'Entrega a Domicilio'}</p>
                           <p>
-                            <strong>Pagado:</strong> C$ {paySummary.paid.toFixed(2)} / C$ {getOrderChargeTotal(order).toFixed(2)}
-                            {paySummary.balance > 0.009 && <span className='text-red-600'> · saldo C$ {paySummary.balance.toFixed(2)}</span>}
+                            <strong>Pagado:</strong> {moneyNIO(paySummary.paid)} / {moneyNIO(getOrderChargeTotal(order))}
+                            {paySummary.balance > 0.009 && <span className='text-red-600'> · saldo {moneyNIO(paySummary.balance)}</span>}
                           </p>
-                          {SHOW_WHATSAPP_REMINDER && order.follow_up_reason && order.follow_up_date && (
-                            <p><strong>Recordatorio WhatsApp:</strong> {followUpReasonLabels[order.follow_up_reason]} · {new Date(order.follow_up_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>
-                          )}
+
                           {order.order_date && <p><strong>Encargo:</strong> {new Date(order.order_date + 'T00:00:00').toLocaleDateString('es-NI')}</p>}
                         </div>
                       </div>
-                      
+
                       <div className='text-right ml-4'>
-                        <p className='text-xl font-bold text-gray-900'>C$ {parseFloat(order.total_amount).toFixed(2)}</p>
+                        <p className='text-xl font-bold text-gray-900'>{moneyNIO(parseFloat(order.total_amount))}</p>
                         {order.delivery_fee > 0 && (
-                          <p className='text-xs text-gray-500'>+ Delivery: C$ {parseFloat(order.delivery_fee).toFixed(2)}</p>
+                          <p className='text-xs text-gray-500'>+ Delivery: {moneyNIO(parseFloat(order.delivery_fee))}</p>
                         )}
                         {order.delivery_fee > 0 && (
-                          <p className='text-sm font-semibold text-gray-700'>Total cliente: C$ {getOrderChargeTotal(order).toFixed(2)}</p>
+                          <p className='text-sm font-semibold text-gray-700'>Total cliente: {moneyNIO(getOrderChargeTotal(order))}</p>
                         )}
                         {paySummary.commission > 0.009 && (
                           <p className='text-xs text-gray-500'>
-                            Comisión: − C$ {paySummary.commission.toFixed(2)} · Neto: <span className='font-semibold text-[#51c879]'>C$ {paySummary.net.toFixed(2)}</span>
+                            Comisión: − {moneyNIO(paySummary.commission)} · Neto: <span className='font-semibold text-[#51c879]'>{moneyNIO(paySummary.net)}</span>
                           </p>
                         )}
                         <p className='text-sm text-gray-500 mt-1'>{new Date(order.created_at).toLocaleDateString('es-NI')}</p>
@@ -1650,11 +1538,11 @@ export default function Orders() {
                                   </span>
                                 )}
                                 {item.rush_fee > 0 && (
-                                  <span className='text-orange-600 font-medium'>⚡ Urgencia: +C$ {parseFloat(item.rush_fee).toFixed(2)}</span>
+                                  <span className='text-orange-600 font-medium'>⚡ Urgencia: +{moneyNIO(parseFloat(item.rush_fee))}</span>
                                 )}
                               </div>
                             </div>
-                            <span className='font-bold text-gray-900 text-base whitespace-nowrap'>C$ {parseFloat(item.subtotal).toFixed(2)}</span>
+                            <span className='font-bold text-gray-900 text-base whitespace-nowrap'>{moneyNIO(parseFloat(item.subtotal))}</span>
                           </div>
                         ))}
                       </div>
@@ -1686,35 +1574,7 @@ export default function Orders() {
                         {paymentStatusLabels[paySummary.status]} · Pagos
                       </button>
                       <div className='flex items-center gap-1 ml-auto'>
-                        {SHOW_WHATSAPP_REMINDER && order.customer_phone && (
-                          <div className='relative'>
-                            <button
-                              type='button'
-                              onClick={() => setOpenWhatsAppMenuId(openWhatsAppMenuId === order.id ? null : order.id)}
-                              className='px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:border-[#25D366] hover:bg-green-50 focus:ring-2 focus:ring-[#25D366]/30 focus:border-transparent transition-colors'
-                              title='Enviar mensaje rápido por WhatsApp'
-                            >
-                              WhatsApp rápido
-                            </button>
-                            {openWhatsAppMenuId === order.id && (
-                              <div className='absolute right-0 bottom-full mb-2 w-64 bg-white border border-gray-100 rounded-xl shadow-lg p-1.5 z-30'>
-                                {Object.entries(followUpReasonLabels).map(([key, label]) => (
-                                  <button
-                                    key={key}
-                                    type='button'
-                                    onClick={() => {
-                                      setOpenWhatsAppMenuId(null)
-                                      openFollowUpWhatsApp(order, key)
-                                    }}
-                                    className='w-full text-left px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-green-50 hover:text-green-700 transition-colors'
-                                  >
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
+
 		                        <button
 	                          onClick={() => editOrder(order)}
 	                          className='p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors'
@@ -1840,7 +1700,7 @@ export default function Orders() {
 
                   {sourceQuote && !editingOrder && (
                     <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
-                      Completado desde la cotización «{sourceQuote.name}». Revisa y guarda.
+                      Completado desde la cotización «{sourceQuote.name}». Revise y guarde.
                       {existingQuoteOrder && (
                         <p className='mt-1'>Esta cotización ya tiene el pedido #{existingQuoteOrder.order_number}</p>
                       )}
@@ -1867,7 +1727,7 @@ export default function Orders() {
                             }}
                             onBlur={() => setTimeout(() => setClientSearchOpen(false), 140)}
                             className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                            placeholder='Busca o escribe un cliente...'
+                            placeholder='Busque o escriba un cliente...'
                             autoComplete='off'
                           />
 
@@ -1908,7 +1768,7 @@ export default function Orders() {
                           <div className='mt-1.5 flex flex-wrap items-center justify-between gap-2'>
                             <p className='text-xs font-medium text-[#51c879]'>
                               {editingOrder
-                                ? 'Cliente seleccionado. Guarda para aplicar el vínculo.'
+                                ? 'Cliente seleccionado. Guarde para aplicar el vínculo.'
                                 : 'Cliente seleccionado. Se vinculará al crear el pedido.'}
                             </p>
                             <div className='flex items-center gap-2'>
@@ -1943,40 +1803,21 @@ export default function Orders() {
                           </div>
                         )}
                       </div>
-                      {!isInPerson && (
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>
                           Teléfono
-                          {formData.customer_phone && formData.customer_phone.length !== 8 && (
-                            <span className='ml-1.5 text-orange-400 font-normal'>{formData.customer_phone.length}/8</span>
-                          )}
                         </label>
                         <input
                           type='text'
                           value={formData.customer_phone}
                           onChange={(e) => {
-                            const digits = e.target.value.replace(/\D/g, '')
-                            const phone = digits.startsWith('505') && digits.length > 8 ? digits.slice(3) : digits
-                            setFormData({ ...formData, customer_phone: phone.slice(0, 8) })
+                            setFormData({ ...formData, customer_phone: normalizePhone(e.target.value).slice(0, 15) })
                           }}
                           className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                           placeholder='88881234'
                         />
                       </div>
-                      )}
-                      {SHOW_SOCIAL_MEDIA && (
-                        <div>
-                          <label className='block text-xs font-medium text-gray-600 mb-1.5'>Red Social</label>
-                          <input
-                            type='text'
-                            value={formData.customer_social_media}
-                            onChange={(e) => setFormData({ ...formData, customer_social_media: e.target.value })}
-                            className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                            placeholder='Facebook, Instagram...'
-                          />
-                        </div>
-                      )}
-                      {!isInPerson && (
+
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Dirección de Entrega</label>
                         <input
@@ -1986,7 +1827,6 @@ export default function Orders() {
                           className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                         />
                       </div>
-                      )}
                     </div>
                   </div>
 
@@ -2083,7 +1923,7 @@ export default function Orders() {
                           </div>
 
                           {!editingOrder ? (
-                            <p className='text-sm text-gray-400'>Guarda el pedido para registrar pagos.</p>
+                            <p className='text-sm text-gray-400'>Guarde el pedido para registrar pagos.</p>
                           ) : (
                             <>
                               {editPayments.length === 0 ? (
@@ -2098,7 +1938,7 @@ export default function Orders() {
                                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${payMethodColor[p.method]}`}>
                                         {payMethodLabels[p.method]}
                                       </span>
-                                      <span className='font-semibold text-gray-800 flex-shrink-0'>C$ {toNumber(p.amount).toFixed(2)}</span>
+                                      <span className='font-semibold text-gray-800 flex-shrink-0'>{moneyNIO(toNumber(p.amount))}</span>
                                       {p.note && <span className='text-gray-400 truncate'>{p.note}</span>}
                                       <button
                                         type='button'
@@ -2116,23 +1956,23 @@ export default function Orders() {
                               <div className='text-sm border-t border-gray-100 pt-3 mb-3 space-y-0.5'>
                                 <div className='flex justify-between'>
                                   <span className='text-gray-500'>Pagado</span>
-                                  <span className='font-semibold text-gray-800'>C$ {summary.paid.toFixed(2)} / C$ {draftTotal.toFixed(2)}</span>
+                                  <span className='font-semibold text-gray-800'>{moneyNIO(summary.paid)} / {moneyNIO(draftTotal)}</span>
                                 </div>
                                 {summary.balance > 0.009 && (
                                   <div className='flex justify-between'>
                                     <span className='text-gray-500'>Saldo pendiente</span>
-                                    <span className='font-semibold text-red-600'>C$ {summary.balance.toFixed(2)}</span>
+                                    <span className='font-semibold text-red-600'>{moneyNIO(summary.balance)}</span>
                                   </div>
                                 )}
                                 {summary.commission > 0.009 && (
                                   <>
                                     <div className='flex justify-between'>
                                       <span className='text-gray-500'>Comisión tarjeta (6.75%)</span>
-                                      <span className='text-gray-500'>− C$ {summary.commission.toFixed(2)}</span>
+                                      <span className='text-gray-500'>− {moneyNIO(summary.commission)}</span>
                                     </div>
                                     <div className='flex justify-between'>
                                       <span className='text-gray-600 font-medium'>Neto recibido</span>
-                                      <span className='font-bold text-[#51c879]'>C$ {summary.net.toFixed(2)}</span>
+                                      <span className='font-bold text-[#51c879]'>{moneyNIO(summary.net)}</span>
                                     </div>
                                   </>
                                 )}
@@ -2149,7 +1989,7 @@ export default function Orders() {
                                       className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-[#51c879] hover:text-white transition-colors'
                                       title='Usar el saldo pendiente'
                                     >
-                                      Saldo C$ {summary.balance.toFixed(0)}
+                                      Saldo {moneyNIO(summary.balance)}
                                     </button>
                                   </div>
                                   <input
@@ -2203,8 +2043,8 @@ export default function Orders() {
                               </div>
                               ) : (
                                 draftTotal < 0.009
-                                  ? <p className='text-sm text-gray-400'>Pedido sin costo (C$0) — no se requiere pago.</p>
-                                  : <p className='text-sm text-gray-400'>Pedido pagado por completo. Para ajustar, usa el botón Borrar de un pago en la lista de arriba.</p>
+                                  ? <p className='text-sm text-gray-400'>Pedido sin costo (C$ 0) — no se requiere pago.</p>
+                                  : <p className='text-sm text-gray-400'>Pedido pagado por completo. Para ajustar, use el botón Borrar de un pago en la lista de arriba.</p>
                               )}
                             </>
                           )}
@@ -2215,9 +2055,8 @@ export default function Orders() {
 
                   {/* Entrega */}
                   <div className='border-t border-gray-100 pt-5'>
-                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>{isInPerson ? 'Fecha' : 'Entrega'}</p>
+                    <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3'>Entrega</p>
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                      {!isInPerson && (
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Modalidad *</label>
                         <select
@@ -2230,7 +2069,6 @@ export default function Orders() {
                           ))}
                         </select>
                       </div>
-                      )}
                       <div>
                         <label className='block text-xs font-medium text-gray-600 mb-1.5'>Fecha del Encargo *</label>
                         <input
@@ -2242,7 +2080,7 @@ export default function Orders() {
                         />
                       </div>
                     </div>
-                    {!isInPerson && formData.delivery_method === 'delivery' && (
+                    {formData.delivery_method === 'delivery' && (
                       <div className='grid grid-cols-1 md:grid-cols-3 gap-3 mt-3'>
                         <div>
                           <label className='block text-xs font-medium text-gray-600 mb-1.5'>Costo Delivery (C$)</label>
@@ -2269,17 +2107,12 @@ export default function Orders() {
                         <div>
                           <label className='block text-xs font-medium text-gray-600 mb-1.5'>
                             Teléfono de quien Recibe
-                            {formData.recipient_phone && formData.recipient_phone.length !== 8 && (
-                              <span className='ml-1.5 text-orange-400 font-normal'>{formData.recipient_phone.length}/8</span>
-                            )}
                           </label>
                           <input
                             type='text'
                             value={formData.recipient_phone}
                             onChange={(e) => {
-                              const digits = e.target.value.replace(/\D/g, '')
-                              const phone = digits.startsWith('505') && digits.length > 8 ? digits.slice(3) : digits
-                              setFormData({ ...formData, recipient_phone: phone.slice(0, 8) })
+                              setFormData({ ...formData, recipient_phone: normalizePhone(e.target.value).slice(0, 15) })
                             }}
                             className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
                             placeholder='Si es diferente al cliente'
@@ -2288,81 +2121,6 @@ export default function Orders() {
                       </div>
                     )}
                   </div>
-
-                  {/* Recordatorio de WhatsApp */}
-                  {SHOW_WHATSAPP_REMINDER && (
-                  <div className='border-t border-gray-100 pt-5'>
-                    <div className='flex items-center justify-between gap-3 mb-3'>
-                      <p className='text-xs font-semibold text-gray-400 uppercase tracking-wide'>Recordatorio WhatsApp</p>
-                      {(formData.follow_up_reason || formData.follow_up_date) && (
-                        <button
-                          type='button'
-                          onClick={() => setFormData({ ...formData, follow_up_reason: '', follow_up_date: '' })}
-                          className='text-xs font-medium text-gray-400 hover:text-red-500'
-                        >
-                          Limpiar recordatorio
-                        </button>
-                      )}
-                    </div>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                      <div>
-                        <label className='block text-xs font-medium text-gray-600 mb-1.5'>Mensaje sugerido</label>
-                        <select
-                          value={formData.follow_up_reason}
-                          onChange={(e) => setFormData({ ...formData, follow_up_reason: e.target.value })}
-                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                        >
-                          <option value=''>Sin recordatorio</option>
-                          {Object.entries(followUpReasonLabels).map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <div className='flex items-center justify-between mb-1.5'>
-                          <label className='block text-xs font-medium text-gray-600'>Recordar el</label>
-                          <div className='flex gap-1'>
-                            {formData.estimated_delivery_date && (
-                              <button
-                                type='button'
-                                onClick={() => {
-                                  const dateStr = addDays(formData.estimated_delivery_date, -1)
-                                  setFormData({
-                                    ...formData,
-                                    follow_up_reason: formData.follow_up_reason || 'confirm_delivery_details',
-                                    follow_up_date: dateStr
-                                  })
-                                }}
-                                className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white transition-colors'
-                              >
-                                1d antes entrega
-                              </button>
-                            )}
-                            {[1, 2, 3].map((days) => (
-                              <button
-                                key={days}
-                                type='button'
-                                onClick={() => {
-                                  const dateStr = addDays(nicaraguaToday(), days)
-                                  setFormData({ ...formData, follow_up_date: dateStr })
-                                }}
-                                className='text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-amber-500 hover:text-white transition-colors'
-                              >
-                                +{days}d
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <input
-                          type='date'
-                          value={formData.follow_up_date}
-                          onChange={(e) => setFormData({ ...formData, follow_up_date: e.target.value })}
-                          className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent text-sm'
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  )}
 
                   {/* Notas y regalo */}
                   <div className='border-t border-gray-100 pt-5 space-y-3'>
@@ -2376,7 +2134,6 @@ export default function Orders() {
                         placeholder='Instrucciones especiales, detalles del diseño...'
                       />
                     </div>
-                    {!isInPerson && (
                     <button
                       type='button'
                       onClick={() => setFormData({ ...formData, is_gift: !formData.is_gift })}
@@ -2391,7 +2148,6 @@ export default function Orders() {
                       </svg>
                       {formData.is_gift ? 'Es un regalo' : 'Marcar como regalo'}
                     </button>
-                    )}
                   </div>
 
                   {/* Productos */}
@@ -2414,19 +2170,15 @@ export default function Orders() {
                       {formData.items.map((item, index) => (
                         <div key={item._key || index} className='bg-gray-50 p-3 rounded-xl border border-gray-200'>
                           <div className='flex items-center justify-between mb-3'>
-                            {isInPerson ? (
-                              <span className='text-xs font-semibold text-gray-600'>Trabajo de grabado</span>
-                            ) : (
-                              <label className='flex items-center gap-2 cursor-pointer'>
-                                <input
-                                  type='checkbox'
-                                  checked={item.is_custom}
-                                  onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
-                                  className='w-3.5 h-3.5 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
-                                />
-                                <span className='text-xs font-medium text-gray-600'>Producto personalizado</span>
-                              </label>
-                            )}
+                            <label className='flex items-center gap-2 cursor-pointer'>
+                              <input
+                                type='checkbox'
+                                checked={item.is_custom}
+                                onChange={(e) => updateItem(index, 'is_custom', e.target.checked)}
+                                className='w-3.5 h-3.5 rounded border-gray-300 text-[#51c879] focus:ring-[#51c879]'
+                              />
+                              <span className='text-xs font-medium text-gray-600'>Producto personalizado</span>
+                            </label>
                             <button
                               type='button'
                               onClick={() => removeItem(index)}
@@ -2440,7 +2192,7 @@ export default function Orders() {
                           </div>
 
                           <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                            {!(isInPerson || item.is_custom) ? (
+                            {!item.is_custom ? (
                               <div className='md:col-span-2'>
                                 <label className='block text-xs font-medium text-gray-600 mb-1.5'>Producto del Catálogo</label>
                                 <div className='relative'>
@@ -2467,7 +2219,7 @@ export default function Orders() {
                                             }}
                                             onKeyDown={(e) => handleProductKeyDown(index, e, visible)}
                                             className='w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent bg-white text-sm'
-                                            placeholder='Busca un producto...'
+                                            placeholder='Busque un producto...'
                                             role='combobox'
                                             aria-expanded={item.product_open ? 'true' : 'false'}
                                             aria-controls={`product-list-${index}`}
@@ -2479,7 +2231,7 @@ export default function Orders() {
 
                                         {item.product_id && (
                                           <div className='mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200'>
-                                            {item.product_name} · C$ {toNumber(item.unit_price).toFixed(2)}
+                                            {item.product_name} · {moneyNIO(toNumber(item.unit_price))}
                                           </div>
                                         )}
 
@@ -2507,7 +2259,7 @@ export default function Orders() {
                                                   <span className='truncate font-medium text-gray-800'>
                                                     {highlightMatch(p.name, item.product_query || '')}
                                                   </span>
-                                                  <span className='text-gray-500 flex-shrink-0'>C$ {parseFloat(p.price).toFixed(2)}</span>
+                                                  <span className='text-gray-500 flex-shrink-0'>{moneyNIO(parseFloat(p.price))}</span>
                                                 </button>
                                               ))
                                             )}
@@ -2581,11 +2333,11 @@ export default function Orders() {
                             </div>
                           </div>
 
-                          {!isInPerson && !item.is_custom && <OrderItemOptions item={item} product={products.find(product => product.id === item.product_id)} onChange={changes => setFormData(previous => ({ ...previous, items: previous.items.map((row, i) => i === index ? { ...row, ...changes } : row) }))} />}
+                          {!item.is_custom && <OrderItemOptions item={item} product={products.find(product => product.id === item.product_id)} onChange={changes => setFormData(previous => ({ ...previous, items: previous.items.map((row, i) => i === index ? { ...row, ...changes } : row) }))} />}
 
 	                          <div className='mt-2 text-right'>
 	                            <span className='text-xs font-semibold text-gray-600'>
-	                              Subtotal: C$ {((toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee)).toFixed(2)}
+	                              Subtotal: {moneyNIO((toQuantity(item.quantity) * toNumber(item.unit_price)) + toNumber(item.rush_fee))}
 	                            </span>
 	                          </div>
                         </div>
@@ -2594,7 +2346,7 @@ export default function Orders() {
                       {formData.items.length === 0 && (
                         <div className='text-center py-6 border-2 border-dashed border-gray-200 rounded-xl'>
                           <p className='text-sm text-gray-400'>
-                            {formData.status === 'backlog' ? 'Puedes guardar sin productos por ahora.' : 'Agrega al menos un ítem para crear el pedido. Puede ser un “Producto personalizado” (ej. un grabado).'}
+                            {formData.status === 'backlog' ? 'Puede guardar sin productos por ahora.' : 'Agregue al menos un ítem para crear el pedido. Puede ser un “Producto personalizado” (ej. un grabado).'}
                           </p>
                         </div>
                       )}
@@ -2603,13 +2355,13 @@ export default function Orders() {
                     {formData.items.length > 0 && (
                       <div className='mt-4 flex items-center justify-between bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 px-4 py-3 rounded-xl'>
                         <div className='text-sm text-gray-600 space-y-0.5'>
-                          <p>Productos: <span className='font-semibold'>C$ {calculateTotal().toFixed(2)}</span></p>
+                          <p>Productos: <span className='font-semibold'>{moneyNIO(calculateTotal())}</span></p>
                           {formData.delivery_method === 'delivery' && toNumber(formData.delivery_fee) > 0 && (
-                            <p>Delivery: <span className='font-semibold'>C$ {toNumber(formData.delivery_fee).toFixed(2)}</span></p>
+                            <p>Delivery: <span className='font-semibold'>{moneyNIO(toNumber(formData.delivery_fee))}</span></p>
                           )}
                         </div>
                         <p className='text-xl font-bold text-gray-900'>
-                          C$ {(calculateTotal() + (formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0)).toFixed(2)}
+                          {moneyNIO(calculateTotal() + (formData.delivery_method === 'delivery' ? toNumber(formData.delivery_fee) : 0))}
                         </p>
                       </div>
                     )}

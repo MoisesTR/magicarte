@@ -86,7 +86,7 @@ export default function ProductOptionsEditor({
   if (options.error)
     return (
       <p role='alert' className='text-sm text-red-600'>
-        No se pudieron cargar las presentaciones. Cierra y vuelve a abrir el
+        No se pudieron cargar las presentaciones. Cierre y vuelva a abrir el
         producto.
       </p>
     )
@@ -118,7 +118,7 @@ export default function ProductOptionsEditor({
       if (request === requestVersion.current)
         toast.error(
           error?.message ||
-            'No se pudieron detectar los diseños. Intenta de nuevo.'
+            'No se pudieron detectar los diseños. Intente de nuevo.'
         )
     } finally {
       if (request === requestVersion.current) {
@@ -204,8 +204,8 @@ export default function ProductOptionsEditor({
                 >
                   <p role='status' className='text-sm'>
                     {suggestions.length
-                      ? 'Revisa los nombres y selecciona los diseños que deseas agregar.'
-                      : 'No se encontraron diseños nuevos. Puedes agregarlos manualmente.'}
+                      ? 'Revise los nombres y seleccione los diseños que desea agregar.'
+                      : 'No se encontraron diseños nuevos. Puede agregarlos manualmente.'}
                   </p>
                   {suggestions.map((row, index) => (
                     <div key={index} className='flex items-center gap-2'>
@@ -482,7 +482,7 @@ export default function ProductOptionsEditor({
             value={sourceId}
             onChange={(event) => setSourceId(event.target.value)}
           >
-            <option value=''>Selecciona un producto</option>
+            <option value=''>Seleccione un producto</option>
             {products
               .filter((row) => row.id !== productId)
               .map((row) => (

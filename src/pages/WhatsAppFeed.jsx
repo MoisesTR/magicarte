@@ -32,7 +32,7 @@ const TAB_LABELS = {
   unanswered: 'Sin responder',
   toQuote: 'Por cotizar',
   payments: 'Pagos',
-  waiting: 'Esperando cliente',
+  waiting: 'Esperando al cliente',
   inOrders: 'En Pedidos ✓',
   closed: 'Descartados',
 }

@@ -264,7 +264,7 @@ test('rendered tabs keep seven counts, one panel, and only selected group rows',
     'Sin responder',
     'Por cotizar',
     'Pagos',
-    'Esperando cliente',
+    'Esperando al cliente',
     'En Pedidos ✓',
     'Descartados',
   ])

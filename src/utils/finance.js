@@ -48,10 +48,11 @@ export function daysBetween(a, b) {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000)
 }
 
-export const moneyNIO = (value) =>
-  new Intl.NumberFormat('es-NI', {
-    style: 'currency',
-    currency: 'NIO',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0))
+/** Córdobas with grouping and two decimal places only when cents are present. */
+export function moneyNIO(value) {
+  const amount = Number(Number(value || 0).toFixed(2)) || 0
+  return `C$ ${new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)}`
+}

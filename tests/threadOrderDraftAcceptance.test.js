@@ -42,6 +42,7 @@ async function page(file, initial, imported = true, { failCreateOnce = false, fa
     if (name.endsWith('/BusinessContext')) return { useBusiness: () => ({ currentBusinessId: 2, currentBusiness: { slug: 'hikari', name: 'Hikari' } }) }
     if (name.endsWith('/supabaseClient')) return { supabase: {} }
     if (name.endsWith('/orderClientLink')) return clientLink
+    if (name.endsWith('/phone')) return require('../src/utils/phone.js')
     if (name.endsWith('/finance')) return finance
     if (name.endsWith('/orderItemsSave')) return itemSave
     if (name.endsWith('/data/clients')) return new Proxy({}, { get: (_, method) => async (...args) => { calls.push([method, ...args]); if (failClientLink) return { data: null, error: new Error('Client unavailable') }; return { data: method === 'createClientReturning' ? { id: 'client' } : null, error: null } } })
@@ -143,3 +144,16 @@ for (const file of ['src/pages/Orders.jsx', 'src/pages/hikari/Orders.jsx']) {
     }
   })
 }
+
+test('Magic Arte edit sends no hidden follow-up or social fields, preserving existing values', async () => {
+  const existing = { id: 'existing', follow_up_date: '2026-12-01', follow_up_reason: 'deposit_request', customer_social_media: '@ana' }
+  const before = structuredClone(existing)
+  const form = { ...threadOrderPrefill({ customer_name: 'Ana', customer_phone: '+506 7254 5734', summary: 'Modelo', quoted_amount: 300 }), client_id: 'client', ...existing }
+  const h = await page('src/pages/Orders.jsx', form, false, { editingOrder: existing })
+  await find(h.render(), node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  const update = h.calls.find(([name]) => name === 'updateOrder')
+  assert.ok(update, 'the actual editing handler must save successfully')
+  assert.equal(update[1], 'existing')
+  for (const key of ['follow_up_date', 'follow_up_reason', 'customer_social_media']) assert.equal(Object.hasOwn(update[2], key), false, key)
+  assert.deepEqual(existing, before, 'editing does not mutate the loaded record')
+})

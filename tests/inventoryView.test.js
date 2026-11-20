@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { transform } from 'esbuild'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { moneyNIO as money } from '../src/utils/finance.js'
 import * as colors from '../src/utils/filamentColors.js'
 import * as wall from '../src/utils/filamentWall.js'
 
@@ -20,6 +21,7 @@ async function inventoryHarness(overrides = {}, business = { currentBusiness: { 
   const state = { 0: { id: 'owner' }, 1: false, 17: wall.readWallPreferences('other', {}), ...overrides }
   let index = 0
   const deps = {
+    money,
     ...colors,
     ...wall,
     useState(initial) {

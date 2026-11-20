@@ -35,14 +35,14 @@ export default function ProductDesignPicker({
       )}
       {totals.over > 0 && (
         <p role='status' className='text-sm text-amber-700'>
-          Sobran {totals.over} piezas. Puedes ajustar los diseños o la cantidad
+          Sobran {totals.over} piezas. Puede ajustar los diseños o la cantidad
           de paquetes.
         </p>
       )}
       {showGroupHint && (
         <div className='flex items-center gap-3 rounded-xl bg-gray-50 p-3'>
           <p className='text-sm text-gray-700'>
-            Elige tus diseños de la foto principal
+            Elija sus diseños de la foto principal
           </p>
           {mainImageUrl && (
             <>
@@ -184,7 +184,7 @@ export default function ProductDesignPicker({
           Otro diseño
           <input
             className='mt-1 min-h-10 w-full min-w-0 rounded-lg border border-gray-300 px-3'
-            placeholder='Escribe el diseño que deseas'
+            placeholder='Escriba el diseño que desea'
             value={customName}
             onChange={(event) => setCustomName(event.target.value)}
           />

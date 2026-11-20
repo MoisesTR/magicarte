@@ -1,3 +1,5 @@
+import { normalizePhone } from '../utils/phone'
+import { moneyNIO as formatCurrency } from '../utils/finance'
 import { isBillableOrder, summarizeReceivables } from '../utils/orderPayments'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -19,21 +21,6 @@ const initialFormData = {
   social_media: '',
   delivery_address: '',
   notes: '',
-}
-
-function normalizePhone(value) {
-  const digits = value.replace(/\D/g, '')
-  const phone = digits.startsWith('505') && digits.length > 8 ? digits.slice(3) : digits
-  return phone.slice(0, 8)
-}
-
-function formatCurrency(value, maximumFractionDigits = 0) {
-  return new Intl.NumberFormat('es-NI', {
-    style: 'currency',
-    currency: 'NIO',
-    minimumFractionDigits: maximumFractionDigits,
-    maximumFractionDigits,
-  }).format(Number(value || 0))
 }
 
 export default function Clients() {
@@ -369,7 +356,7 @@ export default function Clients() {
           <div className='bg-white rounded-2xl shadow-soft p-12 text-center'>
             <div className='text-5xl mb-3'>👥</div>
             <p className='text-lg font-semibold text-gray-700'>No hay clientes que mostrar</p>
-            <p className='text-sm text-gray-400 mt-1'>Agrega tus clientes frecuentes para reutilizar sus datos en pedidos.</p>
+            <p className='text-sm text-gray-400 mt-1'>Agregue sus clientes frecuentes para reutilizar sus datos en pedidos.</p>
           </div>
         ) : (
           <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
@@ -456,7 +443,7 @@ export default function Clients() {
                     <input
                       type='text'
                       value={formData.phone}
-                      onChange={(event) => setFormData({ ...formData, phone: normalizePhone(event.target.value) })}
+                      onChange={(event) => setFormData({ ...formData, phone: normalizePhone(event.target.value).slice(0, 15) })}
                       className='w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-sm'
                       placeholder='88881234'
                     />

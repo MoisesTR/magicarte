@@ -359,7 +359,7 @@ export default function Admin() {
         <section aria-labelledby='photo-draft-title' className='mb-6 rounded-2xl bg-white p-4 shadow-soft sm:p-6'>
           <h2 id='photo-draft-title' className='font-semibold text-gray-800'>Crear borrador desde fotos</h2>
           <p id='photo-draft-help' className='mt-1 text-sm text-gray-500'>
-            Selecciona varias fotos de un solo producto. La IA analiza hasta 6; todas se adjuntan al borrador y se suben solo al guardar.
+            Seleccione varias fotos de un solo producto. La IA analiza hasta 6; todas se adjuntan al borrador y se suben solo al guardar.
           </p>
           <fieldset disabled={generatingDraft} aria-busy={generatingDraft} className='mt-4 space-y-3 disabled:opacity-60'>
             <button
@@ -569,7 +569,7 @@ export default function Admin() {
                 <form onSubmit={handleSubmit} className='space-y-6'>
                   {sourceQuote && !editingProduct && (
                     <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
-                      Completado desde la cotización «{sourceQuote.name}». Se guardará oculto: agrega la foto y actívalo cuando esté listo.
+                      Completado desde la cotización «{sourceQuote.name}». Se guardará oculto: agregue la foto y actívelo cuando esté listo.
                       {existingQuoteProduct && (
                         <p className='mt-1'>Esta cotización ya tiene el producto «{existingQuoteProduct.name}»</p>
                       )}
@@ -578,7 +578,7 @@ export default function Admin() {
 
                   {fromPhotoDraft && (
                     <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
-                      Revisa el nombre, la descripción y la categoría, y agrega el precio. Se guardará oculto; las medidas son opcionales.
+                      Revise el nombre, la descripción y la categoría, y agregue el precio. Se guardará oculto; las medidas son opcionales.
                     </div>
                   )}
 
@@ -699,7 +699,7 @@ export default function Admin() {
                         onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                         className='w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#51c879] focus:border-transparent'
                       >
-                        <option value=''>Selecciona una categoría</option>
+                        <option value=''>Seleccione una categoría</option>
                         {categoriesData.map((category) => (
                           <option key={category.id} value={category.id}>
                             {category.name}

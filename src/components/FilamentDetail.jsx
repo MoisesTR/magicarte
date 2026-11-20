@@ -72,7 +72,7 @@ export default function FilamentDetail({ item, businessId, onClose, onEdit, onRe
     if (!pending || saving || !item.is_active) return
     if (pending.previousStock !== Number(item.current_stock)) {
       setPending(null)
-      setSaveError('La existencia cambió. Revisa el ajuste otra vez.')
+      setSaveError('La existencia cambió. Revise el ajuste otra vez.')
       return
     }
     setSaving(true)
@@ -84,7 +84,7 @@ export default function FilamentDetail({ item, businessId, onClose, onEdit, onRe
       setMessage('Existencia actualizada.')
       await onRefresh()
       setHistoryVersion(version => version + 1)
-    } catch { setSaveError('No pudimos guardar el ajuste. Intenta de nuevo.') }
+    } catch { setSaveError('No pudimos guardar el ajuste. Intente de nuevo.') }
     finally { setSaving(false) }
   }
 

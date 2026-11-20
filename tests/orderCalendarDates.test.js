@@ -48,7 +48,7 @@ test('order filters and relative defaults use the shared Managua calendar primit
   assert.match(source, /nicaraguaWeek\(/)
   assert.match(source, /daysBetween\(nicaraguaToday\(\), deliveryDate\)/)
   assert.match(source, /addDays\(formData\.order_date \|\| nicaraguaToday\(\), days\)/)
-  assert.match(source, /addDays\(nicaraguaToday\(\), days\)/)
+  assert.doesNotMatch(source, /SHOW_WHATSAPP_REMINDER|follow_up_date/, 'removed reminder shortcuts no longer need calendar defaults')
   assert.doesNotMatch(source, /const today = new Date\(\)/)
 })
 

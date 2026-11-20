@@ -17,13 +17,13 @@ export default function FilamentWall({ items, businessId, preferences, onPrefere
       <div className='filament-wall-header'>
         <p className='mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500'>Cada idea tiene su color</p>
         <div className='flex flex-wrap items-end justify-between gap-3'>
-          <div><h2 id='filament-wall-title' className='filament-wall-title'>Muro de filamentos</h2><p className='mt-2 text-sm text-gray-500'>Elige un rollo. Mira lo que queda. Crea algo increíble.</p></div>
+          <div><h2 id='filament-wall-title' className='filament-wall-title'>Muro de filamentos</h2><p className='mt-2 text-sm text-gray-500'>Elija un rollo. Mire lo que queda. Cree algo increíble.</p></div>
           <span className='filament-wall-count rounded-full border border-white bg-white/70 px-3 py-2 text-xs font-semibold text-gray-600'>{filtered.length} {filtered.length === 1 ? 'color' : 'colores'}</span>
         </div>
       </div>
       <div className='my-5 space-y-3'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
-          <label className='block min-w-0 flex-1 text-xs font-semibold text-gray-600'>Busca tu color
+          <label className='block min-w-0 flex-1 text-xs font-semibold text-gray-600'>Busque su color
             <input type='search' value={preferences.query} onChange={event => update({ query: event.target.value })} placeholder='Nombre o código Bambu…' className='field mt-1 min-h-11 w-full min-w-0 bg-white' />
           </label>
           <label className='block text-xs font-semibold text-gray-600'>Ordenar

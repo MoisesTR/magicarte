@@ -1,3 +1,5 @@
+import { normalizePhone, toWhatsAppPhone } from './phone.js'
+export { normalizePhone } from './phone.js'
 export { aiTagChip } from './whatsappTags.js'
 import { newOrderForm } from './quoteForms.js'
 import { addDays, nicaraguaToday } from './finance.js'
@@ -38,15 +40,6 @@ const plain = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
-/** Canonical phone digits; only Nicaragua's exact 505 + eight-digit form is local. */
-export function normalizePhone(value) {
-  const digits = String(value ?? '').replace(/\D/g, '')
-  if (digits.length < 8) return null
-  return digits.length === 11 && digits.startsWith('505')
-    ? digits.slice(3)
-    : digits
-}
-
 /** Explicit links take precedence; inferred matches require a phone, tenant and date window. */
 export function matchThreadsToOrders(threads, orders) {
   const matches = new Map()
@@ -68,7 +61,7 @@ export function matchThreadsToOrders(threads, orders) {
     }
     const phone = normalizePhone(thread.chat_key)
     const requestedAt = timestampAt(thread.requested_at || thread.created_at)
-    if (!phone || requestedAt === null) continue
+    if (phone.length < 8 || requestedAt === null) continue
     let latest = null,
       latestAt = -Infinity
     for (const order of orders) {
@@ -338,7 +331,7 @@ export function groupThreads(threads, now = new Date()) {
   }
   const groups = [
     ['today', 'Responder hoy'],
-    ['unanswered', 'Esperando tu respuesta'],
+    ['unanswered', 'Sin responder'],
     ['toQuote', 'Por cotizar'],
     ['payments', 'Pagos pendientes'],
     ['waiting', 'Esperando al cliente'],
@@ -696,12 +689,10 @@ export function parseWhatsAppChat(input, ourSenders = ['Ivonne Silva']) {
   )
   const ourMessages = messages.filter((m) => oursIncludes(m.sender, ourSenders))
   const sender = customerMessages[0]?.sender || ''
-  const digits = sender.replace(/\D/g, '')
+  const digits = normalizePhone(sender)
   const phone =
     /^[+\d\s()-]+$/.test(sender) && digits.length >= 8
-      ? digits.length === 8
-        ? `505${digits}`
-        : digits
+      ? toWhatsAppPhone(digits)
       : ''
   const promise = detectPromise(messages, ourSenders)
   const lastCustomer = customerMessages.at(-1)?.at || null,
@@ -771,7 +762,7 @@ export function threadOrderPrefill(thread, orderDate = managuaDay()) {
   return {
     ...newOrderForm(orderDate),
     customer_name: (thread.customer_name || '').trim(),
-    customer_phone: phone.startsWith('505') && phone.length === 11 ? phone.slice(3) : phone,
+    customer_phone: normalizePhone(phone),
     client_id: thread.client_id || null,
     notes: notes.join('\n\n'),
     estimated_delivery_date: thread.delivery_date || '',
@@ -801,8 +792,7 @@ export function chatPhone(thread) {
   const candidate =
     thread.customer_phone ||
     (/^\d+$/.test(thread.chat_key || '') ? thread.chat_key : '')
-  const digits = candidate.replace(/\D/g, '')
-  return digits.length === 8 ? `505${digits}` : digits
+  return toWhatsAppPhone(candidate)
 }
 
 /** Manual editor validation is pure and shared with tests; never trust hidden inputs. */

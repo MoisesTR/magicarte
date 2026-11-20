@@ -31,7 +31,7 @@ export default function ProductGallery({ items, onChange, prepareFile, resolveUr
   return (
     <fieldset disabled={disabled} className='min-w-0'>
       <legend className='mb-2 text-sm font-medium text-gray-700'>Fotos del producto</legend>
-      <p className='mb-3 text-xs text-gray-500'>La primera foto es la principal. Usa las flechas para ordenar las fotos.</p>
+      <p className='mb-3 text-xs text-gray-500'>La primera foto es la principal. Use las flechas para ordenar las fotos.</p>
       <div className='grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3'>
         {items.map((item, index) => (
           <div key={item.id} className={`min-w-0 overflow-hidden rounded-xl border ${index === 0 ? 'border-[#51c879]' : 'border-gray-200'}`}>
