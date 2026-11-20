@@ -1634,7 +1634,7 @@ export default function Orders() {
                           <div key={idx} className='flex justify-between items-start text-base'>
                             <div className='flex-1 pr-4'>
                               <div className='font-medium text-gray-800'>• {item.product_name}</div>
-                              {orderItemDetailLines(item).map((line, lineIndex) => <div key={lineIndex} className='ml-4 break-words text-sm text-gray-600'>{line}</div>)}
+                              {orderItemDetailLines(item).map((line, lineIndex) => <div key={lineIndex} className='ml-4 break-words text-sm text-gray-600'>{line}{lineIndex === 0 && item.presentation_label && !item.presentation_id && <span className='ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'>especial</span>}</div>)}
                               {item.product_description && (
                                 <div className='text-gray-500 ml-4 text-sm'>({item.product_description})</div>
                               )}

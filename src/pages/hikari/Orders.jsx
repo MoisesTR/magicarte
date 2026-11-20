@@ -311,7 +311,7 @@ export default function HikariOrders() {
                         <p className='truncate text-xs text-gray-400'>
                           {(o.order_items || []).map((i) => i.product_name).join(', ') || '—'}
                         </p>
-                        {(o.order_items || []).map((item, itemIndex) => orderItemDetailLines(item).length > 0 && <div key={item.id || itemIndex} className='mt-1 text-xs text-gray-500'>{orderItemDetailLines(item).map((line, lineIndex) => <p key={lineIndex} className='break-words'>{line}</p>)}</div>)}
+                        {(o.order_items || []).map((item, itemIndex) => orderItemDetailLines(item).length > 0 && <div key={item.id || itemIndex} className='mt-1 text-xs text-gray-500'>{orderItemDetailLines(item).map((line, lineIndex) => <p key={lineIndex} className='break-words'>{line}{lineIndex === 0 && item.presentation_label && !item.presentation_id && <span className='ml-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700'>especial</span>}</p>)}</div>)}
                       </div>
                       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${st.bg} ${st.text}`}>
                         {st.label}

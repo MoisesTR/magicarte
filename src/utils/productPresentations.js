@@ -84,6 +84,65 @@ export function presentationSnapshot(row) {
     unit_price: Number(row.price),
   }
 }
+// Special packs are order snapshots only; they never create catalog rows.
+export function defaultSpecialLabel(units) {
+  return `Paquete especial de ${Math.max(1, count(units))}`
+}
+export function buildSpecialPresentation({ label, units, price }) {
+  const errors = {}
+  const empty = (value) => value == null || String(value).trim() === ''
+  if (typeof label !== 'string' || !label.trim())
+    errors.label = 'Escribe el nombre del paquete.'
+  if (empty(units) || !Number.isInteger(Number(units)) || Number(units) < 1)
+    errors.units = 'Las unidades deben ser un número entero mayor o igual a 1.'
+  if (empty(price) || !Number.isFinite(Number(price)) || Number(price) < 0)
+    errors.price = 'Escribe un precio mayor o igual a 0.'
+  return {
+    snapshot: Object.keys(errors).length
+      ? null
+      : presentationSnapshot({ label: label.trim(), units, price }),
+    errors,
+  }
+}
+export function isSpecialPresentation(item, presentations = []) {
+  return !!(
+    item?.presentation_label?.trim() &&
+    (!item.presentation_id ||
+      !presentations.some((row) => row.id === item.presentation_id))
+  )
+}
+export function presentationSelectorModel(
+  presentations,
+  selected,
+  { admin = false } = {}
+) {
+  const active = activeOptions(presentations)
+  const current = active.find(
+    (row) =>
+      row.id &&
+      row.id === selected?.id &&
+      row.label === selected.label &&
+      Number(row.units) === Number(selected.units) &&
+      Number(row.price) === Number(selected.price)
+  )
+  const specialSelected =
+    admin &&
+    !!selected &&
+    isSpecialPresentation(presentationSnapshot(selected), presentations)
+  return {
+    active,
+    selectedCatalogId: current?.id || null,
+    specialSelected,
+    hasSnapshot: !!selected && !current && !specialSelected,
+  }
+}
+export function updateSpecialPresentationDraft(draft, field, value) {
+  const next = { ...draft, [field]: value }
+  if (field === 'label') next.nameEdited = true
+  if (field === 'units' && !draft.nameEdited)
+    next.label = defaultSpecialLabel(value)
+  return next
+}
 export function orderItemOptions(item) {
   if (
     !item.presentation_label &&

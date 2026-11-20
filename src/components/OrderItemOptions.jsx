@@ -6,6 +6,8 @@ export default function OrderItemOptions({ item, product, onChange }) {
   const presentations = product?.presentations || []
   const designs = product?.designs || []
   if (
+    !product &&
+    !item.product_id &&
     !presentations.length &&
     !designs.length &&
     !item.presentation_label &&
@@ -22,8 +24,9 @@ export default function OrderItemOptions({ item, product, onChange }) {
     : null
   return (
     <div className='min-w-0 space-y-3 border-t border-gray-200 pt-3'>
-      {(presentations.length > 0 || selected) && (
+      {(product || item.product_id || presentations.length > 0 || selected) && (
         <ProductPresentationSelector
+          admin
           presentations={presentations}
           selected={selected}
           onChange={(row) => onChange({ ...presentationSnapshot(row) })}

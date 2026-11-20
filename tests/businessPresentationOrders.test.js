@@ -176,7 +176,7 @@ function findElement(tree, predicate) {
   if (predicate(tree)) return tree
   return findElement(tree.props?.children, predicate)
 }
-test('Hikari open-edit-save preserves linked product, historical packs, designs and ownership', async () => {
+for (const presentationId of ['same', null, 'deleted']) test(`Hikari open-edit-save preserves pack ${presentationId}, incomplete designs and ownership`, async () => {
   const calls = []
   const item = {
     id: 'item',
@@ -185,7 +185,7 @@ test('Hikari open-edit-save preserves linked product, historical packs, designs 
     quantity: 2,
     unit_price: 690,
     subtotal: 1380,
-    presentation_id: 'same',
+    presentation_id: presentationId,
     presentation_label: 'Paquete antiguo',
     units_per_presentation: 6,
     order_item_designs: [
@@ -307,6 +307,7 @@ test('Hikari open-edit-save preserves linked product, historical packs, designs 
   const [, rows, business] = calls.find(([name]) => name === 'insertOrderItems')
   assert.equal(business, 2)
   assert.equal(rows[0].product_id, 'p')
+  assert.equal(rows[0].presentation_id, presentationId)
   assert.equal(rows[0].presentation_label, 'Paquete antiguo')
   assert.equal(rows[0].units_per_presentation, 6)
   assert.equal(rows[0].unit_price, 690)
