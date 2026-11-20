@@ -429,7 +429,7 @@ test('confirmed compact rows show delivery/payment/safety-net chips and existing
   const panel = render(component, { groups, businessId: 'deliveries', now })
   assert.match(panel, /Acordado en WhatsApp y aún sin pedido registrado/)
   assert.match(panel, /Sin fecha/)
-  assert.match(panel, /Confirmados <span[^>]*>1<\/span>/)
+  assert.match(panel, /Confirmados <span[^>]*>2<\/span>/)
 })
 
 test('editor exposes delivery date, free-text method and paid amount without new payment tables', async () => {

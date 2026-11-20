@@ -147,20 +147,18 @@ function dueCalendarDay(value) {
   return at === null ? null : managuaDay(at)
 }
 
-/** Managua calendar ranges; due-today/overdue rows always pass. All preserves identity. */
+/**
+ * Managua calendar ranges; due-today/overdue rows always pass. All preserves identity.
+ * Confirmed chats without a registered order always pass: the safety net must
+ * stay visible until the owner registers the order, whatever its delivery date.
+ */
 export function filterThreadsByDate(threads, range, now = new Date()) {
   if (range !== 'today' && range !== 'week') return threads
   const today = managuaDay(now)
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
   const monday = addDays(today, -((weekday + 6) % 7))
   return threads.filter((thread) => {
-    if (isConfirmedThread(thread)) {
-      const delivery = dueCalendarDay(thread.delivery_date)
-      return (
-        delivery !== null &&
-        delivery <= (range === 'today' ? today : addDays(monday, 6))
-      )
-    }
+    if (isConfirmedThread(thread)) return true
     if (
       [thread.promised_date, thread.follow_up_date].some((value) => {
         const day = dueCalendarDay(value)
@@ -334,9 +332,7 @@ export function groupThreads(threads, now = new Date()) {
     title: 'Confirmados',
     deliveryGroups: deliveries,
     threads: deliveries.flatMap((group) => group.threads),
-    count: deliveries
-      .slice(0, 4)
-      .reduce((count, group) => count + group.threads.length, 0),
+    count: deliveries.reduce((count, group) => count + group.threads.length, 0),
     urgentCount: deliveries
       .slice(0, 2)
       .reduce((count, group) => count + group.threads.length, 0),

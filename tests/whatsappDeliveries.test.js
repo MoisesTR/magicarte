@@ -126,9 +126,9 @@ test('confirmed takes precedence over all tabs; payment requests always stay in 
     new Set(groups.flatMap((g) => g.threads.map((t) => t.id))).size,
     rows.length
   )
-  assert.equal(groups[0].count, 1)
+  assert.equal(groups[0].count, 2)
   assert.deepEqual(feed.feedKPIs(rows, now), {
-    confirmed: 1,
+    confirmed: 2,
     today: 1,
     unanswered: 0,
     toQuote: 0,
@@ -169,26 +169,27 @@ test('default confirmed only for overdue/today; unknown remembered keys use acti
   assert.equal(feed.defaultFeedTab(groups), 'today')
 })
 
-test('confirmed date filters ignore activity/promises; overdue included and undated only in all', () => {
+test('confirmed chats without a registered order always pass the date filters', () => {
   const rows = [
     open('old', { delivery_date: '2026-11-10' }),
     open('today', { delivery_date: '2026-11-20' }),
     open('week', { delivery_date: '2026-11-22' }),
     open('next', {
-      delivery_date: '2026-11-23',
-      promised_date: '2026-11-01',
-      updated_at: now,
+      delivery_date: '2026-11-25',
+      last_customer_message_at: '2026-11-18T18:00:00Z',
     }),
-    open('undated', { paid_amount: 700, updated_at: now }),
+    open('undated', { paid_amount: 700 }),
     open('reply', { promised_date: '2026-11-20' }),
+    open('stale', { last_customer_message_at: '2026-11-01T18:00:00Z' }),
   ]
+  const visible = ['old', 'today', 'week', 'next', 'undated', 'reply']
   assert.deepEqual(
     feed.filterThreadsByDate(rows, 'today', now).map((t) => t.id),
-    ['old', 'today', 'reply']
+    visible
   )
   assert.deepEqual(
     feed.filterThreadsByDate(rows, 'week', now).map((t) => t.id),
-    ['old', 'today', 'week', 'reply']
+    visible
   )
   assert.equal(feed.filterThreadsByDate(rows, 'all', now), rows)
 })
