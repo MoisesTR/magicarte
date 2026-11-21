@@ -5,6 +5,7 @@ import { activeOptions, formatPresentationMoney } from '../utils/productPresenta
 import { productPriceDisplay } from '../utils/productPriceDisplay.js'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { backTarget } from '../utils/storefrontRoutes.js'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import { TABLE } from '../utils/constants'
 import { useBusiness } from '../context/BusinessContext'
@@ -105,7 +106,7 @@ export default function ProductDetail() {
   }
 
   const handleBackClick = () => {
-    navigate(-1) // Go back to previous page
+    navigate(backTarget(window.history.state))
   }
 
   const isBannerActive = getMothersDay().isActive

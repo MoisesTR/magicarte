@@ -9,3 +9,8 @@ export function storefrontProductPath(businessSlug, productId) {
     ? `/product/${encodeURIComponent(productId)}`
     : null
 }
+
+/** Where "Volver" should go: browser back when this tab has in-app history (react-router idx > 0), else the catalog. */
+export function backTarget(historyState) {
+  return historyState && Number(historyState.idx) > 0 ? -1 : '/products'
+}
