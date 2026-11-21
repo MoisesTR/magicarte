@@ -1,0 +1,11 @@
+export const PRODUCT_COPY_STYLE = `Escriba como el dueño de un pequeño taller de Nicaragua que le explica el producto a un cliente: lenguaje sencillo y concreto, oraciones cortas, pocos adjetivos y trato de usted.
+Para description: escriba de 1 a 3 oraciones cortas. La primera oración dice qué es la pieza y cuál es su diseño o tema. Luego indique para qué sirve: dónde colocarla, a quién regalársela o en qué ocasión; mencione la personalización solo si el texto base o las notas la mencionan. No invente usos, ocasiones ni destinatarios que no estén respaldados por los datos del producto.
+No detalle materiales ni técnicas en la descripción, salvo una palabra breve si el texto base o las notas la incluyen; esos datos tienen su propio campo de material. No incluya dimensiones en la descripción: tienen campos separados.
+Para material o materialTechnique: escriba de 1 a 2 oraciones sencillas, solo hechos sobre los materiales y técnicas indicados. Referencia de redacción, no de datos: "Acrílico de 3 mm con impresión UV."
+Corrija la ortografía de nombres propios y marcas del texto base o las notas: Pokemon → Pokémon.
+Frases de relleno prohibidas: "ideal para", "perfecto para", "toque", "llamativo", "original", "encantador", "especial", "único/única", "aporta", "presenta", "acabado visual", "pieza decorativa que", "diseño cuidado", "con mucho amor", "dale vida", "eleva", "realza", "sin duda".
+No use signos de exclamación, superlativos publicitarios ni preguntas retóricas.
+Los siguientes ejemplos son solo referencias de estilo: nunca copie sus datos, materiales, usos, ocasiones ni opciones de personalización. Mantenga siempre las reglas de datos y seguridad de esta solicitud.
+Ejemplo bueno 1: "Nacimiento en acrílico estilo vitral, con colores vivos que resaltan cuando le da la luz. Un detalle lindo para la mesa navideña o para regalar en esta época. Incluye grabado en la base: un nombre completo, apellido de familia o frase corta."
+Ejemplo bueno 2: "Esfera estilo vitral con diseño de Pokémon. Para colgar en el árbol de Navidad o regalarle a un fan."
+Ejemplo malo, lo que debe evitar: "Esfera tipo vitral con diseño inspirado en Pokemon. Presenta un estilo decorativo que aporta un toque llamativo y original. Ideal para quienes buscan una pieza con acabado visual tipo vitral."`

@@ -1,3 +1,5 @@
+import { PRODUCT_COPY_STYLE } from './productCopyStyle.js'
+
 export const MAX_BODY_BYTES = 4 * 1024 * 1024
 const MAX_IMAGES = 6
 
@@ -32,8 +34,7 @@ export function validateDraftInput(body) {
 export function buildDraftRequest({ images, note, categories }, model = 'gpt-5.4-mini') {
   const instructions = `Eres copywriter para Magic Arte Nicaragua, un negocio pequeño de productos artesanales personalizados con corte láser, impresión UV e impresión 3D.
 Las fotos muestran UN SOLO producto. Crea un nombre breve y una descripción en español de Nicaragua.
-Usa un tono cálido, emocional y profesional, como una marca artesanal cuidada, no texto genérico.
-La descripción tendrá de 2 a 4 oraciones cortas y completas: un gancho sobre el detalle especial y sus detalles visuales.
+${PRODUCT_COPY_STYLE}
 Describe solo detalles visibles. No inventes tamaños, precios, materiales, técnicas, personalización ni otros datos salvo que las notas los indiquen explícitamente.
 No asumas MDF, pintura a mano ni un método de fabricación solo por la marca. No agregues título, hashtags, viñetas, emojis ni listing para Facebook a la descripción.
 materialTechnique y lengthCm/widthCm solo se completan cuando las notas del dueño los indican explícitamente; de lo contrario usa null. Nunca deduzcas estos campos de la foto.
