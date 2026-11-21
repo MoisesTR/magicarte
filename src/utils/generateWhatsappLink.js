@@ -1,6 +1,7 @@
 import { presentationMessageLines } from './productPresentations'
 import {CONTACT_PHONE} from "./constants.js";
 import { trackWhatsAppContact } from './analytics'
+import { productPriceDisplay } from './productPriceDisplay.js'
 
 export function generateWhatsAppLinkForProducts(
   products,
@@ -13,6 +14,7 @@ export function generateWhatsAppLinkForProducts(
 
   const header = 'Hola! Me gustaría cotizar:\n\n'
   const productMessages = products.map((product) => {
+    if (productPriceDisplay(product).mode !== 'fixed') return `- Me interesa cotizar: ${product.name}`
     return `- ${product.name}: C$${product.price}`
   })
 
@@ -34,7 +36,9 @@ export function generateWhatsAppLinkForSingleProduct(
   trackWhatsAppContact(product)
 
   const productUrl = `${window.location.origin}/product/${product.id}`
-  const description = configuration
+  const description = productPriceDisplay(product).mode !== 'fixed'
+    ? `Me interesa cotizar: ${product.name}`
+    : configuration
     ? presentationMessageLines(product, configuration.presentation || { label: 'Unidad', units: 1, price: product.price }, configuration.packs, configuration.designs, configuration.hasDesigns).join('\n')
     : `- ${product.name}: C$${product.price}`
   const message = `Hola! Me gustaría cotizar:

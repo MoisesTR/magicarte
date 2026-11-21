@@ -42,7 +42,7 @@ export function newOrderForm(orderDate = '') {
 
 export function newProductForm() {
   return {
-    name: '', price: '', width: '', length: '', description: '', category_id: '',
+    name: '', price: '', price_mode: 'fixed', width: '', length: '', description: '', category_id: '',
     stock_quantity: 1, image_url: '', secondary_images: [],
     material_technique: DEFAULT_MATERIAL, care_instructions: DEFAULT_CARE, is_visible: true,
   }

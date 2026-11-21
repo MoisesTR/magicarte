@@ -9,6 +9,8 @@ import { getImageUrl } from '../utils/getImageUrl'
 import { prepareFile, uploadCompressedImage } from '../utils/uploadImage'
 import { createPhotoDraft } from '../utils/productPhotoDraft'
 import { formatPresentationMoney } from '../utils/productPresentations'
+import { productPriceDisplay } from '../utils/productPriceDisplay.js'
+import { productPricePayload } from '../utils/productPricePayload.js'
 import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
 import ProductGallery from '../components/ProductGallery'
 import ProductTextField from '../components/ProductTextField'
@@ -131,11 +133,12 @@ export default function Admin() {
 
     try {
       productOptions.validate()
+      const pricing = productPricePayload(formData, productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price)
       const imagePayload = await uploadGallery(gallery, uploadCompressedImage)
 
       const productData = {
         ...formData,
-        price: productOptions.price(formData.price),
+        ...pricing,
         stock_quantity: parseInt(formData.stock_quantity),
         width: formData.width === '' ? null : parseFloat(formData.width),
         length: formData.length === '' ? null : parseFloat(formData.length),
@@ -167,12 +170,14 @@ export default function Admin() {
           params.delete('entrega')
           navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true })
         }
-        toast.success(editingProduct ? 'Producto actualizado!' : 'Producto creado!')
+        if (result.priceModeAvailable === false && pricing.price_mode !== 'fixed') {
+          toast.error('Producto guardado con precio fijo. Aplique la migración antes de publicar precios «Desde» o «A cotizar».')
+        } else toast.success(editingProduct ? 'Producto actualizado!' : 'Producto creado!')
         resetForm()
         fetchProducts()
       }
-    } catch {
-      toast.error('Error al procesar la solicitud')
+    } catch (error) {
+      toast.error(error.message || 'Error al procesar la solicitud')
     } finally {
       setLoading(false)
     }
@@ -207,7 +212,8 @@ export default function Admin() {
     setFromPhotoDraft(false)
     setFormData({
       name: product.name || '',
-      price: product.price || '',
+      price: product.price ?? '',
+      price_mode: productPriceDisplay(product).mode,
       description: product.description || '',
       category_id: product.category_id || '',
       width: product.width || '',
@@ -534,7 +540,7 @@ export default function Admin() {
                 <h3 className='font-semibold text-gray-800 mb-1 line-clamp-1'>{product.name}</h3>
                 <p className='text-gray-500 text-sm mb-3 line-clamp-2'>{product.description}</p>
                 <div className='flex justify-between items-center mb-3'>
-                  <span className='text-base font-bold text-gray-800'>C$ {product.price}</span>
+                  <span className='text-base font-bold text-gray-800'>{productPriceDisplay(product).label}</span>
                   <span className='text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full'>Stock: {product.stock_quantity}</span>
                 </div>
               </div>
@@ -604,7 +610,8 @@ export default function Admin() {
                       </label>
                       <input
                         type='number'
-                        required
+                        required={formData.price_mode !== 'quote'}
+                        min='0'
                         step='0.01'
                         readOnly={productOptions.hasPresentations}
                         value={productOptions.hasPresentations ? productOptions.price(formData.price) : formData.price}
@@ -615,10 +622,19 @@ export default function Admin() {
                       />
                       {productOptions.hasPresentations && (
                         <p id='price-from-presentations' className='mt-1 text-xs text-gray-500'>
-                          Se calcula de las presentaciones: desde {formatPresentationMoney(productOptions.price(formData.price))}. Cambia los precios en «Presentaciones».
+                          Se calcula de las presentaciones: desde {formatPresentationMoney(productOptions.price(formData.price))}. Cambie los precios en «Presentaciones».
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor='product-price-mode' className='mb-2 block text-sm font-medium text-gray-700'>Cómo mostrar el precio</label>
+                    <select id='product-price-mode' value={formData.price_mode || 'fixed'} onChange={event => setFormData({ ...formData, price_mode: event.target.value })} className='min-h-11 w-full rounded-xl border border-gray-300 px-4 py-3 focus:border-transparent focus:ring-2 focus:ring-[#51c879]'>
+                      <option value='fixed'>Precio fijo</option>
+                      <option value='from'>Desde (precio base)</option>
+                      <option value='quote'>A cotizar</option>
+                    </select>
                   </div>
 
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>

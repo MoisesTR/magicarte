@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { productPriceDisplay } from '../src/utils/productPriceDisplay.js'
 import {
   activeOptions,
   presentationPrice,
@@ -185,6 +186,7 @@ test('WhatsApp generator keeps legacy message exact and adds packs without losin
     'CONTACT_PHONE',
     'trackWhatsAppContact',
     'presentationMessageLines',
+    'productPriceDisplay',
     `${source}; return generateWhatsAppLinkForSingleProduct`
   )(
     {
@@ -193,7 +195,8 @@ test('WhatsApp generator keeps legacy message exact and adds packs without losin
     },
     '123',
     () => events.push('analytics'),
-    presentationMessageLines
+    presentationMessageLines,
+    productPriceDisplay
   )
   const product = { id: 'p', name: 'Esferas', price: 135 }
   const legacy = decodeURIComponent(generate(product).split('?text=')[1])
