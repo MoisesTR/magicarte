@@ -5,7 +5,7 @@ import {
   presentationSelectorModel,
   updateSpecialPresentationDraft,
   formatPresentationMoney,
-  unitPrice,
+  unitPriceLabel,
 } from '../utils/productPresentations.js'
 export default function ProductPresentationSelector({
   presentations = [],
@@ -48,7 +48,7 @@ export default function ProductPresentationSelector({
           <span className='mt-1 block text-xs text-gray-600'>
             {selected.units} piezas
             {Number(selected.units) > 1
-              ? ` · ${formatPresentationMoney(unitPrice(selected))} c/u`
+              ? ` · ${unitPriceLabel(selected)} c/u`
               : ''}
           </span>
         </div>
@@ -66,7 +66,7 @@ export default function ProductPresentationSelector({
           </span>
           {row.units > 1 && (
             <span className='mt-1 block text-xs text-gray-500'>
-              {formatPresentationMoney(unitPrice(row))} c/u
+              {unitPriceLabel(row)} c/u
             </span>
           )}
         </button>

@@ -19,6 +19,13 @@ export function unitPrice(presentation) {
     Number(presentation.price) / Math.max(1, count(presentation.units))
   )
 }
+/** Customer-facing "c/u" text: exact when the pack divides evenly, else "≈" whole córdobas. */
+export function unitPriceLabel(presentation) {
+  const exact = Number(presentation.price) / Math.max(1, count(presentation.units))
+  return Math.abs(exact - Math.round(exact)) < 0.005
+    ? formatPresentationMoney(exact)
+    : `≈ ${formatPresentationMoney(Math.round(exact))}`
+}
 export function formatPresentationMoney(value) {
   const rounded = money(value)
   return `C$${rounded.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2, maximumFractionDigits: 2 })}`
