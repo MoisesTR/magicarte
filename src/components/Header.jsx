@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import MothersDayBanner from './MothersDayBanner'
+import SeasonalBanner from './SeasonalBanner'
 
 export default function Header({ categories = [], selectedCategory, onCategorySelect, onBannerDismiss }) {
   const navigate = useNavigate()
@@ -13,7 +13,7 @@ export default function Header({ categories = [], selectedCategory, onCategorySe
 
   return (
     <header className='bg-white fixed top-0 left-0 z-50 w-full shadow-lg border-b border-gray-100'>
-      <MothersDayBanner onDismiss={onBannerDismiss} />
+      <SeasonalBanner onDismiss={onBannerDismiss} />
       <div className='border-b border-gray-100'>
         <div className='container mx-auto flex items-center justify-between py-4 px-6'>
           <div

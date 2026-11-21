@@ -4,9 +4,9 @@ import { Navigate } from 'react-router-dom'
 import { useSupabaseQuery } from '../hooks/useSupabaseQuery'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
-import MothersDayHero from '../components/MothersDayHero'
+import SeasonalHero from '../components/SeasonalHero'
 import { TABLE } from '../utils/constants'
-import { getMothersDay } from '../utils/holidays'
+import { isSeasonalBannerActive } from '../utils/seasonalCampaigns.js'
 import { useBusiness } from '../context/BusinessContext'
 import { businessFilter } from '../data/scope'
 
@@ -33,7 +33,7 @@ export default function Home() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const productsRef = useRef(null)
 
-  const mothersDayBannerActive = getMothersDay().isActive
+  const isBannerActive = isSeasonalBannerActive()
   
   useEffect(() => {
     if (!selectedCategory && modifiedCategories.length > 0) {
@@ -58,17 +58,17 @@ export default function Home() {
           onBannerDismiss={() => setBannerDismissed(true)}
         />
 
-      <main className={mothersDayBannerActive && !bannerDismissed ? 'pt-44' : 'pt-32'}>
+      <main style={{ paddingTop: isBannerActive && !bannerDismissed ? 'calc(8rem + var(--seasonal-banner-height))' : '8rem' }}>
         {/* Main Content */}
         <div className='max-w-7xl mx-auto px-6 pt-16 pb-6'>
-          <MothersDayHero
+          <SeasonalHero
             categories={modifiedCategories}
             onCategorySelect={(cat) => {
               setSelectedCategory(cat)
               productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             }}
           />
-          <div ref={productsRef}>
+          <div ref={productsRef} className='scroll-mt-72 sm:scroll-mt-64'>
             <Products selectedCategory={selectedCategory} categories={modifiedCategories} />
           </div>
         </div>

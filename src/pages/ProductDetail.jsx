@@ -13,7 +13,7 @@ import { businessFilter, withBusiness } from '../data/scope'
 import { getImageUrl } from '../utils/getImageUrl'
 import { generateWhatsAppLinkForSingleProduct } from '../utils/generateWhatsappLink'
 import { trackGenerateLead, trackViewItem } from '../utils/analytics'
-import { getMothersDay } from '../utils/holidays'
+import { isSeasonalBannerActive } from '../utils/seasonalCampaigns.js'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import StorefrontProductGallery from '../components/StorefrontProductGallery'
@@ -22,6 +22,7 @@ export default function ProductDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const { publicBusinessId } = useBusiness()
   const { data: options } = usePublicProductOptions(id)
@@ -109,12 +110,12 @@ export default function ProductDetail() {
     navigate(backTarget(window.history.state))
   }
 
-  const isBannerActive = getMothersDay().isActive
+  const isBannerActive = isSeasonalBannerActive()
 
   if (isLoading) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-        <Header />
+        <Header onBannerDismiss={() => setBannerDismissed(true)} />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
             <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-[#51c879] mx-auto mb-4'></div>
@@ -128,7 +129,7 @@ export default function ProductDetail() {
   if (error || !product) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-        <Header />
+        <Header onBannerDismiss={() => setBannerDismissed(true)} />
         <div className='flex items-center justify-center min-h-screen pt-20'>
           <div className='text-center'>
             <svg className='w-16 h-16 text-gray-400 mx-auto mb-4' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
@@ -153,9 +154,9 @@ export default function ProductDetail() {
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
-      <Header />
+      <Header onBannerDismiss={() => setBannerDismissed(true)} />
 
-      <main className={`max-w-7xl mx-auto px-6 ${hasFixedPrice ? 'pb-24' : 'pb-36 sm:pb-24'} lg:pb-8 lg:px-8 ${isBannerActive ? 'pt-40' : 'pt-28'}`}>
+      <main className={`max-w-7xl mx-auto px-6 ${hasFixedPrice ? 'pb-24' : 'pb-36 sm:pb-24'} lg:pb-8 lg:px-8`} style={{ paddingTop: isBannerActive && !bannerDismissed ? 'calc(7rem + var(--seasonal-banner-height))' : '7rem' }}>
         {/* Back Button */}
         <button
           onClick={handleBackClick}
