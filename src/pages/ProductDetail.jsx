@@ -15,15 +15,12 @@ import { trackGenerateLead, trackViewItem } from '../utils/analytics'
 import { getMothersDay } from '../utils/holidays'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
-import LazyImage from '../components/LazyImage'
+import StorefrontProductGallery from '../components/StorefrontProductGallery'
 
 export default function ProductDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [selectedImage, setSelectedImage] = useState('')
   const [isQuoteRequested, setIsQuoteRequested] = useState(false)
-  const [lightboxOpen, setLightboxOpen] = useState(false)
-  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   const { publicBusinessId } = useBusiness()
   const { data: options } = usePublicProductOptions(id)
@@ -96,12 +93,6 @@ export default function ProductDetail() {
   }, [product])
 
   useEffect(() => {
-    if (product?.image_url) {
-      setSelectedImage(product.image_url)
-    }
-  }, [product])
-
-  useEffect(() => {
     trackViewItem(product)
   }, [product])
 
@@ -156,10 +147,8 @@ export default function ProductDetail() {
     )
   }
 
-  const allImages = [product.image_url, ...(product.secondary_images || [])]
-  const activeImageIndex = allImages.indexOf(selectedImage)
-  const resolvedLightboxIndex = activeImageIndex >= 0 ? activeImageIndex : 0
-  const lightboxImage = allImages[lightboxIndex] || allImages[resolvedLightboxIndex]
+  const allImages = [product.image_url, ...(product.secondary_images || [])].filter(Boolean)
+  if (!allImages.length) allImages.push(null)
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-rose-50/60 to-pink-50/40'>
@@ -191,48 +180,7 @@ export default function ProductDetail() {
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12'>
           {/* Image Gallery */}
-          <div className='space-y-4'>
-            {/* Main Image */}
-            <div
-              className='rounded-2xl overflow-hidden bg-gray-50 shadow-sm p-3 sm:p-6 cursor-zoom-in'
-              onClick={() => {
-                setLightboxIndex(resolvedLightboxIndex)
-                setLightboxOpen(true)
-              }}
-            >
-              <div className='aspect-square lg:aspect-[3/4] w-full'>
-                <LazyImage
-                  src={getImageUrl(selectedImage)}
-                  alt={product.name}
-                  className='w-full h-full object-contain'
-                />
-              </div>
-              <p className='text-center text-xs text-gray-400 mt-2'>Toca para ampliar</p>
-            </div>
-
-            {/* Thumbnail Images */}
-            {allImages.length > 1 && (
-              <div className='flex gap-3 overflow-x-auto pb-2'>
-                {allImages.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(image)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                      selectedImage === image
-                        ? 'border-[#51c879] scale-105'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={getImageUrl(image)}
-                      alt={`Vista ${index + 1}`}
-                      className='w-full h-full object-cover'
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <StorefrontProductGallery key={product.id} images={allImages.map(image => getImageUrl(image))} name={product.name} />
 
           {/* Product Info */}
           <div className='space-y-6'>
@@ -435,53 +383,7 @@ export default function ProductDetail() {
 
       <Footer />
 
-      {/* Lightbox */}
-      {lightboxOpen && (
-        <div
-          className='fixed inset-0 z-50 bg-black/95 flex items-center justify-center'
-          onClick={() => setLightboxOpen(false)}
-        >
-          {/* Close */}
-          <button className='absolute top-4 right-4 text-white/70 hover:text-white p-2'>
-            <svg className='w-7 h-7' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-              <path strokeLinecap='round' strokeLinejoin='round' d='M6 18L18 6M6 6l12 12' />
-            </svg>
-          </button>
 
-          {/* Image */}
-          <img
-            src={getImageUrl(lightboxImage)}
-            alt={product.name}
-            className='max-w-full max-h-full object-contain p-4'
-            onClick={e => e.stopPropagation()}
-          />
-
-          {/* Prev / Next */}
-          {allImages.length > 1 && (
-            <>
-              <button
-                className='absolute left-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2'
-                onClick={e => { e.stopPropagation(); setLightboxIndex((lightboxIndex - 1 + allImages.length) % allImages.length) }}
-              >
-                <svg className='w-8 h-8' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M15 19l-7-7 7-7' />
-                </svg>
-              </button>
-              <button
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2'
-                onClick={e => { e.stopPropagation(); setLightboxIndex((lightboxIndex + 1) % allImages.length) }}
-              >
-                <svg className='w-8 h-8' fill='none' viewBox='0 0 24 24' stroke='currentColor' strokeWidth={2}>
-                  <path strokeLinecap='round' strokeLinejoin='round' d='M9 5l7 7-7 7' />
-                </svg>
-              </button>
-              <div className='absolute bottom-4 text-white/50 text-sm'>
-                {lightboxIndex + 1} / {allImages.length}
-              </div>
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }

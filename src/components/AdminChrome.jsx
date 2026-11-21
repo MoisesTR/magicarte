@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../config/supabaseClient'
 import { useBusiness } from '../context/BusinessContext'
 import BusinessSwitcher from './BusinessSwitcher'
+import { storefrontHomePath } from '../utils/storefrontRoutes.js'
 
 const TABS = [
   { tab: 'whatsapp', label: 'WhatsApp', icon: 'M21 11.5a8.5 8.5 0 01-12.6 7.4L3 21l2.1-5.4A8.5 8.5 0 1121 11.5zM8 8c1 4 3 6 7 7l1-2-2-1-1 1-2-2 1-1-1-2z' },
@@ -47,6 +48,7 @@ export default function AdminChrome() {
   const fg = currentBusiness?.text_color || '#1f2937'
   const accent = currentBusiness?.primary_color || '#51c879'
   const borderCls = dark ? 'border-white/15' : 'border-black/10'
+  const storefrontPath = storefrontHomePath(currentBusiness?.slug)
   const tabBusinessSlug = isAllBusinesses ? defaultBusinessSlug : currentBusiness.slug
   return (
     <header
@@ -90,6 +92,13 @@ export default function AdminChrome() {
             </NavLink>
           ))}
         </nav>
+
+        {storefrontPath && (
+          <a href={storefrontPath} target='_blank' rel='noopener noreferrer' className={`ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-lg border ${borderCls} px-3 py-1.5 text-sm font-medium hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2`}>
+            <svg aria-hidden='true' className='h-4 w-4 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path strokeLinecap='round' strokeLinejoin='round' d='M14 3h7v7m0-7L10 14M10 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5' /></svg>
+            Ver tienda
+          </a>
+        )}
 
         <button
           onClick={handleLogout}

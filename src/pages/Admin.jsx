@@ -14,6 +14,8 @@ import { productPricePayload } from '../utils/productPricePayload.js'
 import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
 import ProductGallery from '../components/ProductGallery'
 import ProductTextField from '../components/ProductTextField'
+import ProductMaterialPreset from '../components/ProductMaterialPreset'
+import { storefrontProductPath } from '../utils/storefrontRoutes.js'
 import { productTextContext } from '../utils/productTextEnhance'
 import { useBusiness } from '../context/BusinessContext'
 import { businessFilter } from '../data/scope'
@@ -538,6 +540,9 @@ export default function Admin() {
               </div>
               <div className='p-4'>
                 <h3 className='font-semibold text-gray-800 mb-1 line-clamp-1'>{product.name}</h3>
+                {storefrontProductPath(currentBusiness?.slug, product.id) && (
+                  <a href={storefrontProductPath(currentBusiness?.slug, product.id)} target='_blank' rel='noopener noreferrer' className='mb-2 inline-flex min-h-10 items-center gap-1 text-sm font-medium text-[#237a42] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2'>Ver en la tienda <span aria-hidden='true'>↗</span></a>
+                )}
                 <p className='text-gray-500 text-sm mb-3 line-clamp-2'>{product.description}</p>
                 <div className='flex justify-between items-center mb-3'>
                   <span className='text-base font-bold text-gray-800'>{productPriceDisplay(product).label}</span>
@@ -573,6 +578,9 @@ export default function Admin() {
                 </div>
 
                 <form onSubmit={handleSubmit} className='space-y-6'>
+                  {editingProduct && storefrontProductPath(currentBusiness?.slug, editingProduct.id) && (
+                    <a href={storefrontProductPath(currentBusiness?.slug, editingProduct.id)} target='_blank' rel='noopener noreferrer' className='inline-flex min-h-10 items-center gap-1 text-sm font-medium text-[#237a42] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2'>Ver en la tienda <span aria-hidden='true'>↗</span></a>
+                  )}
                   {sourceQuote && !editingProduct && (
                     <div role='status' className='rounded-xl bg-blue-50 p-3 text-sm text-blue-800'>
                       Completado desde la cotización «{sourceQuote.name}». Se guardará oculto: agregue la foto y actívelo cuando esté listo.
@@ -679,6 +687,8 @@ export default function Admin() {
                     getSession={() => supabase.auth.getSession()}
                     placeholder='Escriba una base: ocasión, colores, nombres o detalles personalizados...'
                   />
+
+                  <ProductMaterialPreset key={`${currentBusinessId}:${quoteRequest.current}:preset`} formData={formData} onChange={setFormData} />
 
                   <ProductTextField
                     key={`${currentBusinessId}:${quoteRequest.current}:material`}
