@@ -181,7 +181,7 @@ export default function ProductDetail() {
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12'>
           {/* Image Gallery */}
-          <StorefrontProductGallery key={product.id} images={allImages.map(image => getImageUrl(image))} name={product.name} />
+          <StorefrontProductGallery key={product.id} images={allImages.map(image => getImageUrl(image))} name={product.name} videoUrl={product.video_url ? getImageUrl(product.video_url) : null} />
 
           {/* Product Info */}
           <div className='space-y-6'>

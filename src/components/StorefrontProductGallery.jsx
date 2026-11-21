@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { galleryIndex, swipeDirection, thumbnailOverflow } from '../utils/storefrontGallery.js'
+import { galleryIndex, swipeDirection, thumbnailOverflow, storefrontGalleryItems, videoSwipeAllowed } from '../utils/storefrontGallery.js'
 
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#237a42]'
 
-export default function StorefrontProductGallery({ images, name }) {
+function GalleryVideo({ src, poster, active, className }) {
+  const player = useRef(null)
+  useEffect(() => {
+    const video = player.current
+    if (active) {
+      const playback = video.play()
+      playback?.catch(() => {}) // Controls remain available if autoplay is blocked.
+    } else video.pause()
+    return () => video.pause()
+  }, [src, active])
+  return <video ref={player} src={src} aria-label='Video del producto' muted loop playsInline controls preload='none' poster={poster} className={className} />
+}
+
+export default function StorefrontProductGallery({ images = [], name, videoUrl = null }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [overflow, setOverflow] = useState({ left: false, right: false })
@@ -14,9 +27,12 @@ export default function StorefrontProductGallery({ images, name }) {
   const closeButton = useRef(null)
   const touchStart = useRef(null)
   const suppressClick = useRef(false)
-  const count = images.length
+  const items = storefrontGalleryItems(images, videoUrl)
+  const count = items.length
   const index = galleryIndex(selectedIndex, 0, count)
   const multiple = count > 1
+  const item = items[index]
+  const poster = images[0] || undefined
   const navigate = step => setSelectedIndex(current => galleryIndex(current, step, count))
 
   useEffect(() => {
@@ -42,17 +58,19 @@ export default function StorefrontProductGallery({ images, name }) {
   useEffect(() => {
     if (!lightboxOpen) return
     const returnFocus = mainButton.current
+    const restoreFocus = () => (mainButton.current || returnFocus)?.focus({ preventScroll: true })
     const originalOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     closeButton.current?.focus()
     const onKeyDown = event => {
       if (event.key === 'Escape') { event.preventDefault(); setLightboxOpen(false) }
+      if (event.target.closest('video') && ['ArrowLeft', 'ArrowRight'].includes(event.key)) return
       if (multiple && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
         event.preventDefault()
         setSelectedIndex(current => galleryIndex(current, event.key === 'ArrowRight' ? 1 : -1, count))
       }
       if (event.key === 'Tab') {
-        const buttons = [...dialog.current.querySelectorAll('button')]
+        const buttons = [...dialog.current.querySelectorAll('button, video[controls]')]
         const first = buttons[0]
         const last = buttons[buttons.length - 1]
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
@@ -63,7 +81,7 @@ export default function StorefrontProductGallery({ images, name }) {
     return () => {
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = originalOverflow
-      returnFocus?.focus({ preventScroll: true })
+      restoreFocus()
     }
   }, [lightboxOpen, count, multiple])
 
@@ -71,6 +89,8 @@ export default function StorefrontProductGallery({ images, name }) {
     onTouchStart: event => {
       suppressClick.current = false
       const touch = event.touches.length === 1 ? event.touches[0] : null
+      const video = event.target.closest('video')
+      if (video && touch && !videoSwipeAllowed(touch.clientY, video.getBoundingClientRect().bottom)) { touchStart.current = null; return }
       touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
     },
     onTouchEnd: event => {
@@ -100,25 +120,36 @@ export default function StorefrontProductGallery({ images, name }) {
   return (
     <div className='min-w-0 space-y-4'>
       <div className='group relative rounded-2xl bg-gray-50 p-3 shadow-sm sm:p-6'>
-        <button ref={mainButton} type='button' aria-label={`Ampliar foto ${index + 1} de ${name}`} {...gestures}
-          onClick={event => {
-            if (event.detail !== 0 && suppressClick.current) { suppressClick.current = false; return }
-            setLightboxOpen(true)
-          }} className={`block w-full cursor-zoom-in rounded-xl touch-pan-y ${focusRing}`}>
-          <img src={images[index]} alt={`${name}, foto ${index + 1}`} draggable='false' className='aspect-square w-full object-contain lg:aspect-[3/4]' />
-          <span className='mt-2 block text-center text-xs text-gray-500'>Toca para ampliar</span>
-        </button>
+        {item?.type === 'video' ? (
+          <div {...gestures} className='touch-pan-y'>
+            <GalleryVideo src={item.src} poster={poster} active={!lightboxOpen} className='aspect-square w-full rounded-xl bg-black object-contain lg:aspect-[3/4]' />
+            <button ref={mainButton} type='button' aria-label={`Ampliar video de ${name}`} onClick={() => setLightboxOpen(true)}
+              className={`mt-2 min-h-11 w-full rounded-lg text-center text-xs text-gray-500 ${focusRing}`}>Ampliar video</button>
+          </div>
+        ) : (
+          <button ref={mainButton} type='button' aria-label={`Ampliar foto ${index + 1} de ${name}`} {...gestures}
+            onClick={event => {
+              if (event.detail !== 0 && suppressClick.current) { suppressClick.current = false; return }
+              setLightboxOpen(true)
+            }} className={`block w-full cursor-zoom-in rounded-xl touch-pan-y ${focusRing}`}>
+            <img src={item?.src} alt={`${name}, foto ${index + 1}`} draggable='false' className='aspect-square w-full object-contain lg:aspect-[3/4]' />
+            <span className='mt-2 block text-center text-xs text-gray-500'>Toca para ampliar</span>
+          </button>
+        )}
         {arrows(false)}
         {counter(false)}
       </div>
       {multiple && (
         <div className='relative'>
-          <div ref={strip} className='flex gap-3 overflow-x-auto px-1 py-2' aria-label='Fotos del producto'>
-            {images.map((image, position) => (
+          <div ref={strip} className='flex gap-3 overflow-x-auto px-1 py-2' aria-label='Fotos y video del producto'>
+            {items.map((entry, position) => (
               <button ref={element => { thumbnails.current[position] = element }} key={position} type='button'
-                aria-label={`Ver foto ${position + 1}`} aria-current={index === position ? 'true' : undefined}
-                onClick={() => setSelectedIndex(position)} className={`h-20 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${focusRing} ${index === position ? 'border-[#237a42]' : 'border-gray-200 hover:border-gray-400'}`}>
-                <img src={image} alt='' draggable='false' loading='lazy' className='h-full w-full object-cover' />
+                aria-label={entry.type === 'video' ? 'Video del producto' : `Ver foto ${position + 1}`} aria-current={index === position ? 'true' : undefined}
+                onClick={() => setSelectedIndex(position)} className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border-2 ${focusRing} ${index === position ? 'border-[#237a42]' : 'border-gray-200 hover:border-gray-400'}`}>
+                {entry.type === 'video' ? <>
+                  {poster ? <img src={poster} alt='' loading='lazy' className='h-full w-full object-cover' /> : <video src={`${entry.src}#t=0.1`} preload='metadata' muted playsInline aria-hidden='true' className='pointer-events-none h-full w-full object-cover' />}
+                  <span aria-hidden='true' className='pointer-events-none absolute inset-0 grid place-items-center bg-black/25 text-2xl text-white'>▶</span>
+                </> : <img src={entry.src} alt='' draggable='false' loading='lazy' className='h-full w-full object-cover' />}
               </button>
             ))}
           </div>
@@ -131,10 +162,14 @@ export default function StorefrontProductGallery({ images, name }) {
         </div>
       )}
       {lightboxOpen && (
-        <div ref={dialog} role='dialog' aria-modal='true' aria-label={`Fotos de ${name}`} className='fixed inset-0 z-50 flex items-center justify-center bg-black/95'
+        <div ref={dialog} role='dialog' aria-modal='true' aria-label={`Fotos y video de ${name}`} className='fixed inset-0 z-50 flex items-center justify-center bg-black/95'
           onClick={event => { if (event.target === event.currentTarget) setLightboxOpen(false) }}>
           <button ref={closeButton} type='button' aria-label='Cerrar fotos' onClick={() => setLightboxOpen(false)} className={`absolute right-3 top-3 z-10 grid min-h-11 min-w-11 place-items-center rounded-full bg-black/60 text-3xl text-white ${focusRing} focus-visible:outline-white`}><span aria-hidden='true'>×</span></button>
-          <img src={images[index]} alt={`${name}, foto ${index + 1}`} draggable='false' {...gestures} className='max-h-[90dvh] max-w-full touch-pan-y object-contain p-4' />
+          {item?.type === 'video' ? (
+            <div {...gestures} className='w-full max-w-5xl touch-pan-y p-4'>
+              <GalleryVideo src={item.src} poster={poster} active={lightboxOpen} className='max-h-[85dvh] w-full object-contain' />
+            </div>
+          ) : <img src={item?.src} alt={`${name}, foto ${index + 1}`} draggable='false' {...gestures} className='max-h-[90dvh] max-w-full touch-pan-y object-contain p-4' />}
           {arrows(true)}
           {counter(true)}
         </div>

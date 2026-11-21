@@ -3,7 +3,7 @@
 // touches supabase.from('products') directly (keeps Supabase coupling contained).
 
 import { supabase } from '../config/supabaseClient'
-import { productPriceModeFallback } from '../utils/productPricePayload.js'
+import { productOptionalColumnsFallback } from '../utils/productPricePayload.js'
 
 /** List products for a business (admin). Unscoped if businessId is unknown. */
 export function fetchProductsForBusiness(businessId) {
@@ -12,21 +12,29 @@ export function fetchProductsForBusiness(businessId) {
   return query
 }
 
+// Each retry removes one confirmed missing optional column (at most two).
+async function writeProduct(write, payload) {
+  let candidate = payload
+  const availability = {}
+  while (true) {
+    const result = await write(candidate)
+    const legacy = productOptionalColumnsFallback(candidate, result.error)
+    if (!legacy) return { ...result, ...availability }
+    if (Object.hasOwn(candidate, 'price_mode') && !Object.hasOwn(legacy, 'price_mode')) availability.priceModeAvailable = false
+    if (Object.hasOwn(candidate, 'video_url') && !Object.hasOwn(legacy, 'video_url')) availability.videoAvailable = false
+    candidate = legacy
+  }
+}
+
 /** Create a product, stamping the owning business. Returns the inserted row. */
-export async function createProduct(productData, businessId) {
+export function createProduct(productData, businessId) {
   const payload = { ...productData, business_id: businessId }
-  const write = data => supabase.from('products').insert([data]).select()
-  const result = await write(payload)
-  const legacy = productPriceModeFallback(payload, result.error)
-  return legacy ? { ...await write(legacy), priceModeAvailable: false } : result
+  return writeProduct(data => supabase.from('products').insert([data]).select(), payload)
 }
 
 /** Update a product (business_id is intentionally left unchanged). */
-export async function updateProduct(id, productData) {
-  const write = data => supabase.from('products').update(data).eq('id', id)
-  const result = await write(productData)
-  const legacy = productPriceModeFallback(productData, result.error)
-  return legacy ? { ...await write(legacy), priceModeAvailable: false } : result
+export function updateProduct(id, productData) {
+  return writeProduct(data => supabase.from('products').update(data).eq('id', id), productData)
 }
 
 /** Toggle / set a product's visibility. */

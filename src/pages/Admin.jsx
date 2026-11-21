@@ -13,6 +13,7 @@ import { productPriceDisplay } from '../utils/productPriceDisplay.js'
 import { productPricePayload } from '../utils/productPricePayload.js'
 import { fromFiles, fromProduct, uploadGallery } from '../utils/productGallery'
 import ProductGallery from '../components/ProductGallery'
+import ProductVideoField from '../components/ProductVideoField'
 import ProductTextField from '../components/ProductTextField'
 import ProductMaterialPreset from '../components/ProductMaterialPreset'
 import { storefrontProductPath } from '../utils/storefrontRoutes.js'
@@ -66,6 +67,8 @@ export default function Admin() {
   // Form state
   const [formData, setFormData] = useState(newProductForm)
   const [gallery, setGallery] = useState([])
+  const [videoUploading, setVideoUploading] = useState(false)
+  const videoBusy = useRef(false)
 
   // Fetch data
   const { data: categoriesData = [] } = useSupabaseQuery(TABLE.CATEGORIES, {
@@ -131,6 +134,7 @@ export default function Admin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (videoBusy.current || loading) return
     setLoading(true)
 
     try {
@@ -174,6 +178,8 @@ export default function Admin() {
         }
         if (result.priceModeAvailable === false && pricing.price_mode !== 'fixed') {
           toast.error('Producto guardado con precio fijo. Aplique la migración antes de publicar precios «Desde» o «A cotizar».')
+        } else if (result.videoAvailable === false && productData.video_url) {
+          toast.error('Producto guardado sin video. Aplique la migración antes de agregar videos.')
         } else toast.success(editingProduct ? 'Producto actualizado!' : 'Producto creado!')
         resetForm()
         fetchProducts()
@@ -222,6 +228,7 @@ export default function Admin() {
       length: product.length || '',
       stock_quantity: product.stock_quantity || 1,
       image_url: product.image_url || '',
+      video_url: product.video_url || null,
       secondary_images: product.secondary_images || [],
       material_technique: product.material_technique || '',
       care_instructions: product.care_instructions || '',
@@ -779,6 +786,11 @@ export default function Admin() {
                   {/* Main Image Upload */}
                   <ProductGallery items={gallery} onChange={setGallery} prepareFile={prepareFile} resolveUrl={getImageUrl} disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading} />
 
+                  <ProductVideoField key={`${currentBusinessId}:${editingProduct?.id || 'new'}`} value={formData.video_url}
+                    onChange={path => setFormData(current => ({ ...current, video_url: path }))}
+                    onBusyChange={busy => { videoBusy.current = busy; setVideoUploading(busy) }}
+                    disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading} />
+
                   <ProductOptionsEditor mainImage={gallery[0] ? { file: gallery[0].file, url: gallery[0].url ? getImageUrl(gallery[0].url) : null } : null} productName={formData.name} options={productOptions} products={products} productId={editingProduct?.id} businessId={currentBusinessId} disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading} />
                   {/* Submit Buttons */}
                   <div className='flex space-x-4 pt-6'>
@@ -791,7 +803,7 @@ export default function Admin() {
                     </button>
                     <button
                       type='submit'
-                      disabled={loading || productOptions.loading || !!productOptions.error || productOptions.uploading}
+                      disabled={videoUploading || loading || productOptions.loading || !!productOptions.error || productOptions.uploading}
                       className='flex-1 bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#45b86b] hover:to-[#42a8d1] transition-all duration-200 disabled:opacity-50'
                     >
                       {loading ? (

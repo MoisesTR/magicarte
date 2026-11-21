@@ -8,10 +8,10 @@ test('backTarget goes back when the tab has in-app history', () => {
   assert.equal(backTarget({ idx: 1 }), -1)
 })
 
-test('backTarget falls back to the catalog on a fresh tab or direct link', () => {
-  assert.equal(backTarget({ idx: 0 }), '/products')
-  assert.equal(backTarget(null), '/products')
-  assert.equal(backTarget(undefined), '/products')
+test('backTarget falls back to the home page on a fresh tab or direct link', () => {
+  assert.equal(backTarget({ idx: 0 }), '/')
+  assert.equal(backTarget(null), '/')
+  assert.equal(backTarget(undefined), '/')
 })
 
 test('ProductDetail back button uses backTarget', async () => {

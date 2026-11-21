@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import {
   productPricePayload,
   productPriceModeFallback,
+  productOptionalColumnsFallback,
 } from '../src/utils/productPricePayload.js'
 import {
   newProductForm,
@@ -133,9 +134,9 @@ async function dataApi(results) {
     .replaceAll('export ', '')
   const api = new Function(
     'supabase',
-    'productPriceModeFallback',
+    'productOptionalColumnsFallback',
     `${source}; return { createProduct, updateProduct, fetchProductsForBusiness }`
-  )(client, productPriceModeFallback)
+  )(client, productOptionalColumnsFallback)
   return { api, requests }
 }
 
