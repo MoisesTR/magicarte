@@ -10,6 +10,18 @@ export const config = {
   },
 }
 
+/** Upright (EXIF-oriented), width-capped WebP. Phone photos often store landscape pixels plus a rotate tag. */
+export function compressImage(buffer) {
+  return sharp(buffer)
+    .rotate()
+    .resize(MAX_WIDTH, null, {
+      withoutEnlargement: true,
+      fit: 'inside',
+    })
+    .webp({ quality: QUALITY })
+    .toBuffer()
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -52,13 +64,7 @@ export default async function handler(req, res) {
     const folder = req.headers['x-folder'] || 'products'
 
     // Compress
-    const outputBuffer = await sharp(buffer)
-      .resize(MAX_WIDTH, null, {
-        withoutEnlargement: true,
-        fit: 'inside',
-      })
-      .webp({ quality: QUALITY })
-      .toBuffer()
+    const outputBuffer = await compressImage(buffer)
 
     console.log('Compressed:', buffer.length, '->', outputBuffer.length)
 
