@@ -48,7 +48,7 @@ test('annual configuration selects at most one campaign on every day', () => {
 
 test('Christmas banner copy supports an optional order deadline', () => {
   assert.equal(christmas().orderDeadline, null)
-  assert.equal(campaignBannerText(christmas()), '🎄 Temporada navideña · Haga su pedido con anticipación para recibirlo antes de Navidad')
+  assert.equal(campaignBannerText(christmas()), '🎄 Temporada navideña')
   assert.equal(campaignBannerText({ ...christmas(), orderDeadline: '18 de diciembre' }), '🎄 Pedidos para Navidad hasta el 18 de diciembre')
 })
 

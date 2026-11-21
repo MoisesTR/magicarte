@@ -38,7 +38,7 @@ export const campaigns = [
     orderDeadline: null,
     banner: {
       className: 'from-emerald-900 to-red-800 text-white',
-      text: '🎄 Temporada navideña · Haga su pedido con anticipación para recibirlo antes de Navidad',
+      text: '🎄 Temporada navideña',
       deadlineText: '🎄 Pedidos para Navidad hasta el {orderDeadline}',
     },
     hero: {
