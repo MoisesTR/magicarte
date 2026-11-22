@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import useZoomPan from '../hooks/useZoomPan.js'
 import { galleryIndex, swipeDirection, thumbnailOverflow, storefrontGalleryItems, videoSwipeAllowed } from '../utils/storefrontGallery.js'
 
 const focusRing = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#237a42]'
@@ -34,6 +35,11 @@ export default function StorefrontProductGallery({ images = [], name, videoUrl =
   const item = items[index]
   const poster = images[0] || undefined
   const navigate = step => setSelectedIndex(current => galleryIndex(current, step, count))
+  const { handleKeyDown: handleZoomKeyDown, ...zoom } = useZoomPan({
+    enabled: lightboxOpen && item?.type === 'image',
+    resetKey: `${index}:${item?.src}`,
+    onSwipe: step => { if (multiple) navigate(step) },
+  })
 
   useEffect(() => {
     thumbnails.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
@@ -63,6 +69,7 @@ export default function StorefrontProductGallery({ images = [], name, videoUrl =
     document.body.style.overflow = 'hidden'
     closeButton.current?.focus()
     const onKeyDown = event => {
+      if (handleZoomKeyDown(event)) return
       if (event.key === 'Escape') { event.preventDefault(); setLightboxOpen(false) }
       if (event.target.closest('video') && ['ArrowLeft', 'ArrowRight'].includes(event.key)) return
       if (multiple && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
@@ -83,7 +90,7 @@ export default function StorefrontProductGallery({ images = [], name, videoUrl =
       document.body.style.overflow = originalOverflow
       restoreFocus()
     }
-  }, [lightboxOpen, count, multiple])
+  }, [lightboxOpen, count, multiple, handleZoomKeyDown])
 
   const gestures = {
     onTouchStart: event => {
@@ -163,13 +170,25 @@ export default function StorefrontProductGallery({ images = [], name, videoUrl =
       )}
       {lightboxOpen && (
         <div ref={dialog} role='dialog' aria-modal='true' aria-label={`Fotos y video de ${name}`} className='fixed inset-0 z-50 flex items-center justify-center bg-black/95'
-          onClick={event => { if (event.target === event.currentTarget) setLightboxOpen(false) }}>
+          onClick={event => { if (event.target === event.currentTarget && (item?.type === 'video' || zoom.state.scale === 1)) setLightboxOpen(false) }}>
           <button ref={closeButton} type='button' aria-label='Cerrar fotos' onClick={() => setLightboxOpen(false)} className={`absolute right-3 top-3 z-10 grid min-h-11 min-w-11 place-items-center rounded-full bg-black/60 text-3xl text-white ${focusRing} focus-visible:outline-white`}><span aria-hidden='true'>×</span></button>
           {item?.type === 'video' ? (
             <div {...gestures} className='w-full max-w-5xl touch-pan-y p-4'>
               <GalleryVideo src={item.src} poster={poster} active={lightboxOpen} className='max-h-[85dvh] w-full object-contain' />
             </div>
-          ) : <img src={item?.src} alt={`${name}, foto ${index + 1}`} draggable='false' {...gestures} className='max-h-[90dvh] max-w-full touch-pan-y object-contain p-4' />}
+          ) : (
+            <div ref={zoom.viewportRef} {...zoom.bind} className='flex h-[90dvh] w-full items-center justify-center overflow-hidden p-4'
+              style={{ touchAction: 'none' }}
+              onClick={event => {
+                const consumed = zoom.bind.onClick(event)
+                if (!consumed && event.target === event.currentTarget && zoom.state.scale === 1) setLightboxOpen(false)
+              }}>
+              <img ref={zoom.imageRef} src={item?.src} alt={`${name}, foto ${index + 1}`} draggable='false' onLoad={zoom.onImageLoad}
+                className={`max-h-full max-w-full select-none object-contain ${zoom.state.scale > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
+                style={{ transform: `translate3d(${zoom.state.x}px, ${zoom.state.y}px, 0) scale(${zoom.state.scale})`, willChange: 'transform' }} />
+              {zoom.showHint && <span className='pointer-events-none absolute bottom-16 left-1/2 w-max max-w-[90vw] -translate-x-1/2 rounded-full bg-black/65 px-3 py-1 text-center text-xs text-white'>Pellizque o toque dos veces para acercar</span>}
+            </div>
+          )}
           {arrows(true)}
           {counter(true)}
         </div>

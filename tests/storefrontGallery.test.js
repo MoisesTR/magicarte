@@ -101,6 +101,7 @@ async function renderMixedGallery({ images, videoUrl, selectedIndex = 0 }) {
   const React = await import('react')
   const { renderToStaticMarkup } = await import('react-dom/server')
   const utils = await import('../src/utils/storefrontGallery.js')
+  const zoom = await import('../src/hooks/useZoomPan.js')
   const require = createRequire(import.meta.url)
   const source = await readFile(new URL('../src/components/StorefrontProductGallery.jsx', import.meta.url), 'utf8')
   const { code } = await transform(source, { loader: 'jsx', jsx: 'automatic', format: 'cjs' })
@@ -108,6 +109,7 @@ async function renderMixedGallery({ images, videoUrl, selectedIndex = 0 }) {
   new Function('require', 'module', 'exports', code)(name => {
     if (name === 'react') return { ...React, useState: initial => [initial === 0 ? selectedIndex : initial, () => {}], useEffect() {}, useRef: value => ({ current: value }) }
     if (name.endsWith('/storefrontGallery.js')) return utils
+    if (name.endsWith('/useZoomPan.js')) return { __esModule: true, ...zoom }
     return require(name)
   }, module, module.exports)
   return renderToStaticMarkup(React.createElement(module.exports.default, { images, videoUrl, name: 'Marco' }))
