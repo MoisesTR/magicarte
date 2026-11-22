@@ -31,7 +31,8 @@ test('Christmas hero renders exact copy, desktop side card, and optional deadlin
   const Hero = await component('SeasonalHero')
   const campaign = christmas()
   const html = renderToStaticMarkup(React.createElement(Hero, { campaign, categories: [{ id: 1, name: 'Navidad' }] }))
-  for (const text of ['🎄 Temporada navideña', 'Regalos que se quedan en el árbol', 'Esferas, nacimientos y adornos personalizados para esta Navidad.', 'Ver regalos de Navidad →', '✨ Personalizado con nombre', '🚚 Envíos a todo el país', '💬 Pedidos por WhatsApp', 'hidden md:flex', 'from-emerald-900', 'to-red-700', 'amber-300']) assert.ok(html.includes(text), text)
+  for (const text of ['🎄 Temporada navideña', 'Regalos y detalles para esta Navidad', 'Esferas, nacimientos y adornos personalizados.', 'Ver regalos de Navidad →', '✨ Productos personalizados', '🚚 Envíos a todo el país', '💬 Pedidos por WhatsApp', 'hidden md:flex', 'from-red-900', 'via-red-700', 'to-red-900', 'amber-300']) assert.ok(html.includes(text), text)
+  assert.doesNotMatch(html, /emerald-9[05]0 via|Regalos que se quedan/)
   assert.doesNotMatch(html, /📅 Pedidos hasta/)
   const deadline = renderToStaticMarkup(React.createElement(Hero, { campaign: { ...campaign, orderDeadline: '18 de diciembre' } }))
   assert.match(deadline, /📅 Pedidos hasta el 18 de diciembre/)
@@ -48,7 +49,7 @@ test('Christmas CTA invokes existing selection flow with exact category or is om
   assert.equal(selected, category)
   for (const categories of [undefined, [], [{ id: 0, name: 'Todos' }]]) {
     const html = renderToStaticMarkup(React.createElement(Hero, { campaign: christmas(), categories }))
-    assert.match(html, /Regalos que se quedan en el árbol/)
+    assert.match(html, /Regalos y detalles para esta Navidad/)
     assert.doesNotMatch(html, /<button|undefined/)
     assert.match(html, /min-h-12/)
   }
@@ -64,17 +65,19 @@ test('seasonal banner renders both deadline variants and dismisses locally with 
   let dismissed = false
   let callbackCount = 0
   const Banner = await component('SeasonalBanner', { ...React, useState: () => [dismissed, value => { dismissed = value }] })
-  for (const orderDeadline of [null, '18 de diciembre']) {
+  assert.equal(Banner({ campaign: christmas() }), null, 'Christmas shows no top banner without a deadline')
+  for (const orderDeadline of ['18 de diciembre']) {
     const campaign = { ...christmas(), orderDeadline }
     const html = renderToStaticMarkup(React.createElement(Banner, { campaign }))
     assert.ok(html.includes(campaigns.campaignBannerText(campaign)))
     assert.match(html, /aria-label="Cerrar banner"/)
     assert.match(html, /seasonal-banner-height/)
   }
-  const tree = Banner({ campaign: christmas(), onDismiss: () => { callbackCount++ } })
+  const withDeadline = { ...christmas(), orderDeadline: '18 de diciembre' }
+  const tree = Banner({ campaign: withDeadline, onDismiss: () => { callbackCount++ } })
   elements(tree, node => node.type === 'button')[0].props.onClick()
   assert.equal(callbackCount, 1)
-  assert.equal(Banner({ campaign: christmas() }), null)
+  assert.equal(Banner({ campaign: withDeadline }), null)
   dismissed = false
   assert.equal(Banner({ campaign: null }), null)
 })

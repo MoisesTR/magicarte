@@ -9,7 +9,7 @@ const christmas = () => campaigns.find(campaign => campaign.id === 'christmas')
 test('Christmas runs November 15 through December 24 inclusive in Managua', () => {
   for (const [day, expected] of [['2026-11-14', null], ['2026-11-15', 'christmas'], ['2026-12-24', 'christmas'], ['2026-12-25', null]]) {
     assert.equal(activeCampaign(atNoon(day))?.id ?? null, expected, day)
-    assert.equal(isSeasonalBannerActive(atNoon(day)), expected !== null)
+    assert.equal(isSeasonalBannerActive(atNoon(day)), false, `${day}: Christmas has no top banner without a deadline`)
   }
 })
 
@@ -48,8 +48,14 @@ test('annual configuration selects at most one campaign on every day', () => {
 
 test('Christmas banner copy supports an optional order deadline', () => {
   assert.equal(christmas().orderDeadline, null)
-  assert.equal(campaignBannerText(christmas()), '🎄 Temporada navideña')
+  assert.equal(campaignBannerText(christmas()), null, 'no top banner without an order deadline')
   assert.equal(campaignBannerText({ ...christmas(), orderDeadline: '18 de diciembre' }), '🎄 Pedidos para Navidad hasta el 18 de diciembre')
+})
+
+test('seasonal banner slot is active only when the campaign has banner text', () => {
+  assert.equal(isSeasonalBannerActive(atNoon('2026-12-01')), false)
+  assert.equal(isSeasonalBannerActive(atNoon('2026-05-20')), true)
+  assert.equal(isSeasonalBannerActive(atNoon('2026-07-01')), false)
 })
 
 test('Mother banner countdown retains its messages using formal usted copy', () => {

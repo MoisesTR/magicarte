@@ -3,7 +3,8 @@ import { activeCampaign, campaignBannerText } from '../utils/seasonalCampaigns.j
 
 export default function SeasonalBanner({ onDismiss, campaign = activeCampaign() }) {
   const [dismissed, setDismissed] = useState(false)
-  if (!campaign || dismissed) return null
+  const text = campaign ? campaignBannerText(campaign) : null
+  if (!text || dismissed) return null
 
   const handleDismiss = () => {
     setDismissed(true)
@@ -14,7 +15,7 @@ export default function SeasonalBanner({ onDismiss, campaign = activeCampaign() 
     <div className={`relative overflow-hidden bg-gradient-to-r ${campaign.banner.className}`} style={{ height: 'var(--seasonal-banner-height)' }}>
       <div className='container mx-auto h-full px-4 flex items-center gap-2'>
         <p className='min-w-0 flex-1 text-center text-sm md:text-base leading-5 font-medium'>
-          {campaignBannerText(campaign)}
+          {text}
         </p>
         <button
           type='button'

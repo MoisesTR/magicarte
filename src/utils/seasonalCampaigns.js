@@ -37,20 +37,21 @@ export const campaigns = [
     end: { month: 12, day: 24 },
     orderDeadline: null,
     banner: {
-      className: 'from-emerald-900 to-red-800 text-white',
-      text: '🎄 Temporada navideña',
+      className: 'from-red-900 via-red-700 to-red-900 text-white',
+      // No top banner unless an order deadline is set.
+      text: null,
       deadlineText: '🎄 Pedidos para Navidad hasta el {orderDeadline}',
     },
     hero: {
-      className: 'from-emerald-900 via-emerald-950 to-red-700',
+      className: 'from-red-900 via-red-700 to-red-900',
       chip: '🎄 Temporada navideña',
-      title: 'Regalos que se quedan en el árbol',
-      text: 'Esferas, nacimientos y adornos personalizados para esta Navidad.',
+      title: 'Regalos y detalles para esta Navidad',
+      text: 'Esferas, nacimientos y adornos personalizados.',
       cta: 'Ver regalos de Navidad →',
       categoryName: 'Navidad',
       cardEyebrow: 'Esta Navidad',
       cardTitle: 'Hecho para usted 🎁',
-      points: ['✨ Personalizado con nombre', '🚚 Envíos a todo el país', '💬 Pedidos por WhatsApp'],
+      points: ['✨ Productos personalizados', '🚚 Envíos a todo el país', '💬 Pedidos por WhatsApp'],
       decoration: 'sparkles',
     },
   },
@@ -77,14 +78,16 @@ export function activeCampaign(now = new Date()) {
 }
 
 export function isSeasonalBannerActive(now = new Date()) {
-  return activeCampaign(now) !== null
+  const campaign = activeCampaign(now)
+  return campaign !== null && campaignBannerText(campaign) !== null
 }
 
 export function campaignBannerText(campaign) {
   const { banner, daysLeft, orderDeadline } = campaign
   if (orderDeadline && banner.deadlineText) return banner.deadlineText.replace('{orderDeadline}', orderDeadline)
   const countdown = banner.countdown?.find(message => daysLeft <= message.maxDays)
-  return (countdown?.text ?? banner.text).replace('{daysLeft}', daysLeft)
+  const text = countdown?.text ?? banner.text
+  return text ? text.replace('{daysLeft}', daysLeft) : null
 }
 
 // Missing Christmas categories omit the CTA rather than selecting an unrelated one.
