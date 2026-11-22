@@ -301,7 +301,8 @@ export default function ProductDetail() {
                 </svg>
                 <div>
                   <p className='font-semibold text-gray-800'>Tiempo de entrega</p>
-                  <p className='text-gray-600'>de 7 a 15 días hábiles</p>
+                  <p className='text-gray-600'>de 2 a 7 días hábiles</p>
+                  <p className='text-xs text-gray-500'>Sujeto a nuestra agenda y a la complejidad y cantidad del pedido.</p>
                 </div>
               </div>
               <Link to='/politica-de-envio' className='mt-3 block text-xs text-[#51c879] hover:underline'>

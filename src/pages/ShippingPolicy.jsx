@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 const sections = [
   {
     title: 'Tiempos de Elaboración',
-    body: 'Todos nuestros productos se elaboran por encargo. El tiempo de elaboración es de 7 a 15 días hábiles aproximadamente, según el diseño, complejidad del pedido y disponibilidad de agenda.',
+    body: 'Todos nuestros productos se elaboran por encargo. El tiempo de elaboración es de 2 a 7 días hábiles aproximadamente, sujeto a nuestra agenda y a la complejidad y cantidad del pedido.',
   },
   {
     title: 'Tiempos de Envío',
