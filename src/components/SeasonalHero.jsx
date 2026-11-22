@@ -36,7 +36,7 @@ export default function SeasonalHero({ categories = [], onCategorySelect, campai
                 <button
                   type='button'
                   onClick={() => onCategorySelect?.(featuredCategory)}
-                  className={`min-h-12 w-full max-w-full text-sm leading-5 text-emerald-950 font-semibold px-4 py-3 rounded-xl shadow-lg hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${hero.decoration === 'sparkles' ? 'bg-amber-300' : 'bg-gradient-to-r from-[#51c879] to-[#50bfe6]'}`}
+                  className={`min-h-12 w-full max-w-full text-sm leading-5 font-semibold px-4 py-3 rounded-xl shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white ${hero.ctaClassName}`}
                 >
                   {hero.cta}
                 </button>

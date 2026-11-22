@@ -23,6 +23,7 @@ export const campaigns = [
       title: 'Regale amor a mamá',
       text: 'Detalles únicos en madera, personalizados con el cariño que ella merece.',
       cta: 'Ver regalos para mamá →',
+      ctaClassName: 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-emerald-950 hover:brightness-95',
       categoryName: null,
       deadlineMinDays: 2,
       cardEyebrow: 'Con amor para',
@@ -43,7 +44,8 @@ export const campaigns = [
       deadlineText: '🎄 Pedidos para Navidad hasta el {orderDeadline}',
     },
     hero: {
-      className: 'from-red-900 via-red-700 to-red-900',
+      className: 'from-green-900 via-green-950 to-green-950',
+      ctaClassName: 'bg-red-700 text-white hover:bg-red-800',
       chip: '🎄 Temporada navideña',
       title: 'Regalos y detalles para esta Navidad',
       text: 'Esferas, nacimientos y adornos personalizados.',
