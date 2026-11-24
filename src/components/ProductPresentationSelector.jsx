@@ -1,7 +1,8 @@
 import { useId, useState } from 'react'
 import {
   buildSpecialPresentation,
-  defaultSpecialLabel,
+  specialPresentationDraft,
+  specialPackageConfirmation,
   presentationSelectorModel,
   updateSpecialPresentationDraft,
   formatPresentationMoney,
@@ -14,6 +15,7 @@ export default function ProductPresentationSelector({
   admin = false,
   specialOption,
   specialSelected = false,
+  item,
 }) {
   const { active, selectedCatalogId, hasSnapshot } = presentationSelectorModel(
     presentations,
@@ -32,6 +34,7 @@ export default function ProductPresentationSelector({
         ])}
         presentations={presentations}
         selected={selected}
+        item={item}
         onChange={onChange}
       />
     )
@@ -76,19 +79,27 @@ export default function ProductPresentationSelector({
   )
 }
 
-function AdminPresentationSelector({ presentations, selected, onChange }) {
+function AdminPresentationSelector({
+  presentations,
+  selected,
+  item,
+  onChange,
+}) {
   const model = presentationSelectorModel(presentations, selected, {
     admin: true,
   })
   const [specialActive, setSpecialActive] = useState(model.specialSelected)
-  const [draft, setDraft] = useState(() => ({
-    label: model.specialSelected
-      ? selected.label
-      : defaultSpecialLabel(selected?.units || 1),
-    units: selected?.units || 1,
-    price: selected?.price ?? '',
-    nameEdited: model.specialSelected,
-  }))
+  const createDraft = () =>
+    specialPresentationDraft(
+      item || {
+        presentation_id: selected?.id,
+        presentation_label: selected?.label,
+        units_per_presentation: selected?.units,
+        unit_price: selected?.price,
+      },
+      presentations
+    )
+  const [draft, setDraft] = useState(createDraft)
   const [errors, setErrors] = useState({})
   const errorId = useId()
   const change = (field, value) => {
@@ -99,7 +110,20 @@ function AdminPresentationSelector({ presentations, selected, onChange }) {
   }
   const fields = [
     { field: 'label', label: 'Nombre', type: 'text' },
-    { field: 'units', label: 'Unidades', type: 'number', min: 1, step: 1 },
+    {
+      field: 'units',
+      label: 'Piezas en el paquete',
+      type: 'number',
+      min: 1,
+      step: 1,
+    },
+    {
+      field: 'pricePerPiece',
+      label: 'Precio por pieza (C$)',
+      type: 'number',
+      min: 0,
+      step: 'any',
+    },
     {
       field: 'price',
       label: 'Precio del paquete (C$)',
@@ -123,7 +147,10 @@ function AdminPresentationSelector({ presentations, selected, onChange }) {
           <button
             type='button'
             aria-pressed={specialActive}
-            onClick={() => setSpecialActive(true)}
+            onClick={() => {
+              if (!specialActive) setDraft(createDraft())
+              setSpecialActive(true)
+            }}
             className={`min-h-10 w-full min-w-0 rounded-xl border p-3 text-left text-sm font-medium ${specialActive ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white'}`}
           >
             Paquete especial
@@ -168,6 +195,7 @@ function AdminPresentationSelector({ presentations, selected, onChange }) {
                   if (snapshot)
                     onChange({
                       id: null,
+                      quantity: snapshot.quantity,
                       label: snapshot.presentation_label,
                       units: snapshot.units_per_presentation,
                       price: snapshot.unit_price,
@@ -176,6 +204,12 @@ function AdminPresentationSelector({ presentations, selected, onChange }) {
               >
                 Aplicar paquete especial
               </button>
+              <p
+                aria-live='polite'
+                className='text-sm break-words text-emerald-900'
+              >
+                {specialPackageConfirmation(draft)}
+              </p>
             </div>
           )}
         </div>

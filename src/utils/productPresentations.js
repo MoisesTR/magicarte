@@ -21,7 +21,8 @@ export function unitPrice(presentation) {
 }
 /** Customer-facing "c/u" text: exact when the pack divides evenly, else "≈" whole córdobas. */
 export function unitPriceLabel(presentation) {
-  const exact = Number(presentation.price) / Math.max(1, count(presentation.units))
+  const exact =
+    Number(presentation.price) / Math.max(1, count(presentation.units))
   return Math.abs(exact - Math.round(exact)) < 0.005
     ? formatPresentationMoney(exact)
     : `≈ ${formatPresentationMoney(Math.round(exact))}`
@@ -95,19 +96,38 @@ export function presentationSnapshot(row) {
 export function defaultSpecialLabel(units) {
   return `Paquete especial de ${Math.max(1, count(units))}`
 }
-export function buildSpecialPresentation({ label, units, price }) {
+export function buildSpecialPresentation({
+  label,
+  units,
+  price,
+  pricePerPiece,
+}) {
   const errors = {}
   const empty = (value) => value == null || String(value).trim() === ''
   if (typeof label !== 'string' || !label.trim())
-    errors.label = 'Escribe el nombre del paquete.'
+    errors.label = 'Escriba el nombre del paquete.'
   if (empty(units) || !Number.isInteger(Number(units)) || Number(units) < 1)
-    errors.units = 'Las unidades deben ser un número entero mayor o igual a 1.'
+    errors.units = 'Ingrese las piezas como un número entero mayor o igual a 1.'
   if (empty(price) || !Number.isFinite(Number(price)) || Number(price) < 0)
-    errors.price = 'Escribe un precio mayor o igual a 0.'
+    errors.price = 'Ingrese un precio del paquete mayor o igual a 0.'
+  if (
+    pricePerPiece !== undefined &&
+    (empty(pricePerPiece) ||
+      !Number.isFinite(Number(pricePerPiece)) ||
+      Number(pricePerPiece) < 0)
+  )
+    errors.pricePerPiece = 'Ingrese un precio por pieza mayor o igual a 0.'
   return {
     snapshot: Object.keys(errors).length
       ? null
-      : presentationSnapshot({ label: label.trim(), units, price }),
+      : {
+          ...presentationSnapshot({
+            label: label.trim(),
+            units,
+            price: money(price),
+          }),
+          quantity: 1,
+        },
     errors,
   }
 }
@@ -143,12 +163,63 @@ export function presentationSelectorModel(
     hasSnapshot: !!selected && !current && !specialSelected,
   }
 }
+// A saved special keeps its package snapshot. New loose lines use their actual
+// quantity and unit price; single catalog packs keep their existing pack units.
+export function specialPresentationDraft(item = {}, presentations = []) {
+  const special = isSpecialPresentation(item, presentations)
+  const loose = !special && Number(item.quantity) > 1
+  const units = loose
+    ? Number(item.quantity)
+    : Number(item.units_per_presentation) || 1
+  const price = item.unit_price ?? ''
+  return {
+    label: special ? item.presentation_label : defaultSpecialLabel(units),
+    units,
+    pricePerPiece:
+      price === '' ? '' : loose ? Number(price) : Number(price) / units,
+    price:
+      price === '' ? '' : loose ? money(units * Number(price)) : money(price),
+    nameEdited:
+      special && item.presentation_label !== defaultSpecialLabel(units),
+  }
+}
+/** Last edited price wins: piece price multiplies into a two-decimal total;
+ * total divides into an unrounded piece price (avoids round-trip drift).
+ * Changing units retains that piece price and recomputes the rounded total.
+ * Invalid/empty inputs stay editable and clear only the dependent price.
+ */
 export function updateSpecialPresentationDraft(draft, field, value) {
   const next = { ...draft, [field]: value }
+  const validPrice = (number) =>
+    number !== '' &&
+    String(number).trim() !== '' &&
+    Number.isFinite(Number(number)) &&
+    Number(number) >= 0
+  const validUnits =
+    Number.isInteger(Number(next.units)) && Number(next.units) >= 1
   if (field === 'label') next.nameEdited = true
   if (field === 'units' && !draft.nameEdited)
     next.label = defaultSpecialLabel(value)
+  if (field === 'price')
+    next.pricePerPiece =
+      validUnits && validPrice(value) ? Number(value) / Number(next.units) : ''
+  if (field === 'units' || field === 'pricePerPiece')
+    next.price =
+      validUnits && validPrice(next.pricePerPiece)
+        ? money(Number(next.units) * Number(next.pricePerPiece))
+        : ''
   return next
+}
+export function specialPackageConfirmation(draft) {
+  if (!buildSpecialPresentation(draft).snapshot) return ''
+  return `1 paquete de ${draft.units} ${Number(draft.units) === 1 ? 'pieza' : 'piezas'} × ${formatPresentationMoney(draft.pricePerPiece)} = ${formatPresentationMoney(draft.price)}`
+}
+export function specialPackageQuantityNote(item, presentations = []) {
+  if (!isSpecialPresentation(item, presentations) || Number(item.quantity) <= 1)
+    return ''
+  const packs = count(item.quantity)
+  const units = count(item.units_per_presentation) || 1
+  return `${packs} paquetes de ${units} ${units === 1 ? 'pieza' : 'piezas'} = ${packs * units} piezas · ${formatPresentationMoney(packs * Number(item.unit_price))}`
 }
 export function orderItemOptions(item) {
   if (
@@ -230,7 +301,13 @@ export function escapePresentationHtml(value) {
   )
 }
 export function orderItemDetailLines(item) {
-  const lines = item.presentation_label ? [item.presentation_label] : []
+  const lines = item.presentation_label
+    ? [
+        Number(item.units_per_presentation) > 1
+          ? `${item.quantity ?? 1} × ${item.presentation_label} (${count(item.quantity ?? 1) * count(item.units_per_presentation)} piezas)`
+          : item.presentation_label,
+      ]
+    : []
   lines.push(...designLines(item.designs || item.order_item_designs || []))
   return lines
 }

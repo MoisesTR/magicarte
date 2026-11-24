@@ -23,7 +23,7 @@ test('special pack builder trims labels and produces a numeric null-FK snapshot,
       price: '1450.50',
     }),
     {
-      snapshot: { ...saved, unit_price: 1450.5 },
+      snapshot: { ...saved, quantity: 1, unit_price: 1450.5 },
       errors: {},
     }
   )
@@ -231,7 +231,12 @@ test('public selector has no special option; admin option is last, inline and to
     ).length,
     1
   )
-  for (const label of ['Nombre', 'Unidades', 'Precio del paquete']) {
+  for (const label of [
+    'Nombre',
+    'Piezas en el paquete',
+    'Precio por pieza (C$)',
+    'Precio del paquete',
+  ]) {
     assert.ok(input(tree, label))
     assert.match(input(tree, label).props.className, /min-h-10/)
     assert.match(input(tree, label).props.className, /min-w-0/)
@@ -253,7 +258,7 @@ for (const id of [null, 'deleted'])
     let tree = harness.render(props)
     assert.equal(button(tree, 'Paquete especial').props['aria-pressed'], true)
     assert.equal(input(tree, 'Nombre').props.value, saved.presentation_label)
-    assert.equal(input(tree, 'Unidades').props.value, 10)
+    assert.equal(input(tree, 'Piezas en el paquete').props.value, 10)
     assert.equal(input(tree, 'Precio del paquete').props.value, 1450)
     input(tree, 'Nombre').props.onChange({ target: { value: '   ' } })
     tree = harness.render(props)
@@ -309,9 +314,9 @@ test('special pack application uses ten units times pack quantity and preserves 
 })
 
 for (const [field, label, value] of [
-  ['units', 'Unidades', ''],
-  ['units', 'Unidades', '0'],
-  ['units', 'Unidades', '1.5'],
+  ['units', 'Piezas en el paquete', ''],
+  ['units', 'Piezas en el paquete', '0'],
+  ['units', 'Piezas en el paquete', '1.5'],
   ['price', 'Precio del paquete', ''],
   ['price', 'Precio del paquete', '-1'],
 ])
@@ -335,7 +340,7 @@ for (const [field, label, value] of [
     assert.equal(input(tree, label).props['aria-invalid'], true)
     assert.match(
       text(nodes(tree).find((node) => node.props?.role === 'alert')),
-      field === 'units' ? /unidades.*entero/ : /precio.*0/
+      field === 'units' ? /piezas.*entero/ : /precio.*0/
     )
   })
 
@@ -350,12 +355,16 @@ test('new special selector draft follows units until the user edits its name', a
   button(harness.render(props), 'Paquete especial').props.onClick()
   let tree = harness.render(props)
   assert.equal(input(tree, 'Nombre').props.value, 'Paquete especial de 8')
-  input(tree, 'Unidades').props.onChange({ target: { value: '10' } })
+  input(tree, 'Piezas en el paquete').props.onChange({
+    target: { value: '10' },
+  })
   tree = harness.render(props)
   assert.equal(input(tree, 'Nombre').props.value, 'Paquete especial de 10')
   input(tree, 'Nombre').props.onChange({ target: { value: 'Cumpleaños' } })
   tree = harness.render(props)
-  input(tree, 'Unidades').props.onChange({ target: { value: '12' } })
+  input(tree, 'Piezas en el paquete').props.onChange({
+    target: { value: '12' },
+  })
   tree = harness.render(props)
   assert.equal(input(tree, 'Nombre').props.value, 'Cumpleaños')
 })
@@ -379,7 +388,7 @@ async function loadComponent(file, imports) {
   return module.exports.default
 }
 
-test('order-only adapter exposes special packs for legacy products and forwards applied snapshot without changing packs/designs', async () => {
+test('order-only adapter exposes special packs for legacy products and forwards special quantity one without changing designs', async () => {
   const Selector = () => null
   const Picker = () => null
   const Options = await loadComponent('OrderItemOptions', {
@@ -401,13 +410,23 @@ test('order-only adapter exposes special packs for legacy products and forwards 
   })
   const selector = nodes(tree).find((node) => node.type === Selector)
   assert.equal(selector.props.admin, true)
-  selector.props.onChange({ id: null, label: 'Diez', units: 10, price: 1450 })
-  assert.deepEqual(changes, { ...saved, presentation_label: 'Diez' })
+  selector.props.onChange({
+    id: null,
+    label: 'Diez',
+    units: 10,
+    price: 1450,
+    quantity: 1,
+  })
+  assert.deepEqual(changes, {
+    ...saved,
+    presentation_label: 'Diez',
+    quantity: 1,
+  })
   const applied = { ...item, ...changes }
   tree = Options({ item: applied, product, onChange() {} })
   const picker = nodes(tree).find((node) => node.type === Picker)
   assert.equal(picker.props.units, 10)
-  assert.equal(picker.props.packs, 2)
+  assert.equal(picker.props.packs, 1)
   assert.equal(picker.props.selections, designs)
   assert.equal(picker.props.admin, true)
   assert.equal(
@@ -416,7 +435,7 @@ test('order-only adapter exposes special packs for legacy products and forwards 
       picker.props.units,
       picker.props.selections
     ).remaining,
-    16
+    6
   )
 })
 
@@ -440,4 +459,231 @@ test('special packs keep the admin incomplete-design warning without a blocking 
   )
   assert.match(html, /Faltan 16 por elegir/)
   assert.doesNotMatch(html, /required=/)
+})
+
+test('loose line draft prefills 26 pieces at 140 and applies one package at 3640', () => {
+  const draft = helpers.specialPresentationDraft({
+    quantity: 26,
+    unit_price: 140,
+  })
+  assert.equal(draft.units, 26)
+  assert.equal(draft.pricePerPiece, 140)
+  assert.equal(draft.price, 3640)
+  assert.equal(draft.label, 'Paquete especial de 26')
+  assert.equal(draft.nameEdited, false)
+  assert.deepEqual(helpers.buildSpecialPresentation(draft), {
+    snapshot: {
+      quantity: 1,
+      presentation_id: null,
+      presentation_label: 'Paquete especial de 26',
+      units_per_presentation: 26,
+      unit_price: 3640,
+    },
+    errors: {},
+  })
+})
+
+test('catalog line quantity greater than one uses the actual line price, not catalog pack price', () => {
+  const draft = helpers.specialPresentationDraft(
+    {
+      quantity: '26',
+      unit_price: '140',
+      presentation_id: 'eight',
+      presentation_label: catalog[0].label,
+      units_per_presentation: 8,
+    },
+    catalog
+  )
+  assert.equal(draft.units, 26)
+  assert.equal(draft.pricePerPiece, 140)
+  assert.equal(draft.price, 3640)
+})
+
+test('saved special draft preserves its package total and units regardless of pack count', () => {
+  const draft = helpers.specialPresentationDraft(
+    { ...saved, quantity: 4 },
+    catalog
+  )
+  assert.equal(draft.units, 10)
+  assert.equal(draft.pricePerPiece, 145)
+  assert.equal(draft.price, 1450)
+  assert.equal(draft.nameEdited, true)
+  assert.equal(draft.label, saved.presentation_label)
+})
+
+test('last price edit wins; units edits retain per-piece price and round total only', () => {
+  let draft = helpers.specialPresentationDraft({
+    quantity: 26,
+    unit_price: 140,
+  })
+  draft = helpers.updateSpecialPresentationDraft(draft, 'price', '3640')
+  assert.equal(draft.pricePerPiece, 140)
+  draft = helpers.updateSpecialPresentationDraft(draft, 'units', '27')
+  assert.equal(draft.price, 3780)
+  draft = helpers.updateSpecialPresentationDraft(
+    draft,
+    'pricePerPiece',
+    '140.125'
+  )
+  assert.equal(draft.price, 3783.38)
+  draft = helpers.updateSpecialPresentationDraft(draft, 'units', '3')
+  draft = helpers.updateSpecialPresentationDraft(draft, 'price', '100')
+  assert.equal(draft.pricePerPiece, 100 / 3)
+  assert.equal(helpers.buildSpecialPresentation(draft).snapshot.unit_price, 100)
+  draft = helpers.updateSpecialPresentationDraft(draft, 'units', '6')
+  assert.equal(draft.price, 200)
+})
+
+for (const [field, values] of Object.entries({
+  units: [0, 1.5, ''],
+  pricePerPiece: [-1, '', Infinity],
+  price: [-1, '', Infinity],
+})) {
+  for (const value of values)
+    test(`new special validation uses formal Spanish for ${field} ${value}`, () => {
+      const draft = helpers.updateSpecialPresentationDraft(
+        helpers.specialPresentationDraft({ quantity: 26, unit_price: 140 }),
+        field,
+        value
+      )
+      const result = helpers.buildSpecialPresentation(draft)
+      assert.equal(result.snapshot, null)
+      assert.match(result.errors[field], /Ingrese|Indique|Escriba/)
+    })
+}
+
+test('admin selector prefills actual line, recomputes both prices and confirms one package on apply', async () => {
+  const harness = await selectorHarness()
+  let chosen
+  const props = {
+    admin: true,
+    presentations: catalog,
+    selected: catalog[0],
+    item: {
+      quantity: 26,
+      unit_price: 140,
+      presentation_id: 'eight',
+      presentation_label: catalog[0].label,
+      units_per_presentation: 8,
+    },
+    onChange(row) {
+      chosen = row
+    },
+  }
+  button(harness.render(props), 'Paquete especial').props.onClick()
+  let tree = harness.render(props)
+  assert.equal(input(tree, 'Piezas en el paquete').props.value, 26)
+  assert.equal(input(tree, 'Precio por pieza (C$)').props.value, 140)
+  assert.equal(input(tree, 'Precio del paquete').props.value, 3640)
+  assert.match(text(tree), /1 paquete de 26 piezas × C\$140 = C\$3,640/)
+  input(tree, 'Precio del paquete').props.onChange({
+    target: { value: '3900' },
+  })
+  tree = harness.render(props)
+  assert.equal(input(tree, 'Precio por pieza (C$)').props.value, 150)
+  input(tree, 'Precio por pieza (C$)').props.onChange({
+    target: { value: '140' },
+  })
+  tree = harness.render(props)
+  assert.equal(input(tree, 'Precio del paquete').props.value, 3640)
+  button(tree, 'Aplicar paquete especial').props.onClick()
+  assert.equal(chosen.quantity, 1)
+  assert.equal(chosen.price, 3640)
+  assert.equal(chosen.units, 26)
+})
+
+test('order adapter forwards line context, preserves normal set quantity and warns without blocking special multiples', async () => {
+  const Selector = () => null
+  const Options = await loadComponent('OrderItemOptions', {
+    './ProductPresentationSelector': { __esModule: true, default: Selector },
+    './ProductDesignPicker': { __esModule: true, default: () => null },
+    '../utils/getImageUrl': { getImageUrl: (value) => value },
+    '../utils/productPresentations': helpers,
+  })
+  const item = {
+    quantity: 2,
+    unit_price: 3640,
+    presentation_label: 'Paquete especial de 26',
+    units_per_presentation: 26,
+  }
+  let changes
+  const tree = Options({
+    item,
+    product: { id: 'p', presentations: catalog },
+    onChange(value) {
+      changes = value
+    },
+  })
+  const selector = nodes(tree).find((node) => node.type === Selector)
+  assert.equal(selector.props.item, item)
+  assert.match(text(tree), /2 paquetes de 26 piezas = 52 piezas · C\$7,280/)
+  selector.props.onChange(catalog[0])
+  assert.equal(changes.quantity, undefined)
+  assert.ok(nodes(tree).every((node) => !node.props?.disabled))
+})
+
+test('detail formatter shows total pieces for special and catalog snapshots, leaving legacy items unchanged', () => {
+  assert.equal(
+    helpers.orderItemDetailLines({
+      quantity: 1,
+      presentation_label: 'Paquete especial de 26',
+      units_per_presentation: 26,
+    })[0],
+    '1 × Paquete especial de 26 (26 piezas)'
+  )
+  assert.equal(
+    helpers.orderItemDetailLines({
+      quantity: 2,
+      presentation_label: 'Set de 8 Esferas',
+      units_per_presentation: 8,
+    })[0],
+    '2 × Set de 8 Esferas (16 piezas)'
+  )
+  assert.deepEqual(
+    helpers.orderItemDetailLines({ product_name: 'Esfera', quantity: 26 }),
+    []
+  )
+  assert.deepEqual(
+    helpers.orderItemDetailLines({
+      quantity: 2,
+      presentation_label: 'Individual',
+      units_per_presentation: 1,
+    }),
+    ['Individual']
+  )
+})
+
+test('opening a new special draft uses the latest line quantity even when the selector was already mounted', async () => {
+  const harness = await selectorHarness()
+  const props = {
+    admin: true,
+    presentations: catalog,
+    selected: catalog[0],
+    item: {
+      quantity: 1,
+      unit_price: 140,
+      presentation_id: 'eight',
+      presentation_label: catalog[0].label,
+      units_per_presentation: 8,
+    },
+    onChange() {},
+  }
+  harness.render(props)
+  const latest = { ...props, item: { ...props.item, quantity: 26 } }
+  button(harness.render(latest), 'Paquete especial').props.onClick()
+  const tree = harness.render(latest)
+  assert.equal(input(tree, 'Piezas en el paquete').props.value, 26)
+  assert.equal(input(tree, 'Precio del paquete').props.value, 3640)
+})
+
+test('reopened generated special name still follows units while custom names remain fixed', () => {
+  let draft = helpers.specialPresentationDraft({
+    quantity: 1,
+    unit_price: 3640,
+    presentation_label: 'Paquete especial de 26',
+    units_per_presentation: 26,
+  })
+  assert.equal(draft.nameEdited, false)
+  draft = helpers.updateSpecialPresentationDraft(draft, 'units', '27')
+  assert.equal(draft.label, 'Paquete especial de 27')
 })

@@ -1,10 +1,14 @@
 import { getImageUrl } from '../utils/getImageUrl'
 import ProductPresentationSelector from './ProductPresentationSelector'
 import ProductDesignPicker from './ProductDesignPicker'
-import { presentationSnapshot } from '../utils/productPresentations'
+import {
+  presentationSnapshot,
+  specialPackageQuantityNote,
+} from '../utils/productPresentations'
 export default function OrderItemOptions({ item, product, onChange }) {
   const presentations = product?.presentations || []
   const designs = product?.designs || []
+  const quantityNote = specialPackageQuantityNote(item, presentations)
   if (
     !product &&
     !item.product_id &&
@@ -29,8 +33,22 @@ export default function OrderItemOptions({ item, product, onChange }) {
           admin
           presentations={presentations}
           selected={selected}
-          onChange={(row) => onChange({ ...presentationSnapshot(row) })}
+          item={item}
+          onChange={(row) =>
+            onChange({
+              ...presentationSnapshot(row),
+              ...(row.quantity === 1 ? { quantity: 1 } : {}),
+            })
+          }
         />
+      )}
+      {quantityNote && (
+        <p
+          role='status'
+          className='rounded-lg bg-amber-50 p-2 text-sm break-words text-amber-900'
+        >
+          {quantityNote}
+        </p>
       )}
       {(designs.length > 0 || item.designs?.length > 0) && (
         <ProductDesignPicker
