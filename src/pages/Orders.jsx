@@ -10,6 +10,8 @@ import useOrderDeepLink from '../hooks/useOrderDeepLink'
 import { getOrderChargeTotal, getPaymentSummary } from '../utils/orderPayments'
 import OrderItemOptions from '../components/OrderItemOptions'
 import PiecesToProducePanel from '../components/PiecesToProducePanel'
+import OrderProfitLine from '../components/OrderProfitLine'
+import useOrderCostQuotes from '../hooks/useOrderCostQuotes'
 import { piecesForItem, summarizePiecesToProduce } from '../utils/productionPieces'
 import { presentationSnapshot, orderItemOptions, orderItemDetailLines, escapePresentationHtml } from '../utils/productPresentations'
 import { useState, useEffect, useRef } from 'react'
@@ -110,6 +112,7 @@ export default function Orders() {
     businessId: currentBusinessId, products, catalogBusinessId, getSession: () => supabase.auth.getSession(),
   })
   const { formData, setFormData } = orderDraft
+  const costQuotes = useOrderCostQuotes(orders, showForm ? formData.items : [], currentBusinessId, Boolean(user && currentBusiness.slug === 'magicarte'))
   const threadImport = useThreadOrderImport((prefilled, thread) => {
     quoteRequest.current += 1
     setSourceQuote(null)
@@ -1558,6 +1561,10 @@ export default function Orders() {
                       </div>
                     </div>
 
+                    {currentBusiness.slug === 'magicarte' && (
+                      <OrderProfitLine order={order} quotesByProductId={costQuotes.data} loading={costQuotes.isFetching} error={costQuotes.error} />
+                    )}
+
                     {/* Products */}
                     <div className='mb-4 bg-gray-50 rounded-xl p-4'>
                       <p className='text-base font-semibold text-gray-700 mb-3'>Productos:</p>
@@ -2391,6 +2398,10 @@ export default function Orders() {
                         </div>
                       )}
                     </div>
+
+                    {currentBusiness.slug === 'magicarte' && (
+                      <OrderProfitLine order={{ order_items: formData.items }} quotesByProductId={costQuotes.data} loading={costQuotes.isFetching} error={costQuotes.error} />
+                    )}
 
                     {formData.items.length > 0 && (
                       <div className='mt-4 flex items-center justify-between bg-gradient-to-r from-[#51c879]/10 to-[#50bfe6]/10 px-4 py-3 rounded-xl'>

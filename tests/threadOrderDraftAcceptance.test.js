@@ -39,6 +39,7 @@ async function page(file, initial, imported = true, { failCreateOnce = false, fa
     if (name in imports) return imports[name]
     if (name.endsWith('/useThreadOrderDraft')) return { __esModule: true, default: () => ({ formData: form, setFormData(update) { form = typeof update === 'function' ? update(form) : update }, isImported: importActive, clear() { importActive = false }, cancelPending() {}, status: 'idle' }) }
     if (name.endsWith('/useThreadOrderImport')) return { __esModule: true, default: () => ({ clearImport() {}, completeConversion: async id => { calls.push(['completeConversion', id]); return true } }) }
+    if (name.endsWith('/useOrderCostQuotes')) return { __esModule: true, default: () => ({ data: {}, isFetching: false, error: null }) }
     if (name.endsWith('/useOrderDeepLink')) return { __esModule: true, default() {} }
     if (name.endsWith('/BusinessContext')) return { useBusiness: () => ({ currentBusinessId: 2, currentBusiness: { slug: 'hikari', name: 'Hikari' } }) }
     if (name.endsWith('/supabaseClient')) return { supabase: {} }

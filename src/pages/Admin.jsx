@@ -16,6 +16,7 @@ import ProductGallery from '../components/ProductGallery'
 import ProductVideoField from '../components/ProductVideoField'
 import ProductTextField from '../components/ProductTextField'
 import ProductMaterialPreset from '../components/ProductMaterialPreset'
+import ProductCostQuoteField from '../components/ProductCostQuoteField'
 import { storefrontProductPath } from '../utils/storefrontRoutes.js'
 import { productTextContext } from '../utils/productTextEnhance'
 import { useBusiness } from '../context/BusinessContext'
@@ -145,6 +146,7 @@ export default function Admin() {
       const productData = {
         ...formData,
         ...pricing,
+        calc_quote_id: formData.calc_quote_id || null,
         stock_quantity: parseInt(formData.stock_quantity),
         width: formData.width === '' ? null : parseFloat(formData.width),
         length: formData.length === '' ? null : parseFloat(formData.length),
@@ -155,7 +157,6 @@ export default function Admin() {
       if (editingProduct) {
         result = await updateProduct(editingProduct.id, productData)
       } else {
-        if (sourceQuote) productData.calc_quote_id = sourceQuote.id
         result = await createProduct(productData, currentBusinessId)
       }
 
@@ -219,6 +220,7 @@ export default function Admin() {
     setExistingQuoteProduct(null)
     setFromPhotoDraft(false)
     setFormData({
+      calc_quote_id: product.calc_quote_id || null,
       name: product.name || '',
       price: product.price ?? '',
       price_mode: productPriceDisplay(product).mode,
@@ -299,7 +301,7 @@ export default function Admin() {
         handledQuote.current = key
         resetProductOptions()
         setFromPhotoDraft(false)
-        setFormData(productFormFromQuote(quote))
+        setFormData({ ...productFormFromQuote(quote), calc_quote_id: quote.id })
         setEditingProduct(null)
         setGallery([])
         setSourceQuote(quote)
@@ -651,6 +653,13 @@ export default function Admin() {
                       <option value='quote'>A cotizar</option>
                     </select>
                   </div>
+
+                  {currentBusiness.slug === 'magicarte' && (
+                    <ProductCostQuoteField key={`${currentBusinessId}:${quoteRequest.current}:cost`}
+                      businessId={currentBusinessId} value={formData.calc_quote_id} initialQuote={sourceQuote}
+                      onChange={calc_quote_id => setFormData(current => ({ ...current, calc_quote_id }))}
+                      disabled={loading} />
+                  )}
 
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                     <div>

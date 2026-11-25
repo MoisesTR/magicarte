@@ -45,6 +45,7 @@ async function editor(file, { creating = false, insertError = null, deleteError 
     if (name === 'react-router-dom') return { useLocation: () => ({ pathname: '/admin/orders', search: '', hash: '' }), useNavigate: () => () => {} }
     if (name.endsWith('/useThreadOrderDraft')) return { __esModule: true, default: () => ({ formData: form, setFormData() {}, clear() {}, cancelPending() {}, isImported: false, status: 'idle' }) }
     if (name.endsWith('/useThreadOrderImport')) return { __esModule: true, default: () => ({ clearImport() {}, completeConversion: async id => calls.push(['conversion', id]) }) }
+    if (name.endsWith('/useOrderCostQuotes')) return { __esModule: true, default: () => ({ data: {}, isFetching: false, error: null }) }
     if (name.endsWith('/useOrderDeepLink')) return { __esModule: true, default() {} }
     if (name.endsWith('/BusinessContext')) return { useBusiness: () => ({ currentBusinessId: 2, currentBusiness: { name: 'Magic Arte', slug: 'magic-arte' } }) }
     if (name.endsWith('/supabaseClient')) return { supabase: {} }
