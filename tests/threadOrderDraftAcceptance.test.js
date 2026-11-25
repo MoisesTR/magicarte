@@ -5,6 +5,7 @@ import { transform } from 'esbuild'
 import { createRequire } from 'node:module'
 import { threadOrderPrefill } from '../src/utils/whatsappFeed.js'
 import * as presentations from '../src/utils/productPresentations.js'
+import * as productionPieces from '../src/utils/productionPieces.js'
 import * as quoteForms from '../src/utils/quoteForms.js'
 import * as payments from '../src/utils/orderPayments.js'
 import * as clientLink from '../src/utils/orderClientLink.js'
@@ -48,6 +49,7 @@ async function page(file, initial, imported = true, { failCreateOnce = false, fa
     if (name.endsWith('/data/clients')) return new Proxy({}, { get: (_, method) => async (...args) => { calls.push([method, ...args]); if (failClientLink) return { data: null, error: new Error('Client unavailable') }; return { data: method === 'createClientReturning' ? { id: 'client' } : null, error: null } } })
     if (name.includes('/data/')) return new Proxy({}, { get: (_, method) => mutation(method) })
     if (name.endsWith('/productPresentations')) return presentations
+    if (name.endsWith('/productionPieces')) return productionPieces
     if (name.endsWith('/quoteForms')) return quoteForms
     if (name.endsWith('/orderPayments')) return payments
     if (name.endsWith('/orderDraftFromThread')) return require('../src/utils/orderDraftFromThread.js')

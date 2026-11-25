@@ -9,6 +9,8 @@ import ThreadConversionNotice from '../components/ThreadConversionNotice'
 import useOrderDeepLink from '../hooks/useOrderDeepLink'
 import { getOrderChargeTotal, getPaymentSummary } from '../utils/orderPayments'
 import OrderItemOptions from '../components/OrderItemOptions'
+import PiecesToProducePanel from '../components/PiecesToProducePanel'
+import { piecesForItem, summarizePiecesToProduce } from '../utils/productionPieces'
 import { presentationSnapshot, orderItemOptions, orderItemDetailLines, escapePresentationHtml } from '../utils/productPresentations'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../config/supabaseClient'
@@ -64,6 +66,22 @@ export default function Orders() {
   const [sortBy, setSortBy] = useState('created_at')
   const [selectedOrders, setSelectedOrders] = useState(new Set())
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('ordersViewMode') || 'list')
+  const [showPiecesToProduce, setShowPiecesToProduce] = useState(() => {
+    try {
+      return localStorage.getItem('ordersPiecesToProduceOpen') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const togglePiecesToProduce = () => {
+    const next = !showPiecesToProduce
+    setShowPiecesToProduce(next)
+    try {
+      localStorage.setItem('ordersPiecesToProduceOpen', String(next))
+    } catch {
+      // Keep the toggle usable when browser storage is unavailable.
+    }
+  }
   const [filterMonth, setFilterMonth] = useState(currentMonth)
   const [filterDelivery, setFilterDelivery] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -1002,6 +1020,8 @@ export default function Orders() {
     return 0
   })
 
+  const productionSummary = summarizePiecesToProduce(filteredOrders)
+
   // Count deliveries per weekday using all filters except selectedDay
   const weekDayCounts = (() => {
     const base = orders.filter(order => {
@@ -1340,6 +1360,20 @@ export default function Orders() {
               </div>
             ) : viewMode === 'board' ? (
               /* Kanban Board */
+              <div className='min-w-0 space-y-3'>
+                <div className='flex justify-end'>
+                  <button
+                    type='button'
+                    onClick={togglePiecesToProduce}
+                    aria-expanded={showPiecesToProduce}
+                    aria-controls='pieces-to-produce-panel'
+                    className={`inline-flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${showPiecesToProduce ? 'bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    Piezas por producir
+                    <span className='rounded-full bg-black/5 px-2 py-0.5 text-xs font-bold'>{productionSummary.totalPieces}</span>
+                  </button>
+                </div>
+                {showPiecesToProduce && <PiecesToProducePanel summary={productionSummary} />}
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
                 {[
                   { key: 'pending',     label: 'Pendiente',           dot: 'bg-yellow-400', headerBg: 'bg-yellow-50',  textColor: 'text-yellow-800', border: 'border-yellow-100', badgeBg: 'bg-yellow-100' },
@@ -1377,6 +1411,7 @@ export default function Orders() {
                           <p className='text-center text-gray-400 text-xs py-8'>Sin pedidos</p>
                         )}
                         {colOrders.map(order => {
+                          const orderPieces = (order.order_items || []).reduce((sum, item) => sum + piecesForItem(item), 0)
                           const countdown = getDeliveryCountdown(order.estimated_delivery_date, order.status)
                           const paySummary = getPaymentSummary(order.order_payments, getOrderChargeTotal(order))
                           const payMethodsUsed = [...new Set((order.order_payments || []).map(p => p.method))]
@@ -1395,8 +1430,9 @@ export default function Orders() {
                                   {priorityLabels[order.priority]}
                                 </span>
                               </div>
-                              <div className='text-xs text-gray-400 mb-2'>
+                              <div className='text-xs text-gray-400 mb-2 truncate'>
                                 {order.order_items?.length || 0} producto{(order.order_items?.length || 0) !== 1 ? 's' : ''}
+                                {orderPieces !== (order.order_items?.length || 0) && <><span className='mx-1'>·</span>{`${orderPieces} piezas`}</>}
                                 <span className='mx-1'>·</span>
                                 <span className='font-medium text-gray-600'>{moneyNIO(parseFloat(order.total_amount))}</span>
                               </div>
@@ -1429,6 +1465,7 @@ export default function Orders() {
                     </div>
                   )
                 })}
+              </div>
               </div>
             ) : (
               <div className='space-y-4'>
