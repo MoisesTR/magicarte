@@ -1,3 +1,5 @@
+import WhatsAppCatalog from '../components/WhatsAppCatalog'
+import { toggleCatalogSelection } from '../utils/whatsappCatalog.js'
 import ProductOptionsEditor from '../components/ProductOptionsEditor'
 import { useProductOptionsEditor } from '../hooks/useProductOptions'
 import { useState, useEffect, useRef } from 'react'
@@ -45,6 +47,12 @@ export default function Admin() {
   const [user, setUser] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [products, setProducts] = useState([])
+  const [catalogMode, setCatalogMode] = useState(false)
+  const [catalogSelectedIds, setCatalogSelectedIds] = useState([])
+  useEffect(() => {
+    setCatalogMode(false)
+    setCatalogSelectedIds([])
+  }, [currentBusinessId])
   const [showForm, setShowForm] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -354,6 +362,7 @@ export default function Admin() {
               <p className='text-gray-500 text-sm mt-1'>{currentBusiness?.name} · {user.email}</p>
             </div>
             <div className='flex flex-wrap gap-2'>
+              <button type='button' disabled={catalogMode || loadingProducts} onClick={() => { setCatalogSelectedIds([]); setConfirmDeleteId(null); setCatalogMode(true) }} className='min-h-11 rounded-xl border border-[#237a42] px-4 py-2.5 text-sm font-semibold text-[#237a42] disabled:opacity-50'>Crear catálogo</button>
               <button
                 onClick={() => { resetForm(); setShowForm(true) }}
                 className='bg-gradient-to-r from-[#51c879] to-[#50bfe6] text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm'
@@ -491,8 +500,9 @@ export default function Admin() {
                     <span className='bg-gray-800/80 text-white text-xs font-semibold px-2 py-1 rounded-lg'>Oculto</span>
                   </div>
                 )}
+                {catalogMode && <label className='absolute bottom-2 left-2 right-2 flex min-h-11 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow'><input type='checkbox' checked={catalogSelectedIds.includes(product.id)} onChange={() => setCatalogSelectedIds(previous => toggleCatalogSelection(previous, product.id))} className='h-5 w-5 shrink-0 accent-[#237a42]' /><span className='min-w-0 break-words'>Seleccionar {product.name}</span></label>}
                 {/* Inline delete confirmation */}
-                {confirmDeleteId === product.id ? (
+                {!catalogMode && (confirmDeleteId === product.id ? (
                   <div className='absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3 rounded-t-2xl'>
                     <p className='text-white font-semibold text-sm'>¿Eliminar este producto?</p>
                     <div className='flex gap-2'>
@@ -543,7 +553,7 @@ export default function Admin() {
                       🗑️
                     </button>
                   </div>
-                )}
+                ))}
               </div>
               <div className='p-4'>
                 <h3 className='font-semibold text-gray-800 mb-1 line-clamp-1'>{product.name}</h3>
@@ -559,6 +569,8 @@ export default function Admin() {
             </div>
           ))}
         </div>
+
+        {catalogMode && <WhatsAppCatalog key={currentBusinessId} products={products} visibleProducts={filteredProducts} selectedIds={catalogSelectedIds} onSelectionChange={setCatalogSelectedIds} onCancel={() => { setCatalogMode(false); setCatalogSelectedIds([]) }} businessId={currentBusinessId} />}
 
         {/* Category Manager Modal */}
         <CategoryManager 
