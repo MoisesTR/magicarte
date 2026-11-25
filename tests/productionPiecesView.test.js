@@ -96,3 +96,11 @@ test('board card renders pieces between product count and price only when they d
     assert.match(html, /truncate/)
   }
 })
+
+test('board cards show the order number next to the client name', async () => {
+  const source = await ordersSource()
+  const start = source.indexOf('/* Kanban Board */')
+  const end = source.indexOf("<div className='space-y-4'>", start)
+  const board = source.slice(start, end)
+  assert.match(board, /#\{order\.order_number\}[\s\S]{0,200}\{displayName\(order\)\}/)
+})

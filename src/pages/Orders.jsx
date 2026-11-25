@@ -1425,7 +1425,10 @@ export default function Orders() {
                               onClick={() => editOrder(order)}
                             >
                               <div className='flex items-start justify-between gap-1 mb-1.5'>
-                                <span className='font-semibold text-sm text-gray-800 leading-tight'>{displayName(order)}</span>
+                                <span className='font-semibold text-sm text-gray-800 leading-tight min-w-0'>
+                                  <span className='text-gray-400 font-medium mr-1'>#{order.order_number}</span>
+                                  {displayName(order)}
+                                </span>
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${getPriorityColor(order.priority)}`}>
                                   {priorityLabels[order.priority]}
                                 </span>
