@@ -826,7 +826,6 @@ export default function Orders() {
             ? `<div class="section-title">Dirección de Entrega</div><div class="detail">${order.delivery_address}</div>`
             : ''
         }
-        ${order.notes ? `<div class="notes">${order.notes}</div>` : ''}
         <div class="footer-row">
           <div class="thanks">¡Gracias por su compra! ✨</div>
           <div class="qr-wrap">
@@ -860,7 +859,6 @@ export default function Orders() {
   .qty { }
   .detail { font-size: 11px; text-align: center; margin-top: 1px; }
   .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
-  .notes { font-size: 10px; text-align: center; margin-top: 2px; font-style: italic; }
   .footer-row { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 3px; }
   .thanks { font-size: 10px; font-style: italic; }
   .qr-wrap { text-align: center; flex-shrink: 0; }
@@ -898,7 +896,6 @@ export default function Orders() {
             ? `<div class="section-title">Dirección de Entrega</div><div class="detail">${order.delivery_address}</div>`
             : ''
         }
-        ${order.notes ? `<div class="notes">${order.notes}</div>` : ''}
         <div class="qr-section">
           <img class="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://magicarte.net" alt="QR" />
           <div class="qr-label">magicarte.net</div>
@@ -929,7 +926,6 @@ export default function Orders() {
   .items { margin-top: 4px; width: 100%; }
   .item { font-size: 16px; line-height: 1.6; }
   .detail { font-size: 14px; text-align: center; margin-top: 4px; }
-  .notes { font-size: 13px; text-align: center; margin-top: 6px; font-style: italic; }
   .qr-section { text-align: center; margin-top: auto; padding-top: 12px; }
   .qr { width: 100px; height: 100px; }
   .qr-label { font-size: 11px; margin-top: 4px; letter-spacing: 0.5px; color: #333; }
