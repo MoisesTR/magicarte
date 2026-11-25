@@ -56,14 +56,12 @@ export function fetchPublicProductOptions(productId) {
   return fetchProductOptions(productId, null, true)
 }
 // Shared React Query consumers use this batch rather than issuing a request per card.
-export async function fetchPublicPresentations(businessId, productIds) {
-  if (productIds && !productIds.length) return { data: [], error: null }
+export async function fetchPublicPresentations(businessId) {
   let query = supabase
     .from('product_presentations')
     .select('*')
     .eq('is_active', true)
   if (businessId != null) query = query.eq('business_id', businessId)
-  if (productIds) query = query.in('product_id', productIds)
   const result = await query
   if (isMissingPresentationSchema(result.error))
     return { data: [], error: null, available: false }

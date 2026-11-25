@@ -262,24 +262,3 @@ test('new option writes cannot swallow validation or database errors', async () 
     error
   )
 })
-
-test('catalog export can scope the existing active read-only batch to selected products', async () => {
-  const client = mockClient([{ data: [] }])
-  const api = await dataWithClient(client)
-  await api.fetchPublicPresentations(2, ['a', 'b'])
-  assert.deepEqual(client.requests[0].filters, [
-    ['is_active', true],
-    ['business_id', 2],
-    ['product_id', ['a', 'b']],
-  ])
-  assert.equal(client.requests.length, 1)
-  assert.equal(client.requests[0].insert, undefined)
-  assert.equal(client.requests[0].upsert, undefined)
-  assert.equal(client.requests[0].delete, undefined)
-})
-test('empty catalog selection returns no presentations without issuing a query', async () => {
-  const client = mockClient([])
-  const api = await dataWithClient(client)
-  assert.deepEqual(await api.fetchPublicPresentations(2, []), { data: [], error: null })
-  assert.equal(client.requests.length, 0)
-})
