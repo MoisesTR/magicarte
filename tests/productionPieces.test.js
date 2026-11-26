@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { piecesForItem, summarizePiecesToProduce } from '../src/utils/productionPieces.js'
+import { describePieceKey, orderHasPieceKey, pieceKeyForItem, piecesForItem, piecesInOrderForKey, summarizePiecesToProduce } from '../src/utils/productionPieces.js'
 
 const item = (overrides = {}) => ({ product_id: 'sphere', product_name: 'Esfera Pokémon', quantity: 1, units_per_presentation: 6, ...overrides })
 const order = (order_number, order_items, status = 'pending') => ({ id: `order-${order_number}`, order_number, order_items, status })
@@ -75,4 +75,51 @@ test('summary sorts descending, deduplicates numeric order numbers, and only cou
 test('summary handles empty input', () => {
   assert.deepEqual(summarizePiecesToProduce([]), { rows: [], totalPieces: 0, orderCount: 0 })
   assert.deepEqual(summarizePiecesToProduce(), { rows: [], totalPieces: 0, orderCount: 0 })
+})
+
+test('pieceKeyForItem uses the product id for linked items and a normalized name otherwise', () => {
+  assert.equal(pieceKeyForItem(item()), 'product:sphere')
+  assert.equal(pieceKeyForItem(item({ product_id: 42 })), 'product:42')
+  assert.equal(pieceKeyForItem(item({ product_id: null, product_name: '  Esfera PokÉmon  ' })), 'name:esfera pokemon')
+  assert.equal(pieceKeyForItem(item({ product_id: '', product_name: 'ÁRBOL Navideño' })), 'name:arbol navideno')
+  assert.equal(pieceKeyForItem({ product_id: null, product_name: '  ' }), 'name:producto sin nombre')
+  assert.equal(pieceKeyForItem(), 'name:producto sin nombre')
+})
+
+test('summary row keys match pieceKeyForItem for the same items', () => {
+  const items = [item(), item({ product_id: null, product_name: ' Taza Mágica ' })]
+  const summary = summarizePiecesToProduce([order(1, items)])
+  assert.deepEqual(summary.rows.map(row => row.key).sort(), items.map(pieceKeyForItem).sort())
+})
+
+test('orderHasPieceKey matches linked and unlinked items and tolerates missing data', () => {
+  const mixed = order(5, [item({ product_id: 'mug' }), item({ product_id: null, product_name: 'Esfera Pokémon' })], 'completed')
+  assert.equal(orderHasPieceKey(mixed, 'product:mug'), true)
+  assert.equal(orderHasPieceKey(mixed, 'name:esfera pokemon'), true)
+  assert.equal(orderHasPieceKey(mixed, 'product:sphere'), false)
+  assert.equal(orderHasPieceKey(mixed, 'name:mug'), false)
+  assert.equal(orderHasPieceKey({}, 'product:mug'), false)
+  assert.equal(orderHasPieceKey(mixed, null), false)
+  assert.equal(orderHasPieceKey(undefined, 'product:mug'), false)
+})
+
+test('piecesInOrderForKey sums pieces of matching items including units per presentation', () => {
+  const mixed = order(6, [
+    item({ quantity: 2, units_per_presentation: 6 }),
+    item({ quantity: 1, units_per_presentation: null }),
+    item({ product_id: 'mug', quantity: 4 }),
+  ])
+  assert.equal(piecesInOrderForKey(mixed, 'product:sphere'), 13)
+  assert.equal(piecesInOrderForKey(mixed, 'product:mug'), 24)
+  assert.equal(piecesInOrderForKey(mixed, 'product:none'), 0)
+  assert.equal(piecesInOrderForKey({}, 'product:sphere'), 0)
+})
+
+test('describePieceKey prefers the summary row, then order items, then a generic label', () => {
+  const summary = { rows: [{ key: 'product:sphere', name: 'Esfera actual', pieces: 38 }] }
+  const orders = [order(1, [item({ product_id: 'mug', products: { name: 'Taza catálogo' }, product_name: 'Taza vieja' })], 'ready')]
+  assert.deepEqual(describePieceKey('product:sphere', summary, orders), { name: 'Esfera actual', pieces: 38 })
+  assert.deepEqual(describePieceKey('product:mug', summary, orders), { name: 'Taza catálogo', pieces: 0 })
+  assert.deepEqual(describePieceKey('product:gone', summary, orders), { name: 'Producto seleccionado', pieces: 0 })
+  assert.deepEqual(describePieceKey('product:gone'), { name: 'Producto seleccionado', pieces: 0 })
 })

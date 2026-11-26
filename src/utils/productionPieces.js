@@ -10,6 +10,35 @@ export function piecesForItem(item = {}) {
   return selectionTotals(quantity, Number.isFinite(units) && units > 0 ? units : 1).required
 }
 
+const isLinked = item => item.product_id != null && item.product_id !== ''
+const catalogNameForItem = item => (isLinked(item) ? item.products?.name?.trim() : '') || ''
+const nameForItem = item => catalogNameForItem(item) || item.product_name?.trim() || 'Producto sin nombre'
+
+// Stable grouping key: catalog products by id, unlinked items by accent/case-insensitive name.
+export function pieceKeyForItem(item = {}) {
+  return isLinked(item) ? `product:${item.product_id}` : `name:${normalizedName(nameForItem(item))}`
+}
+
+export function orderHasPieceKey(order, key) {
+  if (!key) return false
+  return (order?.order_items || []).some(item => pieceKeyForItem(item) === key)
+}
+
+export function piecesInOrderForKey(order, key) {
+  return (order?.order_items || []).reduce((sum, item) => (pieceKeyForItem(item) === key ? sum + piecesForItem(item) : sum), 0)
+}
+
+// Label for a selected key, even when it no longer appears in the current summary.
+export function describePieceKey(key, summary = { rows: [] }, orders = []) {
+  const row = summary.rows?.find(candidate => candidate.key === key)
+  if (row) return { name: row.name, pieces: row.pieces }
+  for (const order of orders) {
+    const item = (order.order_items || []).find(candidate => pieceKeyForItem(candidate) === key)
+    if (item) return { name: nameForItem(item), pieces: 0 }
+  }
+  return { name: 'Producto seleccionado', pieces: 0 }
+}
+
 export function summarizePiecesToProduce(orders = [], { statuses = PRODUCTION_STATUSES } = {}) {
   const rows = new Map()
   const contributingOrders = new Set()
@@ -20,10 +49,10 @@ export function summarizePiecesToProduce(orders = [], { statuses = PRODUCTION_ST
     for (const item of order.order_items || []) {
       const pieces = piecesForItem(item)
       if (!pieces) continue
-      const linked = item.product_id != null && item.product_id !== ''
-      const catalogName = linked ? item.products?.name?.trim() : ''
-      const name = catalogName || item.product_name?.trim() || 'Producto sin nombre'
-      const key = linked ? `product:${item.product_id}` : `name:${normalizedName(name)}`
+      const linked = isLinked(item)
+      const catalogName = catalogNameForItem(item)
+      const name = nameForItem(item)
+      const key = pieceKeyForItem(item)
       if (!rows.has(key)) rows.set(key, { key, name, pieces: 0, orderNumbers: new Set(), linked })
       const row = rows.get(key)
       if (catalogName) row.name = catalogName

@@ -12,7 +12,7 @@ import OrderItemOptions from '../components/OrderItemOptions'
 import PiecesToProducePanel from '../components/PiecesToProducePanel'
 import OrderProfitLine from '../components/OrderProfitLine'
 import useOrderCostQuotes from '../hooks/useOrderCostQuotes'
-import { piecesForItem, summarizePiecesToProduce } from '../utils/productionPieces'
+import { describePieceKey, orderHasPieceKey, piecesForItem, piecesInOrderForKey, summarizePiecesToProduce } from '../utils/productionPieces'
 import { presentationSnapshot, orderItemOptions, orderItemDetailLines, escapePresentationHtml } from '../utils/productPresentations'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../config/supabaseClient'
@@ -75,9 +75,11 @@ export default function Orders() {
       return false
     }
   })
+  const [selectedPieceKey, setSelectedPieceKey] = useState(null)
   const togglePiecesToProduce = () => {
     const next = !showPiecesToProduce
     setShowPiecesToProduce(next)
+    if (!next) setSelectedPieceKey(null)
     try {
       localStorage.setItem('ordersPiecesToProduceOpen', String(next))
     } catch {
@@ -1020,6 +1022,7 @@ export default function Orders() {
   })
 
   const productionSummary = summarizePiecesToProduce(filteredOrders)
+  const selectedPiece = selectedPieceKey ? describePieceKey(selectedPieceKey, productionSummary, filteredOrders) : null
 
   // Count deliveries per weekday using all filters except selectedDay
   const weekDayCounts = (() => {
@@ -1372,7 +1375,17 @@ export default function Orders() {
                     <span className='rounded-full bg-black/5 px-2 py-0.5 text-xs font-bold'>{productionSummary.totalPieces}</span>
                   </button>
                 </div>
-                {showPiecesToProduce && <PiecesToProducePanel summary={productionSummary} />}
+                {showPiecesToProduce && <PiecesToProducePanel summary={productionSummary} selectedKey={selectedPieceKey} onSelect={setSelectedPieceKey} />}
+                {selectedPiece && (
+                  <div className='flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-[#51c879] bg-green-50 px-3 py-2'>
+                    <p className='min-w-0 flex-1 basis-48 text-sm text-gray-700 [overflow-wrap:anywhere]'>
+                      {`Mostrando pedidos con: ${selectedPiece.name} · ${selectedPiece.pieces} piezas`}
+                    </p>
+                    <button type='button' onClick={() => setSelectedPieceKey(null)} className='min-h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'>
+                      Quitar filtro
+                    </button>
+                  </div>
+                )}
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
                 {[
                   { key: 'pending',     label: 'Pendiente',           dot: 'bg-yellow-400', headerBg: 'bg-yellow-50',  textColor: 'text-yellow-800', border: 'border-yellow-100', badgeBg: 'bg-yellow-100' },
@@ -1381,7 +1394,7 @@ export default function Orders() {
                   { key: 'ready',       label: 'Listo para Entregar', dot: 'bg-teal-400',   headerBg: 'bg-teal-50',    textColor: 'text-teal-800',   border: 'border-teal-100',   badgeBg: 'bg-teal-100'   }
                 ].map(col => {
                   const colOrders = filteredOrders
-                    .filter(o => o.status === col.key)
+                    .filter(o => o.status === col.key && (!selectedPieceKey || orderHasPieceKey(o, selectedPieceKey)))
                     .sort((a, b) => {
                       const priorityOrder = { urgent: 0, normal: 1, low: 2 }
                       const pDiff = (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1)
@@ -1438,6 +1451,9 @@ export default function Orders() {
                                 <span className='mx-1'>·</span>
                                 <span className='font-medium text-gray-600'>{moneyNIO(parseFloat(order.total_amount))}</span>
                               </div>
+                              {selectedPieceKey && (
+                                <p className='-mt-1 mb-2 text-xs text-gray-500'>{`${piecesInOrderForKey(order, selectedPieceKey)} piezas de este producto`}</p>
+                              )}
                               <div className='flex items-center justify-between gap-1 flex-wrap'>
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${getPaymentColor(paySummary.status)}`}>
                                   {paymentStatusLabels[paySummary.status]}

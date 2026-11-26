@@ -16,10 +16,20 @@ async function component(source) {
   return module.exports.default
 }
 
-async function panel(summary) {
-  const source = await readFile(new URL('../src/components/PiecesToProducePanel.jsx', import.meta.url), 'utf8')
-  const Panel = await component(source)
-  return renderToStaticMarkup(React.createElement(Panel, { summary }))
+const panelComponent = async () => component(await readFile(new URL('../src/components/PiecesToProducePanel.jsx', import.meta.url), 'utf8'))
+
+async function panel(summary, props = {}) {
+  const Panel = await panelComponent()
+  return renderToStaticMarkup(React.createElement(Panel, { summary, ...props }))
+}
+
+function findButtons(node, found = []) {
+  if (Array.isArray(node)) node.forEach(child => findButtons(child, found))
+  else if (node && typeof node === 'object' && node.props) {
+    if (node.type === 'button') found.push(node)
+    findButtons(node.props.children, found)
+  }
+  return found
 }
 
 test('production toggle and panel are only in the board branch and summarize the same filtered orders', async () => {
@@ -51,11 +61,13 @@ test('toggle defaults closed, persists its state, and survives localStorage fail
   for (const open of [false, true]) {
     let state
     const saved = []
-    const run = new Function('showPiecesToProduce', 'setShowPiecesToProduce', 'localStorage', toggle)
-    run(open, value => { state = value }, { setItem: (...args) => saved.push(args) })
+    const run = new Function('showPiecesToProduce', 'setShowPiecesToProduce', 'localStorage', 'setSelectedPieceKey', toggle)
+    const cleared = []
+    run(open, value => { state = value }, { setItem: (...args) => saved.push(args) }, value => cleared.push(value))
     assert.equal(state, !open)
     assert.deepEqual(saved, [['ordersPiecesToProduceOpen', String(!open)]])
-    assert.doesNotThrow(() => run(open, value => { state = value }, { setItem() { throw new Error('denied') } }))
+    assert.deepEqual(cleared, open ? [null] : [], 'closing the panel clears the board product filter')
+    assert.doesNotThrow(() => run(open, value => { state = value }, { setItem() { throw new Error('denied') } }, () => {}))
     assert.equal(state, !open)
   }
 })
@@ -103,4 +115,53 @@ test('board cards show the order number next to the client name', async () => {
   const end = source.indexOf("<div className='space-y-4'>", start)
   const board = source.slice(start, end)
   assert.match(board, /#\{order\.order_number\}[\s\S]{0,200}\{displayName\(order\)\}/)
+})
+
+const selectionSummary = { rows: [
+  { key: 'product:sphere', name: 'Esfera Pokémon', pieces: 38, orderNumbers: [97, 98], linked: true },
+  { key: 'name:manual', name: 'Producto manual', pieces: 2, orderNumbers: [104], linked: false },
+], totalPieces: 40, orderCount: 3 }
+
+test('panel rows are full-width touch buttons with aria-pressed reflecting the selection', async () => {
+  const html = await panel(selectionSummary, { selectedKey: 'name:manual', onSelect() {} })
+  const buttons = html.match(/<button[^>]*>/g) || []
+  assert.equal(buttons.length, 2)
+  for (const button of buttons) {
+    assert.match(button, /type="button"/)
+    assert.match(button, /w-full/)
+    assert.match(button, /min-h-11/)
+  }
+  assert.match(buttons[0], /aria-pressed="false"/)
+  assert.match(buttons[1], /aria-pressed="true"/)
+  assert.match(buttons[1], /bg-green-50/)
+  assert.doesNotMatch(buttons[0], /bg-green-50/)
+  assert.doesNotMatch(html, /<button[^>]*>(?:(?!<\/button>)[\s\S])*<(?:p|div)[\s>]/, 'buttons only contain phrasing content')
+})
+
+test('tapping a row selects it and tapping the selected row clears the selection', async () => {
+  const Panel = await panelComponent()
+  const calls = []
+  const [first, second] = findButtons(Panel({ summary: selectionSummary, selectedKey: 'product:sphere', onSelect: key => calls.push(key) }))
+  first.props.onClick()
+  second.props.onClick()
+  assert.deepEqual(calls, [null, 'name:manual'])
+  assert.doesNotThrow(() => findButtons(Panel({ summary: selectionSummary }))[0].props.onClick())
+})
+
+test('board filters every column by the selected product and shows the filter bar and per-card pieces', async () => {
+  const source = await ordersSource()
+  const start = source.indexOf('/* Kanban Board */')
+  const end = source.indexOf("<div className='space-y-4'>", start)
+  const board = source.slice(start, end)
+  assert.match(source, /const \[selectedPieceKey, setSelectedPieceKey\] = useState\(null\)/)
+  assert.match(board, /selectedKey=\{selectedPieceKey\}/)
+  assert.match(board, /onSelect=\{setSelectedPieceKey\}/)
+  assert.match(board, /o\.status === col\.key && \(!selectedPieceKey \|\| orderHasPieceKey\(o, selectedPieceKey\)\)/)
+  assert.match(board, /Mostrando pedidos con:/)
+  assert.match(board, /Quitar filtro/)
+  assert.match(board, /onClick=\{\(\) => setSelectedPieceKey\(null\)\}/)
+  assert.match(board, /piecesInOrderForKey\(order, selectedPieceKey\)/)
+  assert.match(board, /piezas de este producto/)
+  const list = source.slice(end)
+  assert.doesNotMatch(list, /selectedPieceKey/, 'list view is unchanged')
 })
