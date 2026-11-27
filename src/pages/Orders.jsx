@@ -1112,15 +1112,33 @@ export default function Orders() {
           <>
             {/* Week Calendar */}
             <div className='bg-white rounded-2xl shadow-soft p-4 mb-5'>
-              <div className='flex items-center justify-between mb-3'>
+              <div className='flex flex-wrap items-center justify-between gap-2 mb-3'>
                 <h3 className='text-sm font-semibold text-gray-500 uppercase tracking-wide'>Entregas esta semana</h3>
                 {selectedDay && (
-                  <button
-                    onClick={() => setSelectedDay(null)}
-                    className='text-xs px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg font-medium transition-colors'
-                  >
-                    Quitar filtro
-                  </button>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    {filteredOrders.length > 0 && (
+                      <>
+                        <button
+                          onClick={() => printLabels(filteredOrders)}
+                          className='text-xs px-2.5 py-1 bg-gray-700 text-white hover:bg-gray-800 rounded-lg font-semibold transition-colors'
+                        >
+                          🖨️ Día 4×2 ({filteredOrders.length})
+                        </button>
+                        <button
+                          onClick={() => printLabels4x6(filteredOrders)}
+                          className='text-xs px-2.5 py-1 bg-gray-700 text-white hover:bg-gray-800 rounded-lg font-semibold transition-colors'
+                        >
+                          🖨️ Día 4×6 ({filteredOrders.length})
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setSelectedDay(null)}
+                      className='text-xs px-2.5 py-1 bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg font-medium transition-colors'
+                    >
+                      Quitar filtro
+                    </button>
+                  </div>
                 )}
               </div>
               <div className='grid grid-cols-7 gap-2'>
